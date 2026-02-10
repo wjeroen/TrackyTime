@@ -1,81 +1,94 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/overlayRoot"
-    android:layout_width="280dp"
-    android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="10dp">
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
 
-    <!-- Top bar: drag handle + timer + buttons -->
-    <LinearLayout
+    <!-- Background layer (opacity applies ONLY here) -->
+    <View
+        android:id="@+id/overlayBg"
         android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Content layer (always fully visible) -->
+    <LinearLayout
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:orientation="vertical"
+        android:paddingLeft="12dp"
+        android:paddingRight="12dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="2dp">
 
-        <!-- Drag area (handle + timer) -->
+        <!-- Single row: activity text left, time right -->
         <LinearLayout
-            android:id="@+id/dragArea"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_weight="1"
+            android:id="@+id/contentRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingLeft="4dp"
-            android:paddingRight="8dp">
+            android:gravity="center_vertical">
 
-            <TextView
-                android:id="@+id/dragIcon"
+            <!-- Activity name (tap to edit) -->
+            <EditText
+                android:id="@+id/activityInput"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="⠿"
-                android:textSize="20sp"
-                android:paddingRight="10dp" />
+                android:hint="tap to start"
+                android:singleLine="true"
+                android:imeOptions="actionDone"
+                android:inputType="text"
+                android:background="@android:color/transparent"
+                android:textSize="14sp"
+                android:minWidth="72dp"
+                android:maxWidth="200dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:paddingLeft="0dp"
+                android:paddingRight="4dp"
+                android:fontFamily="sans-serif" />
 
+            <!-- Separator (shown when timer is visible) -->
+            <TextView
+                android:id="@+id/separator"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" · "
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+            <!-- Timer (tap to pause/resume) -->
             <TextView
                 android:id="@+id/timerText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="00:00:00"
-                android:textSize="20sp"
-                android:fontFamily="monospace" />
+                android:text="00:00"
+                android:textSize="14sp"
+                android:fontFamily="monospace"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:paddingLeft="4dp"
+                android:paddingRight="0dp"
+                android:visibility="gone" />
         </LinearLayout>
 
-        <Button
-            android:id="@+id/playPauseBtn"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:text="▶"
-            android:textSize="18sp"
-            android:padding="0dp"
-            android:minWidth="0dp"
-            android:minHeight="0dp"
-            android:layout_marginLeft="4dp" />
+        <!-- Thin accent line at bottom -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="3dp"
+            android:layout_marginTop="2dp">
 
-        <Button
-            android:id="@+id/resetBtn"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:text="↺"
-            android:textSize="18sp"
-            android:padding="0dp"
-            android:minWidth="0dp"
-            android:minHeight="0dp"
-            android:visibility="gone"
-            android:layout_marginLeft="4dp" />
+            <!-- Track (faint) -->
+            <View
+                android:id="@+id/progressTrack"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <!-- Active bar (visible while running) -->
+            <View
+                android:id="@+id/progressBar"
+                android:layout_width="0dp"
+                android:layout_height="match_parent" />
+        </FrameLayout>
+
     </LinearLayout>
-
-    <!-- Activity name input -->
-    <EditText
-        android:id="@+id/activityInput"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Activity..."
-        android:singleLine="true"
-        android:imeOptions="actionDone"
-        android:inputType="text"
-        android:layout_marginTop="6dp"
-        android:padding="10dp"
-        android:textSize="14sp"
-        android:background="#22FFFFFF" />
-</LinearLayout>
+</FrameLayout>

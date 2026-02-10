@@ -251,7 +251,8 @@ public class MainActivity extends Activity {
 
             final int c = color;
             sw.setOnClickListener(v -> {
-                dbHelper.updateColor(entry.getId(), c);
+                // Update ALL entries with this name so colors stay consistent
+                dbHelper.updateColorByName(entry.getName(), c);
                 loadData();
                 dialog.dismiss();
             });
@@ -282,7 +283,7 @@ public class MainActivity extends Activity {
         // Opacity
         addSpacer(layout, 14);
         TextView opLabel = new TextView(this);
-        opLabel.setText("Opacity: " + (prefs.getOpacity() * 100 / 255) + "%");
+        opLabel.setText("Background Opacity: " + (prefs.getOpacity() * 100 / 255) + "%");
         opLabel.setTextColor(0xFFCDD6F4);
         opLabel.setTextSize(15f);
         layout.addView(opLabel);
@@ -293,7 +294,7 @@ public class MainActivity extends Activity {
         opBar.setProgress(prefs.getOpacity());
         opBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar sb, int val, boolean u) {
-                opLabel.setText("Opacity: " + (val * 100 / 255) + "%");
+                opLabel.setText("Background Opacity: " + (val * 100 / 255) + "%");
             }
             public void onStartTrackingTouch(SeekBar sb) {}
             public void onStopTrackingTouch(SeekBar sb) {

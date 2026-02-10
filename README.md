@@ -2,14 +2,32 @@
 
 ## How It Works
 
-- **Overlay**: Floating widget with timer + text field + play/pause
-- **Edit text** → tap the activity name field. Timer resets & starts for the new activity.
-  Previous activity is saved to history automatically.
-- **Reset button** → visible only while editing. Same as changing the activity (saves current, restarts timer).
-- **Drag** → drag the ⠿ handle area to reposition the overlay
-- **Tap drag area** → dismisses keyboard/exits edit mode
-- **App** → shows daily pie chart, history with color assignment, date navigation
-- **Settings** → customize overlay background, text, accent colors, opacity, size
+### Overlay (floating pill)
+- **Compact pill shape**: activity name on the left, timer on the right
+- **Tap activity text** → enter edit mode (keyboard pops up). Type a new name and press Done — the previous activity is saved to history and the timer restarts.
+- **Tap timer** → pause/resume (timer dims when paused)
+- **Drag anywhere** → reposition the pill on screen (clamped to screen bounds)
+- **Tap background** → dismiss keyboard / exit edit mode
+- **Progress bar** → thin accent-colored line at the bottom pulses while timer is running
+
+### Timer
+- **Drift-proof**: uses `virtualStartTimestamp` pattern (elapsed = now − virtualStart) instead of incrementing a counter, so it won't drift over long periods
+- **Compact format**: shows `MM:SS` under 1 hour, `H:MM:SS` at 1 hour+
+
+### App
+- Daily pie chart with color-coded slices
+- History list with color dots, duration, color picker, delete
+- Date navigation (prev/next day)
+- Settings: background color, text color, accent color, background opacity, text size
+
+### Consistent colors
+- Activities with the **same name always get the same color** — on every day, in the pie chart and history
+- New names get a stable color auto-assigned from a palette (based on name hash)
+- Changing an entry's color updates **all** entries with that name
+
+### Opacity
+- The opacity slider in settings controls **only the background** of the overlay pill
+- Text, timer, and accent elements are always fully visible (100% alpha)
 
 ## Quick Reference File Structure
 
@@ -21,9 +39,9 @@
 | `app/build.gradle` | Android build config — SDK versions, package name, build types |
 | `app/proguard-rules.pro` | ProGuard rules for release builds (currently empty) |
 | `app/src/main/AndroidManifest.xml` | Permissions + component declarations |
-| `app/src/main/java/.../OverlayService.java` | Foreground service with floating window, timer, drag, focus |
-| `app/src/main/java/.../MainActivity.java` | History view, pie chart, date nav, color picker, settings |
-| `app/src/main/java/.../DatabaseHelper.java` | SQLite storage for activity entries |
+| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, edit mode |
+| `app/src/main/java/.../MainActivity.java` | History view, pie chart, date nav, color picker (updates by name), settings |
+| `app/src/main/java/.../DatabaseHelper.java` | SQLite storage + `getColorForName()` / `updateColorByName()` for consistent colors |
 | `app/src/main/java/.../ActivityEntry.java` | Data model |
 | `app/src/main/java/.../PieChartView.java` | Custom canvas-drawn pie chart |
 | `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance |

@@ -78,6 +78,49 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.close();
     }
 
+    /**
+     * Returns the color previously used for this activity name (case-insensitive).
+     * If never used before, auto-assigns a stable color from a palette based on
+     * the hash of the name — so the same name always gets the same color.
+     */
+    public int getColorForName(String name) {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor c = db.rawQuery(
+            "SELECT color FROM " + TABLE +
+            " WHERE LOWER(name) = LOWER(?) ORDER BY id DESC LIMIT 1",
+            new String[]{name});
+        int color = 0;
+        boolean found = false;
+        if (c.moveToFirst()) {
+            color = c.getInt(0);
+            found = true;
+        }
+        c.close();
+        db.close();
+        if (found) return color;
+
+        // Auto-assign from palette based on name hash (stable across sessions)
+        int[] palette = {
+            0xFFE53935, 0xFFEC407A, 0xFFAB47BC, 0xFF7E57C2,
+            0xFF42A5F5, 0xFF26C6DA, 0xFF26A69A, 0xFF66BB6A,
+            0xFFD4E157, 0xFFFFEE58, 0xFFFFA726, 0xFF8D6E63
+        };
+        int hash = name.toLowerCase(java.util.Locale.US).hashCode();
+        return palette[Math.abs(hash) % palette.length];
+    }
+
+    /**
+     * Updates color for ALL entries with this name (case-insensitive),
+     * so pie chart + history always show the same color for the same activity.
+     */
+    public void updateColorByName(String name, int color) {
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues cv = new ContentValues();
+        cv.put("color", color);
+        db.update(TABLE, cv, "LOWER(name) = LOWER(?)", new String[]{name});
+        db.close();
+    }
+
     private ActivityEntry cursorToEntry(Cursor c) {
         ActivityEntry e = new ActivityEntry();
         e.setId(c.getLong(c.getColumnIndexOrThrow("id")));
