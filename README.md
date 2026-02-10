@@ -15,13 +15,59 @@
 
 | File | Purpose |
 |------|---------|
-| AndroidManifest.xml | Permissions + component declarations |
-| OverlayService.java | Foreground service with floating window, timer, drag, focus |
-| MainActivity.java | History view, pie chart, date nav, color picker, settings |
-| DatabaseHelper.java | SQLite storage for activity entries |
-| ActivityEntry.java | Data model |
-| PieChartView.java | Custom canvas-drawn pie chart |
-| OverlayPreferences.java | SharedPreferences for overlay appearance |
+| `settings.gradle` | Gradle project config — declares the `app` module and plugin repositories |
+| `app/build.gradle` | Android build config — SDK versions, package name, build types |
+| `app/proguard-rules.pro` | ProGuard rules for release builds (currently empty) |
+| `app/src/main/AndroidManifest.xml` | Permissions + component declarations |
+| `app/src/main/java/.../OverlayService.java` | Foreground service with floating window, timer, drag, focus |
+| `app/src/main/java/.../MainActivity.java` | History view, pie chart, date nav, color picker, settings |
+| `app/src/main/java/.../DatabaseHelper.java` | SQLite storage for activity entries |
+| `app/src/main/java/.../ActivityEntry.java` | Data model |
+| `app/src/main/java/.../PieChartView.java` | Custom canvas-drawn pie chart |
+| `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance |
+| `.github/workflows/android.yml` | GitHub Actions workflow — builds APK on every push |
+
+> **Note:** Java files live under `app/src/main/java/com/timetracker/overlay/`. The `...` above abbreviates that path.
+
+## Project Structure
+
+```
+TrackyTime/
+├── .github/workflows/
+│   └── android.yml              ← CI: builds APK on push
+├── app/
+│   ├── build.gradle             ← SDK versions, package name
+│   ├── proguard-rules.pro       ← ProGuard rules (empty for now)
+│   └── src/main/
+│       ├── AndroidManifest.xml  ← Permissions & components
+│       ├── java/com/timetracker/overlay/
+│       │   ├── ActivityEntry.java
+│       │   ├── DatabaseHelper.java
+│       │   ├── MainActivity.java
+│       │   ├── OverlayPreferences.java
+│       │   ├── OverlayService.java
+│       │   └── PieChartView.java
+│       └── res/
+│           ├── layout/          ← XML layouts
+│           └── values/          ← Strings, colors, styles
+├── settings.gradle              ← Gradle project settings
+├── CLAUDE.md                    ← Instructions for Claude
+└── README.md                    ← This file
+```
+
+## Building
+
+The project uses **Gradle** with the Android Gradle Plugin. There are two ways to build:
+
+### GitHub Actions (automatic)
+Every push triggers a build. The APK is uploaded as a downloadable artifact on the Actions tab.
+
+### Locally (manual)
+You need JDK 17 and Gradle installed. Then run:
+```bash
+gradle assembleDebug --no-daemon
+```
+The APK will be at `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Notes
 
@@ -29,3 +75,6 @@
 - No external dependencies — pure Android SDK
 - Data persists in SQLite across app restarts
 - Overlay runs as foreground service (won't be killed by OS)
+- compileSdk / targetSdk: 33 (Android 13)
+- minSdk: 26 (Android 8.0)
+- Package: `com.timetracker.overlay`
