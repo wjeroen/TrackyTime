@@ -1,4 +1,4 @@
-# Time Tracker Overlay - AIDE Setup Guide
+# TrackyTime
 
 ## How It Works
 
