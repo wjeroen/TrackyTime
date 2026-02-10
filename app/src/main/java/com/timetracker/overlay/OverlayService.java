@@ -23,7 +23,6 @@ import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
-import android.widget.FrameLayout;
 import android.widget.TextView;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -37,14 +36,14 @@ public class OverlayService extends Service {
     private View overlayView;
     private WindowManager.LayoutParams params;
 
-    private View overlayBg, progressTrack, progressBar;
-    private TextView timerText, separator;
+    private View progressContainer, progressTrack, progressBar;
+    private TextView timerText, separator, resetBtn, closeBtn;
     private EditText editText;
 
     private Handler timerHandler;
     private boolean isRunning = false;
 
-    // Drift-proof timer: record "virtual start" and compute elapsed = now - virtualStart
+    // Drift-proof timer
     private long virtualStartTimestamp = -1;
     private long accumulatedMs = 0;
 
@@ -55,9 +54,13 @@ public class OverlayService extends Service {
     private NotificationManager notifManager;
 
     private ObjectAnimator pulseAnimator;
+    private long currentPulseDuration = 0; // 0 = no pulse active
 
     private static final int NOTIF_ID = 1001;
     private static final String CHANNEL_ID = "timetracker_channel";
+    private static final long PULSE_START_SECONDS = 30 * 60; // 30 minutes
+    private static final long PULSE_INTERVAL_SECONDS = 30 * 60;
+    private static final long BASE_PULSE_MS = 3000; // 1500ms each way
 
     // Drag state
     private int initialX, initialY;
@@ -80,19 +83,19 @@ public class OverlayService extends Service {
 
     private void setupOverlay() {
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        LayoutInflater inflater = LayoutInflater.from(this);
-        overlayView = inflater.inflate(R.layout.overlay_layout, null);
+        overlayView = LayoutInflater.from(this).inflate(R.layout.overlay_layout, null);
 
-        overlayBg = overlayView.findViewById(R.id.overlayBg);
         timerText = overlayView.findViewById(R.id.timerText);
         separator = overlayView.findViewById(R.id.separator);
         editText = overlayView.findViewById(R.id.activityInput);
+        resetBtn = overlayView.findViewById(R.id.resetBtn);
+        closeBtn = overlayView.findViewById(R.id.closeBtn);
+        progressContainer = overlayView.findViewById(R.id.progressContainer);
         progressTrack = overlayView.findViewById(R.id.progressTrack);
         progressBar = overlayView.findViewById(R.id.progressBar);
 
         float density = getResources().getDisplayMetrics().density;
 
-        // WRAP_CONTENT both ways — auto-sizes like FloatingCountdownTimer
         params = new WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -106,7 +109,7 @@ public class OverlayService extends Service {
         params.y = (int) (100 * density);
 
         applyPreferences();
-        setupDrag();
+        setupTouchHandlers();
         setupEditText();
 
         windowManager.addView(overlayView, params);
@@ -122,14 +125,14 @@ public class OverlayService extends Service {
         int alpha = prefs.getOpacity();
         int bgWithAlpha = (alpha << 24) | (bgColor & 0x00FFFFFF);
 
-        // Background: rounded pill with user-controlled opacity
+        // Background: rounded pill — drawable alpha doesn't affect children
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.RECTANGLE);
         bg.setCornerRadius(20 * density);
         bg.setColor(bgWithAlpha);
-        overlayBg.setBackground(bg);
+        overlayView.setBackground(bg);
 
-        // Text colors: always fully opaque
+        // Text: always fully opaque
         int textColor = prefs.getTextColor();
         int accentColor = prefs.getAccentColor();
 
@@ -137,6 +140,8 @@ public class OverlayService extends Service {
         separator.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
         editText.setTextColor(textColor);
         editText.setHintTextColor((textColor & 0x00FFFFFF) | 0x55000000);
+        resetBtn.setTextColor((accentColor & 0x00FFFFFF) | 0x99000000);
+        closeBtn.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
 
         float textSize = prefs.getTextSize();
         float timerSize = prefs.getTimerTextSize();
@@ -144,7 +149,7 @@ public class OverlayService extends Service {
         editText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         separator.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
 
-        // Progress track (faint accent, ~10% opacity)
+        // Progress track (faint accent)
         GradientDrawable trackBg = new GradientDrawable();
         trackBg.setShape(GradientDrawable.RECTANGLE);
         trackBg.setCornerRadius(2 * density);
@@ -159,87 +164,85 @@ public class OverlayService extends Service {
         progressBar.setBackground(barBg);
     }
 
-    // ---- Drag handling (whole pill is draggable) ----
+    // ---- Touch handling: each child handles drag + its own tap action ----
 
-    private void setupDrag() {
-        overlayView.setOnTouchListener((v, event) -> {
-            // Let the EditText handle its own touches when in edit mode
-            if (isInEditMode() && isTouchOnView(event, editText)) {
-                return false;
-            }
-
-            switch (event.getAction()) {
-                case MotionEvent.ACTION_DOWN:
-                    initialX = params.x;
-                    initialY = params.y;
-                    initialTouchX = event.getRawX();
-                    initialTouchY = event.getRawY();
-                    isDragging = false;
-                    return true;
-
-                case MotionEvent.ACTION_MOVE:
-                    int dx = (int) (event.getRawX() - initialTouchX);
-                    int dy = (int) (event.getRawY() - initialTouchY);
-                    if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
-                        isDragging = true;
-                    }
-                    if (isDragging) {
-                        params.x = initialX + dx;
-                        params.y = initialY + dy;
-                        clampToScreen();
-                        windowManager.updateViewLayout(overlayView, params);
-                    }
-                    return true;
-
-                case MotionEvent.ACTION_UP:
-                    if (!isDragging) {
-                        if (isTouchOnView(event, timerText)
-                                && timerText.getVisibility() == View.VISIBLE) {
-                            // Tap timer → pause/resume
-                            togglePause();
-                        } else if (isTouchOnView(event, editText)) {
-                            // Tap activity text → enter edit mode
-                            if (!isInEditMode()) enterEditMode();
-                        } else {
-                            // Tap background → exit edit mode
-                            if (isInEditMode()) exitEditMode();
-                        }
-                    }
-                    return true;
-            }
-            return false;
-        });
+    private boolean handleDragTouch(MotionEvent event, Runnable onTap) {
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                initialX = params.x;
+                initialY = params.y;
+                initialTouchX = event.getRawX();
+                initialTouchY = event.getRawY();
+                isDragging = false;
+                return true;
+            case MotionEvent.ACTION_MOVE:
+                int dx = (int) (event.getRawX() - initialTouchX);
+                int dy = (int) (event.getRawY() - initialTouchY);
+                if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
+                    isDragging = true;
+                }
+                if (isDragging) {
+                    params.x = initialX + dx;
+                    params.y = initialY + dy;
+                    clampToScreen();
+                    windowManager.updateViewLayout(overlayView, params);
+                }
+                return true;
+            case MotionEvent.ACTION_UP:
+                if (!isDragging && onTap != null) {
+                    onTap.run();
+                }
+                return true;
+        }
+        return false;
     }
 
-    private boolean isTouchOnView(MotionEvent event, View target) {
-        if (target.getVisibility() != View.VISIBLE) return false;
-        int[] loc = new int[2];
-        target.getLocationOnScreen(loc);
-        float x = event.getRawX();
-        float y = event.getRawY();
-        return x >= loc[0] && x <= loc[0] + target.getWidth()
-            && y >= loc[1] && y <= loc[1] + target.getHeight();
+    private void setupTouchHandlers() {
+        // EditText: when NOT editing, drag or tap-to-enter-edit.
+        // When editing, pass through so EditText handles cursor/selection natively.
+        editText.setOnTouchListener((v, event) -> {
+            if (isInEditMode()) return false; // native EditText handling
+            return handleDragTouch(event, this::enterEditMode);
+        });
+
+        // Timer: drag or tap-to-pause
+        timerText.setOnTouchListener((v, event) ->
+            handleDragTouch(event, this::togglePause));
+
+        // Reset: drag or tap-to-reset
+        resetBtn.setOnTouchListener((v, event) ->
+            handleDragTouch(event, this::resetTimer));
+
+        // Close: drag or tap-to-close
+        closeBtn.setOnTouchListener((v, event) ->
+            handleDragTouch(event, this::stopSelf));
+
+        // Background (root): drag or tap-to-exit-edit
+        overlayView.setOnTouchListener((v, event) ->
+            handleDragTouch(event, () -> {
+                if (isInEditMode()) exitEditMode();
+            }));
     }
 
     private void clampToScreen() {
         DisplayMetrics dm = getResources().getDisplayMetrics();
-        int screenW = dm.widthPixels;
-        int screenH = dm.heightPixels;
         int viewW = overlayView.getWidth();
         int viewH = overlayView.getHeight();
         if (viewW > 0 && viewH > 0) {
-            params.x = Math.max(0, Math.min(params.x, screenW - viewW));
-            params.y = Math.max(0, Math.min(params.y, screenH - viewH));
+            params.x = Math.max(0, Math.min(params.x, dm.widthPixels - viewW));
+            params.y = Math.max(0, Math.min(params.y, dm.heightPixels - viewH));
         }
     }
 
     private void togglePause() {
         if (currentActivityName.isEmpty()) return;
-        if (isRunning) {
-            pauseTimer();
-        } else {
-            resumeTimer();
-        }
+        if (isRunning) pauseTimer(); else resumeTimer();
+    }
+
+    private void resetTimer() {
+        if (currentActivityName.isEmpty()) return;
+        // Save current session, start fresh with same activity name
+        startNewActivity(currentActivityName);
     }
 
     // ---- EditText / focus management ----
@@ -263,10 +266,13 @@ public class OverlayService extends Service {
         windowManager.updateViewLayout(overlayView, params);
         editText.requestFocus();
         editText.setSelection(editText.getText().length());
+        // Show reset (if tracking) and close buttons while editing
+        if (!currentActivityName.isEmpty()) resetBtn.setVisibility(View.VISIBLE);
+        closeBtn.setVisibility(View.VISIBLE);
         editText.postDelayed(() -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
             if (imm != null) imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT);
-        }, 150);
+        }, 200);
     }
 
     private void exitEditMode() {
@@ -283,16 +289,19 @@ public class OverlayService extends Service {
         if (imm != null) imm.hideSoftInputFromWindow(editText.getWindowToken(), 0);
         params.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
         windowManager.updateViewLayout(overlayView, params);
+        // Hide reset + close buttons when not editing
+        resetBtn.setVisibility(View.GONE);
+        closeBtn.setVisibility(View.GONE);
     }
 
-    // ---- Timer (drift-proof using virtualStartTimestamp) ----
+    // ---- Timer (drift-proof) ----
 
     private Runnable timerRunnable = new Runnable() {
         @Override
         public void run() {
             if (isRunning) {
                 updateTimerDisplay();
-                // Update twice per second for snappy display
+                updatePulseSpeed();
                 timerHandler.postDelayed(this, 500);
             }
         }
@@ -333,31 +342,48 @@ public class OverlayService extends Service {
 
     private void showTimerRunning() {
         timerText.setAlpha(1.0f);
-        startProgressPulse();
+        progressContainer.setVisibility(View.VISIBLE);
+        progressBar.setAlpha(0f);
+        currentPulseDuration = 0;
+        // Pulse will start via updatePulseSpeed() when elapsed >= 30 min
     }
 
     private void showTimerPaused() {
         timerText.setAlpha(0.5f);
         stopProgressPulse();
         progressBar.setAlpha(0.3f);
-        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) progressBar.getLayoutParams();
-        lp.width = FrameLayout.LayoutParams.MATCH_PARENT;
-        progressBar.setLayoutParams(lp);
     }
 
-    private void startProgressPulse() {
-        stopProgressPulse();
-        progressBar.setAlpha(1.0f);
-        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) progressBar.getLayoutParams();
-        lp.width = FrameLayout.LayoutParams.MATCH_PARENT;
-        progressBar.setLayoutParams(lp);
+    // ---- Progressive pulse: off < 30min, then 1.5x faster every 30min ----
 
-        // Breathing pulse while timer runs
-        pulseAnimator = ObjectAnimator.ofFloat(progressBar, "alpha", 1.0f, 0.3f);
-        pulseAnimator.setDuration(1500);
-        pulseAnimator.setRepeatCount(ValueAnimator.INFINITE);
-        pulseAnimator.setRepeatMode(ValueAnimator.REVERSE);
-        pulseAnimator.start();
+    private void updatePulseSpeed() {
+        int elapsed = getElapsedSeconds();
+        if (elapsed < PULSE_START_SECONDS) {
+            // Not yet time to pulse
+            if (currentPulseDuration != 0) {
+                stopProgressPulse();
+                progressBar.setAlpha(0f);
+                currentPulseDuration = 0;
+            }
+            return;
+        }
+
+        // How many 30-min periods after the first 30 min?
+        int periods = (int) ((elapsed - PULSE_START_SECONDS) / PULSE_INTERVAL_SECONDS);
+        // duration = BASE / 1.5^periods (each period 1.5x faster)
+        long targetDuration = (long) (BASE_PULSE_MS / Math.pow(1.5, periods));
+        if (targetDuration < 400) targetDuration = 400; // floor
+
+        // Only restart animation if speed changed
+        if (targetDuration != currentPulseDuration) {
+            currentPulseDuration = targetDuration;
+            stopProgressPulse();
+            pulseAnimator = ObjectAnimator.ofFloat(progressBar, "alpha", 1.0f, 0.3f);
+            pulseAnimator.setDuration(targetDuration / 2); // half-cycle
+            pulseAnimator.setRepeatCount(ValueAnimator.INFINITE);
+            pulseAnimator.setRepeatMode(ValueAnimator.REVERSE);
+            pulseAnimator.start();
+        }
     }
 
     private void stopProgressPulse() {
@@ -388,7 +414,6 @@ public class OverlayService extends Service {
         String date = new SimpleDateFormat("yyyy-MM-dd", Locale.US)
             .format(new Date(currentStartTime));
 
-        // Use consistent color for this activity name
         int color = dbHelper.getColorForName(currentActivityName);
 
         ActivityEntry entry = new ActivityEntry(
@@ -404,9 +429,9 @@ public class OverlayService extends Service {
         accumulatedMs = 0;
         virtualStartTimestamp = -1;
 
-        // Show timer + separator
         timerText.setVisibility(View.VISIBLE);
         separator.setVisibility(View.VISIBLE);
+        progressContainer.setVisibility(View.VISIBLE);
 
         updateTimerDisplay();
         startTimer();
@@ -417,8 +442,7 @@ public class OverlayService extends Service {
 
     private void createNotificationChannel() {
         NotificationChannel channel = new NotificationChannel(
-            CHANNEL_ID, "TrackyTime",
-            NotificationManager.IMPORTANCE_LOW);
+            CHANNEL_ID, "TrackyTime", NotificationManager.IMPORTANCE_LOW);
         channel.setDescription("Active time tracking overlay");
         channel.setShowBadge(false);
         notifManager.createNotificationChannel(channel);
@@ -438,12 +462,9 @@ public class OverlayService extends Service {
             int h = elapsed / 3600;
             int m = (elapsed % 3600) / 60;
             int s = elapsed % 60;
-            String time;
-            if (h > 0) {
-                time = String.format(Locale.US, "%d:%02d:%02d", h, m, s);
-            } else {
-                time = String.format(Locale.US, "%02d:%02d", m, s);
-            }
+            String time = h > 0
+                ? String.format(Locale.US, "%d:%02d:%02d", h, m, s)
+                : String.format(Locale.US, "%02d:%02d", m, s);
             text = currentActivityName + " " + time + (isRunning ? "" : " (paused)");
         }
 

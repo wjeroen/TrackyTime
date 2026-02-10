@@ -56,8 +56,35 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             "SELECT * FROM " + TABLE + " WHERE date = ? ORDER BY start_time DESC",
             new String[]{date});
         while (c.moveToNext()) {
-            ActivityEntry e = cursorToEntry(c);
-            list.add(e);
+            list.add(cursorToEntry(c));
+        }
+        c.close();
+        db.close();
+        return list;
+    }
+
+    public List<ActivityEntry> getEntriesByDateRange(String startDate, String endDate) {
+        List<ActivityEntry> list = new ArrayList<>();
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor c = db.rawQuery(
+            "SELECT * FROM " + TABLE +
+            " WHERE date >= ? AND date <= ? ORDER BY start_time DESC",
+            new String[]{startDate, endDate});
+        while (c.moveToNext()) {
+            list.add(cursorToEntry(c));
+        }
+        c.close();
+        db.close();
+        return list;
+    }
+
+    public List<ActivityEntry> getAllEntries() {
+        List<ActivityEntry> list = new ArrayList<>();
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor c = db.rawQuery(
+            "SELECT * FROM " + TABLE + " ORDER BY start_time DESC", null);
+        while (c.moveToNext()) {
+            list.add(cursorToEntry(c));
         }
         c.close();
         db.close();
@@ -78,11 +105,21 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.close();
     }
 
-    /**
-     * Returns the color previously used for this activity name (case-insensitive).
-     * If never used before, auto-assigns a stable color from a palette based on
-     * the hash of the name — so the same name always gets the same color.
-     */
+    public void deleteEntriesByNameAndDate(String name, String date) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.delete(TABLE, "LOWER(name) = LOWER(?) AND date = ?",
+            new String[]{name, date});
+        db.close();
+    }
+
+    public void deleteEntriesByNameInRange(String name, String startDate, String endDate) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.delete(TABLE,
+            "LOWER(name) = LOWER(?) AND date >= ? AND date <= ?",
+            new String[]{name, startDate, endDate});
+        db.close();
+    }
+
     public int getColorForName(String name) {
         SQLiteDatabase db = getReadableDatabase();
         Cursor c = db.rawQuery(
@@ -99,7 +136,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.close();
         if (found) return color;
 
-        // Auto-assign from palette based on name hash (stable across sessions)
         int[] palette = {
             0xFFE53935, 0xFFEC407A, 0xFFAB47BC, 0xFF7E57C2,
             0xFF42A5F5, 0xFF26C6DA, 0xFF26A69A, 0xFF66BB6A,
@@ -109,16 +145,39 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return palette[Math.abs(hash) % palette.length];
     }
 
-    /**
-     * Updates color for ALL entries with this name (case-insensitive),
-     * so pie chart + history always show the same color for the same activity.
-     */
     public void updateColorByName(String name, int color) {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues cv = new ContentValues();
         cv.put("color", color);
         db.update(TABLE, cv, "LOWER(name) = LOWER(?)", new String[]{name});
         db.close();
+    }
+
+    /** Import entries, skipping duplicates by name+start_time. Returns count imported. */
+    public int importEntries(List<ActivityEntry> entries) {
+        int imported = 0;
+        SQLiteDatabase db = getWritableDatabase();
+        for (ActivityEntry entry : entries) {
+            Cursor c = db.rawQuery(
+                "SELECT COUNT(*) FROM " + TABLE +
+                " WHERE name = ? AND start_time = ?",
+                new String[]{entry.getName(), String.valueOf(entry.getStartTime())});
+            c.moveToFirst();
+            boolean exists = c.getInt(0) > 0;
+            c.close();
+            if (!exists) {
+                ContentValues cv = new ContentValues();
+                cv.put("name", entry.getName());
+                cv.put("duration_seconds", entry.getDurationSeconds());
+                cv.put("color", entry.getColor());
+                cv.put("start_time", entry.getStartTime());
+                cv.put("date", entry.getDate());
+                db.insert(TABLE, null, cv);
+                imported++;
+            }
+        }
+        db.close();
+        return imported;
     }
 
     private ActivityEntry cursorToEntry(Cursor c) {

@@ -27,8 +27,42 @@
             android:layout_height="wrap_content"
             android:text="Start Overlay"
             android:textSize="16sp"
-            android:layout_marginBottom="20dp" />
+            android:layout_marginBottom="12dp" />
 
+        <!-- Day / Week toggle -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="8dp">
+
+            <Button
+                android:id="@+id/dayViewBtn"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:text="Day"
+                android:textSize="14sp"
+                android:padding="0dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:layout_marginRight="4dp" />
+
+            <Button
+                android:id="@+id/weekViewBtn"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:text="Week"
+                android:textSize="14sp"
+                android:padding="0dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:layout_marginLeft="4dp" />
+        </LinearLayout>
+
+        <!-- Date navigation -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -89,13 +123,39 @@
             android:layout_height="wrap_content"
             android:orientation="vertical" />
 
+        <!-- Bottom buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="8dp">
+
+            <Button
+                android:id="@+id/exportBtn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Export"
+                android:textSize="13sp"
+                android:layout_marginRight="4dp" />
+
+            <Button
+                android:id="@+id/importBtn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Import"
+                android:textSize="13sp"
+                android:layout_marginLeft="4dp" />
+        </LinearLayout>
+
         <Button
             android:id="@+id/settingsBtn"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="⚙ Customize Overlay"
             android:textSize="14sp"
-            android:layout_marginTop="20dp"
             android:layout_marginBottom="16dp" />
 
     </LinearLayout>

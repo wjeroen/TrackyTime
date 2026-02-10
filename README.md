@@ -4,26 +4,36 @@
 
 ### Overlay (floating pill)
 - **Compact pill shape**: activity name on the left, timer on the right
-- **Tap activity text** → enter edit mode (keyboard pops up). Type a new name and press Done — the previous activity is saved to history and the timer restarts.
+- **Tap activity text** → enter edit mode (keyboard pops up, reset + close buttons appear). Type a new name and press Done — the previous activity is saved and timer restarts.
 - **Tap timer** → pause/resume (timer dims when paused)
 - **Drag anywhere** → reposition the pill on screen (clamped to screen bounds)
 - **Tap background** → dismiss keyboard / exit edit mode
-- **Progress bar** → thin accent-colored line at the bottom pulses while timer is running
+- **↺ reset** → saves current session, restarts timer with same activity name (only visible in edit mode)
+- **× close** → stops the overlay service (only visible in edit mode)
+- **Progress bar** → thin accent-colored line at the bottom; starts pulsing after 30 minutes, speeds up 1.5x every 30 minutes as a gentle nudge
 
 ### Timer
-- **Drift-proof**: uses `virtualStartTimestamp` pattern (elapsed = now − virtualStart) instead of incrementing a counter, so it won't drift over long periods
+- **Drift-proof**: uses `virtualStartTimestamp` pattern (elapsed = now − virtualStart) instead of incrementing a counter
 - **Compact format**: shows `MM:SS` under 1 hour, `H:MM:SS` at 1 hour+
 
 ### App
-- Daily pie chart with color-coded slices
-- History list with color dots, duration, color picker, delete
-- Date navigation (prev/next day)
+- Daily pie chart with color-coded slices (entries grouped by name)
+- **Week view**: toggle between Day/Week; week view aggregates Mon-Sun
+- History list with color dots, total duration per activity, color picker, delete
+- Date navigation (prev/next day or week)
 - Settings: background color, text color, accent color, background opacity, text size
+- **Export**: save all data as JSON to any location (Google Drive, email, etc.)
+- **Import**: restore data from a JSON backup (skips duplicates)
 
 ### Consistent colors
-- Activities with the **same name always get the same color** — on every day, in the pie chart and history
+- Activities with the **same name always get the same color** — in pie chart, history, and across all days
 - New names get a stable color auto-assigned from a palette (based on name hash)
 - Changing an entry's color updates **all** entries with that name
+
+### Grouping
+- Entries with the same name are **grouped together** in both the pie chart and history
+- Durations are summed — e.g., three "Coding" sessions of 30min each show as one "Coding" entry at 1h 30m
+- Delete removes all sessions for that activity (with confirmation)
 
 ### Opacity
 - The opacity slider in settings controls **only the background** of the overlay pill
@@ -39,9 +49,9 @@
 | `app/build.gradle` | Android build config — SDK versions, package name, build types |
 | `app/proguard-rules.pro` | ProGuard rules for release builds (currently empty) |
 | `app/src/main/AndroidManifest.xml` | Permissions + component declarations |
-| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, edit mode |
-| `app/src/main/java/.../MainActivity.java` | History view, pie chart, date nav, color picker (updates by name), settings |
-| `app/src/main/java/.../DatabaseHelper.java` | SQLite storage + `getColorForName()` / `updateColorByName()` for consistent colors |
+| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, edit mode, progressive pulse |
+| `app/src/main/java/.../MainActivity.java` | History view, pie chart, day/week toggle, date nav, color picker, entry grouping, export/import, settings |
+| `app/src/main/java/.../DatabaseHelper.java` | SQLite storage + `getColorForName()` / `updateColorByName()` / date range queries / export/import |
 | `app/src/main/java/.../ActivityEntry.java` | Data model |
 | `app/src/main/java/.../PieChartView.java` | Custom canvas-drawn pie chart |
 | `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance |

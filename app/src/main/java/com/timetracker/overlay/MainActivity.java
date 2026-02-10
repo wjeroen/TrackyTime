@@ -18,16 +18,27 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class MainActivity extends Activity {
 
     private static final int OVERLAY_PERM_CODE = 100;
     private static final int NOTIF_PERM_CODE = 101;
+    private static final int EXPORT_FILE_CODE = 200;
+    private static final int IMPORT_FILE_CODE = 201;
 
     private static final int[] ENTRY_COLORS = {
         0xFFE53935, 0xFFEC407A, 0xFFAB47BC, 0xFF7E57C2,
@@ -45,6 +56,7 @@ public class MainActivity extends Activity {
     };
 
     private Button toggleBtn, prevDayBtn, nextDayBtn, settingsBtn;
+    private Button dayViewBtn, weekViewBtn, exportBtn, importBtn;
     private TextView dateText, totalTimeText;
     private PieChartView pieChart;
     private LinearLayout historyContainer;
@@ -53,6 +65,7 @@ public class MainActivity extends Activity {
     private OverlayPreferences prefs;
     private Calendar calendar;
     private SimpleDateFormat dateFormat;
+    private boolean isWeekView = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -68,6 +81,10 @@ public class MainActivity extends Activity {
         prevDayBtn = findViewById(R.id.prevDayBtn);
         nextDayBtn = findViewById(R.id.nextDayBtn);
         settingsBtn = findViewById(R.id.settingsBtn);
+        dayViewBtn = findViewById(R.id.dayViewBtn);
+        weekViewBtn = findViewById(R.id.weekViewBtn);
+        exportBtn = findViewById(R.id.exportBtn);
+        importBtn = findViewById(R.id.importBtn);
         dateText = findViewById(R.id.dateText);
         totalTimeText = findViewById(R.id.totalTimeText);
         pieChart = findViewById(R.id.pieChart);
@@ -75,7 +92,10 @@ public class MainActivity extends Activity {
 
         setupToggle();
         setupDateNav();
+        setupViewToggle();
         settingsBtn.setOnClickListener(v -> showSettingsDialog());
+        exportBtn.setOnClickListener(v -> exportData());
+        importBtn.setOnClickListener(v -> importData());
 
         checkNotificationPermission();
     }
@@ -120,6 +140,12 @@ public class MainActivity extends Activity {
             startForegroundService(new Intent(this, OverlayService.class));
             toggleBtn.postDelayed(this::updateToggleButton, 300);
         }
+        if (req == EXPORT_FILE_CODE && res == RESULT_OK && data != null) {
+            writeExportToUri(data.getData());
+        }
+        if (req == IMPORT_FILE_CODE && res == RESULT_OK && data != null) {
+            readImportFromUri(data.getData());
+        }
     }
 
     private void checkNotificationPermission() {
@@ -133,43 +159,100 @@ public class MainActivity extends Activity {
         }
     }
 
+    // ======== Day / Week toggle ========
+
+    private void setupViewToggle() {
+        updateViewToggleButtons();
+        dayViewBtn.setOnClickListener(v -> {
+            isWeekView = false;
+            updateViewToggleButtons();
+            updateDateDisplay();
+            loadData();
+        });
+        weekViewBtn.setOnClickListener(v -> {
+            isWeekView = true;
+            updateViewToggleButtons();
+            updateDateDisplay();
+            loadData();
+        });
+    }
+
+    private void updateViewToggleButtons() {
+        dayViewBtn.setAlpha(isWeekView ? 0.5f : 1.0f);
+        weekViewBtn.setAlpha(isWeekView ? 1.0f : 0.5f);
+    }
+
     // ======== Date navigation ========
 
     private void setupDateNav() {
         updateDateDisplay();
         prevDayBtn.setOnClickListener(v -> {
-            calendar.add(Calendar.DAY_OF_MONTH, -1);
+            calendar.add(Calendar.DAY_OF_MONTH, isWeekView ? -7 : -1);
             updateDateDisplay();
             loadData();
         });
         nextDayBtn.setOnClickListener(v -> {
-            calendar.add(Calendar.DAY_OF_MONTH, 1);
+            calendar.add(Calendar.DAY_OF_MONTH, isWeekView ? 7 : 1);
             updateDateDisplay();
             loadData();
         });
     }
 
     private void updateDateDisplay() {
-        String current = dateFormat.format(calendar.getTime());
-        String today = dateFormat.format(new Date());
-        if (current.equals(today)) {
-            dateText.setText("Today");
+        if (isWeekView) {
+            String[] range = getWeekRange();
+            SimpleDateFormat shortFmt = new SimpleDateFormat("MMM d", Locale.US);
+            try {
+                Date start = dateFormat.parse(range[0]);
+                Date end = dateFormat.parse(range[1]);
+                dateText.setText(shortFmt.format(start) + " — " + shortFmt.format(end));
+            } catch (Exception e) {
+                dateText.setText(range[0] + " — " + range[1]);
+            }
         } else {
-            SimpleDateFormat display = new SimpleDateFormat("EEE, MMM d", Locale.US);
-            dateText.setText(display.format(calendar.getTime()));
+            String current = dateFormat.format(calendar.getTime());
+            String today = dateFormat.format(new Date());
+            if (current.equals(today)) {
+                dateText.setText("Today");
+            } else {
+                SimpleDateFormat display = new SimpleDateFormat("EEE, MMM d", Locale.US);
+                dateText.setText(display.format(calendar.getTime()));
+            }
         }
     }
 
-    // ======== Data loading ========
+    /** Returns [startDate, endDate] for the week (Mon-Sun) containing the current calendar date. */
+    private String[] getWeekRange() {
+        Calendar cal = (Calendar) calendar.clone();
+        // Go back to Monday
+        while (cal.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
+            cal.add(Calendar.DAY_OF_MONTH, -1);
+        }
+        String start = dateFormat.format(cal.getTime());
+        cal.add(Calendar.DAY_OF_MONTH, 6);
+        String end = dateFormat.format(cal.getTime());
+        return new String[]{start, end};
+    }
+
+    // ======== Data loading (with grouping) ========
 
     private void loadData() {
-        String date = dateFormat.format(calendar.getTime());
-        List<ActivityEntry> entries = dbHelper.getEntriesByDate(date);
+        List<ActivityEntry> rawEntries;
+        if (isWeekView) {
+            String[] range = getWeekRange();
+            rawEntries = dbHelper.getEntriesByDateRange(range[0], range[1]);
+        } else {
+            String date = dateFormat.format(calendar.getTime());
+            rawEntries = dbHelper.getEntriesByDate(date);
+        }
 
-        pieChart.setEntries(entries);
+        // Group by name (case-insensitive), sum durations
+        List<ActivityEntry> grouped = groupEntries(rawEntries);
+
+        pieChart.setEntries(grouped);
 
         int totalSec = 0;
-        for (ActivityEntry e : entries) totalSec += e.getDurationSeconds();
+        for (ActivityEntry e : grouped) totalSec += e.getDurationSeconds();
         if (totalSec > 0) {
             int h = totalSec / 3600;
             int m = (totalSec % 3600) / 60;
@@ -181,7 +264,7 @@ public class MainActivity extends Activity {
         }
 
         historyContainer.removeAllViews();
-        if (entries.isEmpty()) {
+        if (grouped.isEmpty()) {
             TextView empty = new TextView(this);
             empty.setText("No activities recorded");
             empty.setTextColor(0xFF888899);
@@ -190,10 +273,31 @@ public class MainActivity extends Activity {
             empty.setPadding(0, 48, 0, 48);
             historyContainer.addView(empty);
         } else {
-            for (ActivityEntry entry : entries) {
+            for (ActivityEntry entry : grouped) {
                 addHistoryItem(entry);
             }
         }
+    }
+
+    private List<ActivityEntry> groupEntries(List<ActivityEntry> raw) {
+        Map<String, ActivityEntry> map = new LinkedHashMap<>();
+        for (ActivityEntry e : raw) {
+            String key = e.getName().toLowerCase(Locale.US);
+            if (map.containsKey(key)) {
+                ActivityEntry existing = map.get(key);
+                existing.setDurationSeconds(
+                    existing.getDurationSeconds() + e.getDurationSeconds());
+            } else {
+                ActivityEntry group = new ActivityEntry();
+                group.setName(e.getName());
+                group.setDurationSeconds(e.getDurationSeconds());
+                group.setColor(e.getColor());
+                group.setStartTime(e.getStartTime());
+                group.setDate(e.getDate());
+                map.put(key, group);
+            }
+        }
+        return new ArrayList<>(map.values());
     }
 
     private void addHistoryItem(ActivityEntry entry) {
@@ -216,8 +320,23 @@ public class MainActivity extends Activity {
 
         colorBtn.setOnClickListener(v -> showEntryColorPicker(entry));
         deleteBtn.setOnClickListener(v -> {
-            dbHelper.deleteEntry(entry.getId());
-            loadData();
+            new AlertDialog.Builder(this)
+                .setTitle("Delete")
+                .setMessage("Delete all \"" + entry.getName() + "\" entries" +
+                    (isWeekView ? " this week?" : " today?"))
+                .setPositiveButton("Delete", (d, w) -> {
+                    if (isWeekView) {
+                        String[] range = getWeekRange();
+                        dbHelper.deleteEntriesByNameInRange(
+                            entry.getName(), range[0], range[1]);
+                    } else {
+                        String date = dateFormat.format(calendar.getTime());
+                        dbHelper.deleteEntriesByNameAndDate(entry.getName(), date);
+                    }
+                    loadData();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
         });
 
         historyContainer.addView(item);
@@ -251,7 +370,6 @@ public class MainActivity extends Activity {
 
             final int c = color;
             sw.setOnClickListener(v -> {
-                // Update ALL entries with this name so colors stay consistent
                 dbHelper.updateColorByName(entry.getName(), c);
                 loadData();
                 dialog.dismiss();
@@ -261,6 +379,88 @@ public class MainActivity extends Activity {
 
         dialog.setView(grid);
         dialog.show();
+    }
+
+    // ======== Export / Import ========
+
+    private void exportData() {
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/json");
+        intent.putExtra(Intent.EXTRA_TITLE, "trackytime_backup.json");
+        startActivityForResult(intent, EXPORT_FILE_CODE);
+    }
+
+    private void importData() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        startActivityForResult(intent, IMPORT_FILE_CODE);
+    }
+
+    private void writeExportToUri(Uri uri) {
+        try {
+            List<ActivityEntry> entries = dbHelper.getAllEntries();
+            JSONArray arr = new JSONArray();
+            for (ActivityEntry e : entries) {
+                JSONObject obj = new JSONObject();
+                obj.put("name", e.getName());
+                obj.put("duration_seconds", e.getDurationSeconds());
+                obj.put("color", e.getColor());
+                obj.put("start_time", e.getStartTime());
+                obj.put("date", e.getDate());
+                arr.put(obj);
+            }
+            JSONObject root = new JSONObject();
+            root.put("version", 1);
+            root.put("entries", arr);
+
+            OutputStream os = getContentResolver().openOutputStream(uri);
+            if (os != null) {
+                os.write(root.toString(2).getBytes("UTF-8"));
+                os.close();
+            }
+            Toast.makeText(this,
+                "Exported " + entries.size() + " entries", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Toast.makeText(this,
+                "Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void readImportFromUri(Uri uri) {
+        try {
+            BufferedReader reader = new BufferedReader(
+                new InputStreamReader(getContentResolver().openInputStream(uri), "UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) sb.append(line);
+            reader.close();
+
+            JSONObject root = new JSONObject(sb.toString());
+            JSONArray arr = root.getJSONArray("entries");
+            List<ActivityEntry> entries = new ArrayList<>();
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject obj = arr.getJSONObject(i);
+                ActivityEntry e = new ActivityEntry();
+                e.setName(obj.getString("name"));
+                e.setDurationSeconds(obj.getInt("duration_seconds"));
+                e.setColor(obj.getInt("color"));
+                e.setStartTime(obj.getLong("start_time"));
+                e.setDate(obj.getString("date"));
+                entries.add(e);
+            }
+
+            int count = dbHelper.importEntries(entries);
+            Toast.makeText(this,
+                "Imported " + count + " new entries" +
+                (count < entries.size() ? " (" + (entries.size() - count) + " duplicates skipped)" : ""),
+                Toast.LENGTH_SHORT).show();
+            loadData();
+        } catch (Exception e) {
+            Toast.makeText(this,
+                "Import failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     // ======== Settings dialog ========
