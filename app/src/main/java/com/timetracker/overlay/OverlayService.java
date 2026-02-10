@@ -405,7 +405,7 @@ public class OverlayService extends Service {
 
     // ---- Progressive pulse: starts immediately, 1.5x faster every 30min ----
     // Pulse affects the timeline bar's live segment AND (optionally) the entire overlay bg+border.
-    // The user's opacity setting is the CEILING — pulse breathes from invisible (0) up to
+    // The user's opacity setting is the CEILING — pulse breathes from 20% visible (floor) up to
     // the opacity setting. Lower opacity = subtler pulse. Higher opacity = more visible pulse.
 
     /** Refresh cached pulse values from current preferences (called on pref change). */
@@ -451,26 +451,31 @@ public class OverlayService extends Service {
 
     /**
      * Animate overlay bg + border in sync with the timeline bar pulse.
-     * Opacity setting is the CEILING: pulse goes from 0 (invisible) up to the user's opacity.
-     * This makes low opacity = subtler breathing, high opacity = more visible breathing.
+     * Pulse breathes between the user's opacity (ceiling) and 20% visible opacity (floor).
+     * This keeps the overlay always somewhat visible — never fully disappearing.
      */
+    private static final int PULSE_FLOOR_ALPHA = 51; // 20% of 255 ≈ 20% user-visible opacity
+
     private void applyOverlayPulse(float pulseAlpha) {
         if (!cachedOverlayPulseEnabled) return;
         if (overlayBg == null) return;
 
-        // Map pulseAlpha (1.0→0.3) to bg alpha (cachedBgOpacity→0)
+        // If user's opacity is already at or below the floor, don't animate
+        int floor = Math.min(PULSE_FLOOR_ALPHA, cachedBgOpacity);
+
+        // Map pulseAlpha (1.0→0.3) to bg alpha (cachedBgOpacity→floor)
         // At pulseAlpha=1.0: bgAlpha=cachedBgOpacity (user's setting = ceiling)
-        // At pulseAlpha=0.3: bgAlpha=0 (invisible)
-        int bgAlpha = (int) (cachedBgOpacity * (pulseAlpha - 0.3f) / 0.7f);
+        // At pulseAlpha=0.3: bgAlpha=floor (20% visible, not invisible)
+        int range = cachedBgOpacity - floor;
+        int bgAlpha = floor + (int) (range * (pulseAlpha - 0.3f) / 0.7f);
         if (bgAlpha > cachedBgOpacity) bgAlpha = cachedBgOpacity;
-        if (bgAlpha < 0) bgAlpha = 0;
+        if (bgAlpha < floor) bgAlpha = floor;
         overlayBg.setColor((bgAlpha << 24) | (cachedBgColor & 0x00FFFFFF));
 
         if (cachedBorderWidth > 0) {
-            // Border: same alpha scaling
-            int borderAlpha = (int) (cachedBgOpacity * (pulseAlpha - 0.3f) / 0.7f);
+            int borderAlpha = floor + (int) (range * (pulseAlpha - 0.3f) / 0.7f);
             if (borderAlpha > cachedBgOpacity) borderAlpha = cachedBgOpacity;
-            if (borderAlpha < 0) borderAlpha = 0;
+            if (borderAlpha < floor) borderAlpha = floor;
             overlayBg.setStroke((int) (cachedBorderWidth * cachedDensity),
                 (borderAlpha << 24) | (cachedAccentColor & 0x00FFFFFF));
         }

@@ -18,8 +18,8 @@ public class OverlayPreferences {
     public int getTextColor() { return sp.getInt("text_color", 0xFF000000); }
     public void setTextColor(int c) { sp.edit().putInt("text_color", c).apply(); }
 
-    // 0-255
-    public int getOpacity() { return sp.getInt("opacity", 60); }
+    // 0-255 (153 ≈ 60% user-visible opacity)
+    public int getOpacity() { return sp.getInt("opacity", 153); }
     public void setOpacity(int o) { sp.edit().putInt("opacity", o).apply(); }
 
     // Border color (accent) — used for the overlay border
