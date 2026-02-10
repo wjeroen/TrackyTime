@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:padding="12dp"
+    android:layout_marginBottom="4dp"
+    android:background="#FF2A2A3C">
+
+    <View
+        android:id="@+id/colorDot"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginRight="12dp" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/entryName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFCDD6F4"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/entryDuration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FF89B4FA"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/colorBtn"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:text="🎨"
+        android:textSize="14sp"
+        android:padding="0dp"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:layout_marginRight="4dp"
+        android:background="@android:color/transparent" />
+
+    <Button
+        android:id="@+id/deleteBtn"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:text="✕"
+        android:textSize="14sp"
+        android:textColor="#FFFF6666"
+        android:padding="0dp"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:background="@android:color/transparent" />
+</LinearLayout>
