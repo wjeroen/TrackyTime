@@ -23,7 +23,7 @@ _(none right now)_
 - [ ] Test that opacity slider affects background + border (text stays fully visible)
 - [ ] Test consistent colors: create "Coding" twice on different days, verify same color
 - [ ] Test color picker: 44 colors (vivid, warm, pastel, deep), changing color updates all entries with same name
-- [ ] Test open-app button (↗) appears only in edit mode, opens full app
+- [ ] Test open-app button (➚) appears only in edit mode, opens full app
 - [ ] Test close button (✕) appears only in edit mode, stops overlay service
 - [ ] Test tapping outside overlay exits edit mode and saves any typed text
 - [ ] Test timeline bar: colored segments, live segment grows, tick marks at hour (full) and half-hour (half, hidden >5h)
@@ -46,15 +46,15 @@ _(none right now)_
 - [x] Tick marks: 2px wide, half-hour fully opaque (only height differentiates from full-hour) (2026-02-10)
 - [x] Fix pulse: live-updates on toggle, respects opacity as ceiling (0→opacity) (2026-02-10)
 - [x] Border grows outward (dynamic padding), default width 1dp (2026-02-10)
-- [x] Open-app icon (↗) sized larger (+4sp) to match ✕ visually (2026-02-10)
+- [x] Open-app icon (➚) sized larger (+4sp) to match ✕ visually (2026-02-10)
 - [x] Timeline bar tick marks: hour (full height) + half-hour (bottom half, hidden >5h), both 2px fully opaque (2026-02-10)
-- [x] Remove reset button, add ↗ open-app button to overlay edit mode (2026-02-10)
+- [x] Remove reset button, add ➚ open-app button to overlay edit mode (2026-02-10)
 - [x] Exit edit mode when tapping outside overlay (FLAG_WATCH_OUTSIDE_TOUCH + ACTION_OUTSIDE) (2026-02-10)
 - [x] Breathing overlay: bg + border pulse in sync with timeline bar, optional setting (default on) (2026-02-10)
 - [x] Expand activity color palette from 12 to 44 colors (vivid, warm, pastel, deep) with smaller swatches (2026-02-10)
 - [x] Move export/import/settings above history list for quick access (2026-02-10)
 - [x] Fix timeline bar color: refresh from DB every 30s + on segment reload (2026-02-10)
-- [x] Fix button alignment: consistent gravity/includeFontPadding on ↗ and ✕ (2026-02-10)
+- [x] Fix button alignment: consistent gravity/includeFontPadding on ➚ and ✕ (2026-02-10)
 - [x] Overlay visual redesign: white bg default, black text/border, 10dp corners, 5dp padding, unified text sizes (2026-02-10)
 - [x] Add configurable border using accent color (default black, 3dp, adjustable 0–6dp) (2026-02-10)
 - [x] Live-update overlay when settings change (SharedPreferences listener, 100ms debounce) (2026-02-10)

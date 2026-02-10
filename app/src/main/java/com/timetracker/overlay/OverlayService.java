@@ -192,7 +192,7 @@ public class OverlayService extends Service {
         timerText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         editText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         separator.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
-        openAppBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize + 4);
+        openAppBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         closeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
 
         // Timeline bar corner radius (not affected by opacity)

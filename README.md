@@ -5,11 +5,11 @@
 ### Overlay (floating pill)
 - **Compact pill shape**: activity name on the left, timer on the right, 10dp rounded corners
 - **Border**: configurable color (uses accent/border color setting) and width (0–6dp, default 1dp black). Border grows outward (content area stays the same size). Follows the same opacity as the background (both at rest and during pulse).
-- **Tap activity text** → enter edit mode (keyboard pops up, ↗ open-app + ✕ close buttons appear). Type a new name and press Done — the previous activity is saved and timer restarts.
+- **Tap activity text** → enter edit mode (keyboard pops up, ➚ open-app + ✕ close buttons appear). Type a new name and press Done — the previous activity is saved and timer restarts.
 - **Tap timer** → pause/resume (timer dims when paused)
 - **Drag anywhere** → reposition the pill on screen (clamped to screen bounds)
 - **Tap outside overlay** → saves any typed text and exits edit mode automatically
-- **↗ open app** → opens the full TrackyTime app (only visible in edit mode)
+- **➚ open app** → opens the full TrackyTime app (only visible in edit mode)
 - **✕ close** → stops the overlay service (only visible in edit mode)
 - **Timeline bar** → 6dp colored bar at the bottom showing the day's activity history as proportional segments. Each activity session is a colored rectangle. The currently-running activity grows live. The live segment pulses immediately, speeding up 1.5x every 30 minutes as a gentle nudge. Not affected by the opacity slider. White tick marks (2px wide) at every hour (full height) and half-hour (bottom half). Both fully opaque. Half-hour marks are hidden once total tracked time exceeds 5 hours.
 - **Breathing overlay** → optional (default on): the entire background + border pulse in sync with the timeline bar. Breathes from invisible (0) up to the user's opacity setting — higher opacity = more visible pulse, lower opacity = subtler. Live-updates when toggled in settings.
