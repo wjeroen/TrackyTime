@@ -82,6 +82,7 @@ The APK will be at `app/build/outputs/apk/debug/app-debug.apk`.
 - No external dependencies — pure Android SDK
 - Data persists in SQLite across app restarts
 - Overlay runs as foreground service (won't be killed by OS)
-- compileSdk / targetSdk: 33 (Android 13)
+- compileSdk: 34 (Android 14) — needed for `specialUse` foreground service type
+- targetSdk: 33 (Android 13)
 - minSdk: 26 (Android 8.0)
 - Package: `com.timetracker.overlay`

@@ -21,6 +21,7 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Bump compileSdk 33→34 to fix `specialUse` foregroundServiceType build error (2026-02-10)
 - [x] Add Gradle wrapper (gradlew) pinned to Gradle 8.14.3 — fixes CI build failure with Gradle 9.x (2026-02-10)
 - [x] Set up Gradle build files (settings.gradle, app/build.gradle) (2026-02-10)
 - [x] Reorganize repo to standard Android/Gradle directory structure (2026-02-10)
