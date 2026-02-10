@@ -16,6 +16,8 @@
 | File | Purpose |
 |------|---------|
 | `settings.gradle` | Gradle project config — declares the `app` module and plugin repositories |
+| `gradlew` / `gradlew.bat` | Gradle wrapper scripts — runs the correct Gradle version automatically |
+| `gradle/wrapper/gradle-wrapper.properties` | Pins the Gradle version (currently 8.14.3) |
 | `app/build.gradle` | Android build config — SDK versions, package name, build types |
 | `app/proguard-rules.pro` | ProGuard rules for release builds (currently empty) |
 | `app/src/main/AndroidManifest.xml` | Permissions + component declarations |
@@ -35,6 +37,11 @@
 TrackyTime/
 ├── .github/workflows/
 │   └── android.yml              ← CI: builds APK on push
+├── gradle/wrapper/
+│   ├── gradle-wrapper.jar       ← Wrapper bootstrap (auto-downloads Gradle)
+│   └── gradle-wrapper.properties ← Pins Gradle version
+├── gradlew                      ← Gradle wrapper script (Linux/Mac)
+├── gradlew.bat                  ← Gradle wrapper script (Windows)
 ├── app/
 │   ├── build.gradle             ← SDK versions, package name
 │   ├── proguard-rules.pro       ← ProGuard rules (empty for now)
@@ -63,9 +70,9 @@ The project uses **Gradle** with the Android Gradle Plugin. There are two ways t
 Every push triggers a build. The APK is uploaded as a downloadable artifact on the Actions tab.
 
 ### Locally (manual)
-You need JDK 17 and Gradle installed. Then run:
+You need JDK 17. The Gradle wrapper handles the rest — no separate Gradle install needed:
 ```bash
-gradle assembleDebug --no-daemon
+./gradlew assembleDebug
 ```
 The APK will be at `app/build/outputs/apk/debug/app-debug.apk`.
 
