@@ -3,14 +3,16 @@
 ## How It Works
 
 ### Overlay (floating pill)
-- **Compact pill shape**: activity name on the left, timer on the right
+- **Compact pill shape**: activity name on the left, timer on the right, 10dp rounded corners
+- **Border**: configurable color (uses accent/border color setting) and width (0–6dp, default 3dp black). Border alpha scales with background opacity.
 - **Tap activity text** → enter edit mode (keyboard pops up, reset + close buttons appear). Type a new name and press Done — the previous activity is saved and timer restarts.
 - **Tap timer** → pause/resume (timer dims when paused)
 - **Drag anywhere** → reposition the pill on screen (clamped to screen bounds)
 - **Tap background** → dismiss keyboard / exit edit mode
-- **↺ reset** → saves current session, restarts timer with same activity name (only visible in edit mode)
+- **↺ reset** → saves current session and pauses (does NOT auto-start a new timer). Only visible in edit mode.
 - **× close** → stops the overlay service (only visible in edit mode)
 - **Timeline bar** → thin colored bar at the bottom showing the day's activity history as proportional segments. Each activity session is a colored rectangle. The currently-running activity grows live. The live segment pulses immediately, speeding up 1.5x every 30 minutes as a gentle nudge. Not affected by the opacity slider.
+- **Live-update**: changing any setting (colors, size, border, opacity) updates the overlay instantly — no restart needed.
 
 ### Timer
 - **Drift-proof**: uses `virtualStartTimestamp` pattern (elapsed = now − virtualStart) instead of incrementing a counter
@@ -19,9 +21,10 @@
 ### App
 - Daily pie chart with color-coded slices (entries grouped by name)
 - **Week view**: toggle between Day/Week; week view aggregates Mon-Sun
-- History list with color dots, total duration per activity, color picker, delete
+- History list shows **individual entries** with time range (e.g. "10:00 – 11:00 · 1h 00m"), color dot, color picker, delete
+- **Inline rename**: tap an entry's name → it becomes editable. Press Done → saves new name and auto-assigns a matching color.
 - Date navigation (prev/next day or week)
-- Settings: background color, text color, accent color, background opacity, text size
+- Settings: background color, text color, border color (accent), border width (0–6dp), background opacity, text size
 - **Export**: save all data as JSON to any location (Google Drive, email, etc.)
 - **Import**: restore data from a JSON backup (skips duplicates)
 
@@ -31,9 +34,9 @@
 - Changing an entry's color updates **all** entries with that name
 
 ### Grouping
-- Entries with the same name are **grouped together** in both the pie chart and history
-- Durations are summed — e.g., three "Coding" sessions of 30min each show as one "Coding" entry at 1h 30m
-- Delete removes all sessions for that activity (with confirmation)
+- The **pie chart** groups entries by name: three "Coding" sessions of 30min each show as one 1h 30m slice
+- The **history list** shows individual entries (not grouped) so you can rename or delete specific sessions
+- Delete removes the individual entry (not all entries with the same name)
 
 ### Opacity
 - The opacity slider in settings controls **only the background** of the overlay pill
@@ -49,13 +52,13 @@
 | `app/build.gradle` | Android build config — SDK versions, package name, build types |
 | `app/proguard-rules.pro` | ProGuard rules for release builds (currently empty) |
 | `app/src/main/AndroidManifest.xml` | Permissions + component declarations |
-| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, edit mode, timeline bar, progressive pulse |
+| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, edit mode, timeline bar, progressive pulse, border, live-update settings |
 | `app/src/main/java/.../TimelineBarView.java` | Custom View: draws day timeline as proportional colored segments on a Canvas |
-| `app/src/main/java/.../MainActivity.java` | History view, pie chart, day/week toggle, date nav, color picker, entry grouping, export/import, settings |
-| `app/src/main/java/.../DatabaseHelper.java` | SQLite storage + `getColorForName()` / `updateColorByName()` / date range queries / export/import |
+| `app/src/main/java/.../MainActivity.java` | History view (individual entries, inline rename), pie chart, day/week toggle, date nav, color picker, export/import, settings (border color + width) |
+| `app/src/main/java/.../DatabaseHelper.java` | SQLite storage + `getColorForName()` / `updateColorByName()` / `updateEntryNameAndColor()` / date range queries / export/import |
 | `app/src/main/java/.../ActivityEntry.java` | Data model |
 | `app/src/main/java/.../PieChartView.java` | Custom canvas-drawn pie chart |
-| `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance |
+| `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance (bg/text/border colors, border width, opacity, size) |
 | `.github/workflows/android.yml` | GitHub Actions workflow — builds APK on every push |
 
 > **Note:** Java files live under `app/src/main/java/com/timetracker/overlay/`. The `...` above abbreviates that path.

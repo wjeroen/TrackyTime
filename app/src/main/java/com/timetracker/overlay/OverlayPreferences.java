@@ -12,36 +12,39 @@ public class OverlayPreferences {
         sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
-    public int getBgColor() { return sp.getInt("bg_color", 0xFF1E1E2E); }
+    public int getBgColor() { return sp.getInt("bg_color", 0xFFFFFFFF); }
     public void setBgColor(int c) { sp.edit().putInt("bg_color", c).apply(); }
 
-    public int getTextColor() { return sp.getInt("text_color", 0xFFCDD6F4); }
+    public int getTextColor() { return sp.getInt("text_color", 0xFF000000); }
     public void setTextColor(int c) { sp.edit().putInt("text_color", c).apply(); }
-
-    public int getAccentColor() { return sp.getInt("accent_color", 0xFF89B4FA); }
-    public void setAccentColor(int c) { sp.edit().putInt("accent_color", c).apply(); }
 
     // 0-255
     public int getOpacity() { return sp.getInt("opacity", 230); }
     public void setOpacity(int o) { sp.edit().putInt("opacity", o).apply(); }
 
+    // Border color (accent) — used for the overlay border
+    public int getAccentColor() { return sp.getInt("accent_color", 0xFF000000); }
+    public void setAccentColor(int c) { sp.edit().putInt("accent_color", c).apply(); }
+
+    // 0-4 dp (0 = no border)
+    public int getBorderWidth() { return sp.getInt("border_width", 3); }
+    public void setBorderWidth(int w) { sp.edit().putInt("border_width", w).apply(); }
+
     // 0=small, 1=medium, 2=large
-    public int getSize() { return sp.getInt("size", 1); }
+    public int getSize() { return sp.getInt("size", 0); }
     public void setSize(int s) { sp.edit().putInt("size", s).apply(); }
 
+    /** Unified text size — activity name, timer, separator all use this. */
     public float getTextSize() {
         switch (getSize()) {
-            case 0: return 12f;
-            case 2: return 18f;
-            default: return 14f;
+            case 0: return 14f;
+            case 2: return 20f;
+            default: return 16f;
         }
     }
 
+    /** Same as getTextSize() — timer matches activity text. */
     public float getTimerTextSize() {
-        switch (getSize()) {
-            case 0: return 16f;
-            case 2: return 24f;
-            default: return 20f;
-        }
+        return getTextSize();
     }
 }

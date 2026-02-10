@@ -11,7 +11,10 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.GridLayout;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
@@ -65,6 +68,7 @@ public class MainActivity extends Activity {
     private OverlayPreferences prefs;
     private Calendar calendar;
     private SimpleDateFormat dateFormat;
+    private SimpleDateFormat timeFormat;
     private boolean isWeekView = false;
 
     @Override
@@ -76,6 +80,7 @@ public class MainActivity extends Activity {
         prefs = new OverlayPreferences(this);
         calendar = Calendar.getInstance();
         dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+        timeFormat = new SimpleDateFormat("HH:mm", Locale.US);
 
         toggleBtn = findViewById(R.id.toggleBtn);
         prevDayBtn = findViewById(R.id.prevDayBtn);
@@ -234,7 +239,7 @@ public class MainActivity extends Activity {
         return new String[]{start, end};
     }
 
-    // ======== Data loading (with grouping) ========
+    // ======== Data loading ========
 
     private void loadData() {
         List<ActivityEntry> rawEntries;
@@ -246,13 +251,12 @@ public class MainActivity extends Activity {
             rawEntries = dbHelper.getEntriesByDate(date);
         }
 
-        // Group by name (case-insensitive), sum durations
+        // Pie chart uses grouped data (same name = one slice)
         List<ActivityEntry> grouped = groupEntries(rawEntries);
-
         pieChart.setEntries(grouped);
 
         int totalSec = 0;
-        for (ActivityEntry e : grouped) totalSec += e.getDurationSeconds();
+        for (ActivityEntry e : rawEntries) totalSec += e.getDurationSeconds();
         if (totalSec > 0) {
             int h = totalSec / 3600;
             int m = (totalSec % 3600) / 60;
@@ -263,8 +267,9 @@ public class MainActivity extends Activity {
             totalTimeText.setText("");
         }
 
+        // History shows individual entries (not grouped) — each session editable
         historyContainer.removeAllViews();
-        if (grouped.isEmpty()) {
+        if (rawEntries.isEmpty()) {
             TextView empty = new TextView(this);
             empty.setText("No activities recorded");
             empty.setTextColor(0xFF888899);
@@ -273,12 +278,13 @@ public class MainActivity extends Activity {
             empty.setPadding(0, 48, 0, 48);
             historyContainer.addView(empty);
         } else {
-            for (ActivityEntry entry : grouped) {
+            for (ActivityEntry entry : rawEntries) {
                 addHistoryItem(entry);
             }
         }
     }
 
+    /** Group entries by name (case-insensitive), sum durations — used for pie chart. */
     private List<ActivityEntry> groupEntries(List<ActivityEntry> raw) {
         Map<String, ActivityEntry> map = new LinkedHashMap<>();
         for (ActivityEntry e : raw) {
@@ -305,7 +311,7 @@ public class MainActivity extends Activity {
             R.layout.item_activity_entry, historyContainer, false);
 
         View colorDot = item.findViewById(R.id.colorDot);
-        TextView nameText = item.findViewById(R.id.entryName);
+        EditText nameEdit = (EditText) item.findViewById(R.id.entryName);
         TextView durationText = item.findViewById(R.id.entryDuration);
         Button colorBtn = item.findViewById(R.id.colorBtn);
         Button deleteBtn = item.findViewById(R.id.deleteBtn);
@@ -315,24 +321,55 @@ public class MainActivity extends Activity {
         dotBg.setColor(entry.getColor());
         colorDot.setBackground(dotBg);
 
-        nameText.setText(entry.getName());
-        durationText.setText(entry.getFormattedDuration());
+        nameEdit.setText(entry.getName());
 
+        // Time range + duration: "10:00 – 11:00 · 1h 00m"
+        String startStr = timeFormat.format(new Date(entry.getStartTime()));
+        long endMs = entry.getStartTime() + (entry.getDurationSeconds() * 1000L);
+        String endStr = timeFormat.format(new Date(endMs));
+        durationText.setText(startStr + " – " + endStr + " · " + entry.getFormattedDuration());
+
+        // Inline rename: tap name → becomes editable, press Done → saves
+        nameEdit.setOnClickListener(v -> {
+            nameEdit.setFocusable(true);
+            nameEdit.setFocusableInTouchMode(true);
+            nameEdit.setCursorVisible(true);
+            nameEdit.requestFocus();
+            nameEdit.setSelection(nameEdit.getText().length());
+            InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null) imm.showSoftInput(nameEdit, InputMethodManager.SHOW_IMPLICIT);
+        });
+
+        nameEdit.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                String newName = nameEdit.getText().toString().trim();
+                if (!newName.isEmpty() && !newName.equals(entry.getName())) {
+                    int color = dbHelper.getColorForName(newName);
+                    dbHelper.updateEntryNameAndColor(entry.getId(), newName, color);
+                    loadData();
+                }
+                // Disable editing
+                nameEdit.setFocusable(false);
+                nameEdit.setFocusableInTouchMode(false);
+                nameEdit.setCursorVisible(false);
+                nameEdit.clearFocus();
+                InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (imm != null) imm.hideSoftInputFromWindow(nameEdit.getWindowToken(), 0);
+                return true;
+            }
+            return false;
+        });
+
+        // Color picker (updates all entries with same name)
         colorBtn.setOnClickListener(v -> showEntryColorPicker(entry));
+
+        // Delete this individual entry
         deleteBtn.setOnClickListener(v -> {
             new AlertDialog.Builder(this)
                 .setTitle("Delete")
-                .setMessage("Delete all \"" + entry.getName() + "\" entries" +
-                    (isWeekView ? " this week?" : " today?"))
+                .setMessage("Delete this entry?")
                 .setPositiveButton("Delete", (d, w) -> {
-                    if (isWeekView) {
-                        String[] range = getWeekRange();
-                        dbHelper.deleteEntriesByNameInRange(
-                            entry.getName(), range[0], range[1]);
-                    } else {
-                        String date = dateFormat.format(calendar.getTime());
-                        dbHelper.deleteEntriesByNameAndDate(entry.getName(), date);
-                    }
+                    dbHelper.deleteEntry(entry.getId());
                     loadData();
                 })
                 .setNegativeButton("Cancel", null)
@@ -478,7 +515,7 @@ public class MainActivity extends Activity {
 
         addColorRow(layout, "Background", prefs.getBgColor(), c -> prefs.setBgColor(c));
         addColorRow(layout, "Text Color", prefs.getTextColor(), c -> prefs.setTextColor(c));
-        addColorRow(layout, "Accent", prefs.getAccentColor(), c -> prefs.setAccentColor(c));
+        addColorRow(layout, "Border Color", prefs.getAccentColor(), c -> prefs.setAccentColor(c));
 
         // Opacity
         addSpacer(layout, 14);
@@ -503,6 +540,29 @@ public class MainActivity extends Activity {
         });
         layout.addView(opBar);
 
+        // Border Width
+        addSpacer(layout, 14);
+        TextView borderLabel = new TextView(this);
+        int bw = prefs.getBorderWidth();
+        borderLabel.setText(bw == 0 ? "Border: Off" : "Border: " + bw + "dp");
+        borderLabel.setTextColor(0xFFCDD6F4);
+        borderLabel.setTextSize(15f);
+        layout.addView(borderLabel);
+
+        SeekBar borderBar = new SeekBar(this);
+        borderBar.setMax(6);
+        borderBar.setProgress(prefs.getBorderWidth());
+        borderBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int val, boolean u) {
+                borderLabel.setText(val == 0 ? "Border: Off" : "Border: " + val + "dp");
+            }
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {
+                prefs.setBorderWidth(sb.getProgress());
+            }
+        });
+        layout.addView(borderBar);
+
         // Size
         addSpacer(layout, 14);
         TextView sizeLabel = new TextView(this);
@@ -524,13 +584,6 @@ public class MainActivity extends Activity {
         sizeGroup.check(prefs.getSize());
         sizeGroup.setOnCheckedChangeListener((g, id) -> prefs.setSize(id));
         layout.addView(sizeGroup);
-
-        addSpacer(layout, 14);
-        TextView note = new TextView(this);
-        note.setText("Restart overlay to apply changes");
-        note.setTextColor(0xFF888899);
-        note.setTextSize(12f);
-        layout.addView(note);
 
         new AlertDialog.Builder(this)
             .setTitle("Overlay Settings")

@@ -7,7 +7,6 @@
 
 ### Features to Implement
 - [ ] Add separate opacity slider for the timeline bar
-- [ ] Live-update overlay when color/settings change (no restart needed)
 
 ### Bug Fixes
 _(none right now)_
@@ -23,17 +22,29 @@ _(none right now)_
 - [ ] Test that opacity slider only affects background (text stays fully visible)
 - [ ] Test consistent colors: create "Coding" twice on different days, verify same color
 - [ ] Test color picker: changing color for one entry updates all entries with same name
-- [ ] Test reset button (↺) appears only in edit mode, saves + restarts timer
+- [ ] Test reset button (↺) appears only in edit mode, saves + pauses (does NOT auto-start)
 - [ ] Test close button (×) appears only in edit mode, stops overlay service
 - [ ] Test timeline bar: shows day's activity history as colored segments, live segment grows
 - [ ] Test progressive pulse: starts immediately, speeds up 1.5x every 30min, only pulses live segment
-- [ ] Test entry grouping: multiple sessions with same name show as one grouped entry
+- [ ] Test border: accent/border color applied, border width adjustable 0–6dp, alpha scales with bg opacity
+- [ ] Test live-update: changing settings in app immediately updates the overlay (no restart)
+- [ ] Test inline rename: tap entry name in history → edit → press Done → name + color update
+- [ ] Test individual history entries: each session shown separately with time range ("10:00 – 11:00 · 1h 00m")
+- [ ] Test delete removes individual entry (not all entries with same name)
+- [ ] Test pie chart still groups entries by name
 - [ ] Test week view: toggle Day/Week, verify Mon–Sun aggregation
 - [ ] Test export: creates valid JSON file via share sheet
 - [ ] Test import: restores data from JSON backup, skips duplicates
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Overlay visual redesign: white bg default, black text/border, 10dp corners, 5dp padding, unified text sizes (2026-02-10)
+- [x] Add configurable border using accent color (default black, 3dp, adjustable 0–6dp) (2026-02-10)
+- [x] Live-update overlay when settings change (SharedPreferences listener, 100ms debounce) (2026-02-10)
+- [x] Reset button now saves + pauses (no longer auto-starts new timer) (2026-02-10)
+- [x] History shows individual entries with time ranges + inline rename (tap name → edit → Done) (2026-02-10)
+- [x] Delete removes individual entry by ID (not all entries with same name) (2026-02-10)
+- [x] Settings: "Accent" → "Border Color", added border width slider, removed restart note (2026-02-10)
 - [x] Fix overlay sizing bug — root changed from FrameLayout to LinearLayout, bg applied via setBackground() (2026-02-10)
 - [x] Fix keyboard reliability — per-child touch listeners instead of single root listener (2026-02-10)
 - [x] Add reset (↺) and close (×) buttons — only visible during edit mode (2026-02-10)
@@ -60,6 +71,7 @@ _(none right now)_
 
 ## Future Ideas
 - [ ] Add release build signing for installable release APKs
+- [ ] Fix package conflicts on update (dedicated signing key setup — currently debug key mismatch between build environments)
 - [ ] Set up version bumping automation
 
 ## Reference

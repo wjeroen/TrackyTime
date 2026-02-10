@@ -91,6 +91,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return list;
     }
 
+    /** Rename a single entry and update its color to match the new name. */
+    public void updateEntryNameAndColor(long id, String name, int color) {
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues cv = new ContentValues();
+        cv.put("name", name);
+        cv.put("color", color);
+        db.update(TABLE, cv, "id = ?", new String[]{String.valueOf(id)});
+        db.close();
+    }
+
     public void updateColor(long id, int color) {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues cv = new ContentValues();

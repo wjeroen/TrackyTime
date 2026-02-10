@@ -7,6 +7,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
@@ -62,6 +63,10 @@ public class OverlayService extends Service {
     private ValueAnimator pulseAnimator;
     private long currentPulseDuration = 0; // 0 = no pulse active
 
+    // Live-update: listen for pref changes from the settings dialog
+    private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
+    private Runnable applyPrefsRunnable = () -> applyPreferences();
+
     private static final int NOTIF_ID = 1001;
     private static final String CHANNEL_ID = "timetracker_channel";
     private static final long PULSE_INTERVAL_SECONDS = 30 * 60; // speed up every 30 min
@@ -84,6 +89,14 @@ public class OverlayService extends Service {
         startForeground(NOTIF_ID, buildNotification());
         isServiceRunning = true;
         setupOverlay();
+
+        // Live-update: re-apply prefs whenever settings change
+        SharedPreferences sp = getSharedPreferences("overlay_prefs", MODE_PRIVATE);
+        prefsListener = (sharedPreferences, key) -> {
+            timerHandler.removeCallbacks(applyPrefsRunnable);
+            timerHandler.postDelayed(applyPrefsRunnable, 100); // debounce
+        };
+        sp.registerOnSharedPreferenceChangeListener(prefsListener);
     }
 
     private void setupOverlay() {
@@ -119,39 +132,48 @@ public class OverlayService extends Service {
         windowManager.addView(overlayView, params);
     }
 
-    // ---- Visual preferences (opacity ONLY on background) ----
+    // ---- Visual preferences (opacity ONLY on background, border follows opacity) ----
 
     private void applyPreferences() {
         OverlayPreferences prefs = new OverlayPreferences(this);
         float density = getResources().getDisplayMetrics().density;
 
         int bgColor = prefs.getBgColor();
-        int alpha = prefs.getOpacity();
-        int bgWithAlpha = (alpha << 24) | (bgColor & 0x00FFFFFF);
+        int bgOpacity = prefs.getOpacity();
+        int bgWithAlpha = (bgOpacity << 24) | (bgColor & 0x00FFFFFF);
 
-        // Background: rounded pill — drawable alpha doesn't affect children
+        // Background: rounded rect with optional border
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.RECTANGLE);
-        bg.setCornerRadius(20 * density);
+        bg.setCornerRadius(10 * density); // 10dp, matching FCT
         bg.setColor(bgWithAlpha);
+
+        int borderWidth = prefs.getBorderWidth();
+        if (borderWidth > 0) {
+            // Border uses accent color, alpha scales with background opacity
+            int accentColor = prefs.getAccentColor();
+            int borderColor = (bgOpacity << 24) | (accentColor & 0x00FFFFFF);
+            bg.setStroke((int) (borderWidth * density), borderColor);
+        }
         overlayView.setBackground(bg);
 
         // Text: always fully opaque
         int textColor = prefs.getTextColor();
-        int accentColor = prefs.getAccentColor();
 
         timerText.setTextColor(textColor);
         separator.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
         editText.setTextColor(textColor);
         editText.setHintTextColor((textColor & 0x00FFFFFF) | 0x55000000);
-        resetBtn.setTextColor((accentColor & 0x00FFFFFF) | 0x99000000);
+        resetBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
         closeBtn.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
 
+        // Unified text size for everything
         float textSize = prefs.getTextSize();
-        float timerSize = prefs.getTimerTextSize();
-        timerText.setTextSize(TypedValue.COMPLEX_UNIT_SP, timerSize);
+        timerText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         editText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         separator.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+        resetBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+        closeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
 
         // Timeline bar corner radius (not affected by opacity)
         timelineBar.setCornerRadius(2 * density);
@@ -234,8 +256,21 @@ public class OverlayService extends Service {
 
     private void resetTimer() {
         if (currentActivityName.isEmpty()) return;
-        // Save current session, start fresh with same activity name
-        startNewActivity(currentActivityName);
+        // Save current session, reset to 00:00 but DON'T auto-start
+        saveCurrentActivity();
+        loadTodaySegments();
+        currentStartTime = System.currentTimeMillis();
+        accumulatedMs = 0;
+        virtualStartTimestamp = -1;
+        if (isRunning) {
+            isRunning = false;
+            timerHandler.removeCallbacks(timerRunnable);
+        }
+        stopProgressPulse();
+        currentPulseDuration = 0;
+        updateTimerDisplay();
+        showTimerPaused();
+        updateNotification();
     }
 
     // ---- EditText / focus management ----
@@ -510,7 +545,11 @@ public class OverlayService extends Service {
         isServiceRunning = false;
         saveCurrentActivity();
         timerHandler.removeCallbacks(timerRunnable);
+        timerHandler.removeCallbacks(applyPrefsRunnable);
         stopProgressPulse();
+        // Unregister pref listener
+        getSharedPreferences("overlay_prefs", MODE_PRIVATE)
+            .unregisterOnSharedPreferenceChangeListener(prefsListener);
         if (overlayView != null && overlayView.isAttachedToWindow()) {
             windowManager.removeView(overlayView);
         }

@@ -1,15 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Root is LinearLayout (NOT FrameLayout) — bg applied in code via setBackground().
+<!-- Root is LinearLayout — bg + border applied in code via setBackground().
      Drawable alpha only affects the drawable, not child views, so text stays 100% opaque. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/overlayRoot"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingLeft="12dp"
-    android:paddingRight="12dp"
-    android:paddingTop="6dp"
-    android:paddingBottom="2dp">
+    android:padding="5dp">
 
     <!-- Single row: activity text left, time right, reset + close -->
     <LinearLayout
@@ -31,10 +28,7 @@
             android:textSize="14sp"
             android:minWidth="60dp"
             android:maxWidth="180dp"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp"
-            android:paddingLeft="0dp"
-            android:paddingRight="0dp"
+            android:padding="0dp"
             android:fontFamily="sans-serif" />
 
         <!-- Separator (shown when timer is visible) -->
@@ -42,7 +36,7 @@
             android:id="@+id/separator"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text=" · "
+            android:text=" - "
             android:textSize="14sp"
             android:visibility="gone" />
 
@@ -54,23 +48,18 @@
             android:text="00:00"
             android:textSize="14sp"
             android:fontFamily="monospace"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp"
-            android:paddingLeft="0dp"
-            android:paddingRight="0dp"
+            android:padding="0dp"
             android:visibility="gone" />
 
-        <!-- Reset (save + restart same activity) -->
+        <!-- Reset (save + pause timer) -->
         <TextView
             android:id="@+id/resetBtn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text=" ↺"
-            android:textSize="13sp"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp"
-            android:paddingLeft="6dp"
-            android:paddingRight="0dp"
+            android:textSize="14sp"
+            android:paddingLeft="8dp"
+            android:paddingRight="2dp"
             android:visibility="gone" />
 
         <!-- Close overlay (shown only in edit mode) -->
@@ -79,9 +68,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text=" ×"
-            android:textSize="13sp"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp"
+            android:textSize="14sp"
             android:paddingLeft="6dp"
             android:paddingRight="0dp"
             android:visibility="gone" />
@@ -91,8 +78,8 @@
     <com.timetracker.overlay.TimelineBarView
         android:id="@+id/timelineBar"
         android:layout_width="match_parent"
-        android:layout_height="3dp"
-        android:layout_marginTop="2dp"
+        android:layout_height="5dp"
+        android:layout_marginTop="3dp"
         android:visibility="gone" />
 
 </LinearLayout>
