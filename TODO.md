@@ -41,9 +41,10 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Fix pulse direction: breathes from invisible (0) up to user's opacity (ceiling), not the other way (2026-02-10)
 - [x] Fix default opacity to 60 (~24%), border follows same opacity as background (2026-02-10)
 - [x] Tick marks: 2px wide, half-hour fully opaque (only height differentiates from full-hour) (2026-02-10)
-- [x] Fix pulse: live-updates on toggle, respects opacity as floor (255→opacity) (2026-02-10)
+- [x] Fix pulse: live-updates on toggle, respects opacity as ceiling (0→opacity) (2026-02-10)
 - [x] Border grows outward (dynamic padding), default width 1dp (2026-02-10)
 - [x] Open-app icon (↗) sized larger (+4sp) to match ✕ visually (2026-02-10)
 - [x] Timeline bar tick marks: hour (full height) + half-hour (bottom half, hidden >5h), both 2px fully opaque (2026-02-10)

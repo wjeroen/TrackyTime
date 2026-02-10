@@ -12,7 +12,7 @@
 - **↗ open app** → opens the full TrackyTime app (only visible in edit mode)
 - **✕ close** → stops the overlay service (only visible in edit mode)
 - **Timeline bar** → 6dp colored bar at the bottom showing the day's activity history as proportional segments. Each activity session is a colored rectangle. The currently-running activity grows live. The live segment pulses immediately, speeding up 1.5x every 30 minutes as a gentle nudge. Not affected by the opacity slider. White tick marks (2px wide) at every hour (full height) and half-hour (bottom half). Both fully opaque. Half-hour marks are hidden once total tracked time exceeds 5 hours.
-- **Breathing overlay** → optional (default on): the entire background + border pulse in sync with the timeline bar. Breathes from fully opaque down to the user's opacity setting — lower opacity = more dramatic pulse, higher opacity = subtler. Live-updates when toggled in settings.
+- **Breathing overlay** → optional (default on): the entire background + border pulse in sync with the timeline bar. Breathes from invisible (0) up to the user's opacity setting — higher opacity = more visible pulse, lower opacity = subtler. Live-updates when toggled in settings.
 - **Live-update**: changing any setting (colors, size, border, opacity) updates the overlay instantly — no restart needed.
 
 ### Timer
@@ -41,8 +41,8 @@
 - Delete removes the individual entry (not all entries with the same name)
 
 ### Opacity
-- The opacity slider sets the **minimum opacity** of the overlay background and border (default ~24%)
-- With breathing enabled: overlay pulses from fully opaque down to this opacity (the "floor")
+- The opacity slider sets the **maximum opacity** of the overlay background and border (default ~24%)
+- With breathing enabled: overlay pulses from invisible (0) up to this opacity (the "ceiling")
 - Without breathing: background stays at the set opacity
 - Text, timer, and timeline bar are always fully visible (100% alpha)
 
