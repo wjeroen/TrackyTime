@@ -1,6 +1,5 @@
 package com.timetracker.overlay;
 
-import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -25,7 +24,10 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.TextView;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 public class OverlayService extends Service {
@@ -36,9 +38,13 @@ public class OverlayService extends Service {
     private View overlayView;
     private WindowManager.LayoutParams params;
 
-    private View progressContainer, progressTrack, progressBar;
+    private TimelineBarView timelineBar;
     private TextView timerText, separator, resetBtn, closeBtn;
     private EditText editText;
+
+    // Cached timeline segments (from DB, chronological order)
+    private List<TimelineBarView.Segment> savedSegments = new ArrayList<>();
+    private int currentActivityColor = 0;
 
     private Handler timerHandler;
     private boolean isRunning = false;
@@ -53,14 +59,13 @@ public class OverlayService extends Service {
     private DatabaseHelper dbHelper;
     private NotificationManager notifManager;
 
-    private ObjectAnimator pulseAnimator;
+    private ValueAnimator pulseAnimator;
     private long currentPulseDuration = 0; // 0 = no pulse active
 
     private static final int NOTIF_ID = 1001;
     private static final String CHANNEL_ID = "timetracker_channel";
-    private static final long PULSE_START_SECONDS = 30 * 60; // 30 minutes
-    private static final long PULSE_INTERVAL_SECONDS = 30 * 60;
-    private static final long BASE_PULSE_MS = 3000; // 1500ms each way
+    private static final long PULSE_INTERVAL_SECONDS = 30 * 60; // speed up every 30 min
+    private static final long BASE_PULSE_MS = 3000; // 1500ms each way at start
 
     // Drag state
     private int initialX, initialY;
@@ -90,9 +95,7 @@ public class OverlayService extends Service {
         editText = overlayView.findViewById(R.id.activityInput);
         resetBtn = overlayView.findViewById(R.id.resetBtn);
         closeBtn = overlayView.findViewById(R.id.closeBtn);
-        progressContainer = overlayView.findViewById(R.id.progressContainer);
-        progressTrack = overlayView.findViewById(R.id.progressTrack);
-        progressBar = overlayView.findViewById(R.id.progressBar);
+        timelineBar = overlayView.findViewById(R.id.timelineBar);
 
         float density = getResources().getDisplayMetrics().density;
 
@@ -111,6 +114,7 @@ public class OverlayService extends Service {
         applyPreferences();
         setupTouchHandlers();
         setupEditText();
+        loadTodaySegments();
 
         windowManager.addView(overlayView, params);
     }
@@ -149,19 +153,8 @@ public class OverlayService extends Service {
         editText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         separator.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
 
-        // Progress track (faint accent)
-        GradientDrawable trackBg = new GradientDrawable();
-        trackBg.setShape(GradientDrawable.RECTANGLE);
-        trackBg.setCornerRadius(2 * density);
-        trackBg.setColor((accentColor & 0x00FFFFFF) | 0x1A000000);
-        progressTrack.setBackground(trackBg);
-
-        // Progress bar (solid accent)
-        GradientDrawable barBg = new GradientDrawable();
-        barBg.setShape(GradientDrawable.RECTANGLE);
-        barBg.setCornerRadius(2 * density);
-        barBg.setColor(accentColor);
-        progressBar.setBackground(barBg);
+        // Timeline bar corner radius (not affected by opacity)
+        timelineBar.setCornerRadius(2 * density);
     }
 
     // ---- Touch handling: each child handles drag + its own tap action ----
@@ -301,6 +294,7 @@ public class OverlayService extends Service {
         public void run() {
             if (isRunning) {
                 updateTimerDisplay();
+                updateTimelineBar();
                 updatePulseSpeed();
                 timerHandler.postDelayed(this, 500);
             }
@@ -342,34 +336,24 @@ public class OverlayService extends Service {
 
     private void showTimerRunning() {
         timerText.setAlpha(1.0f);
-        progressContainer.setVisibility(View.VISIBLE);
-        progressBar.setAlpha(0f);
-        currentPulseDuration = 0;
-        // Pulse will start via updatePulseSpeed() when elapsed >= 30 min
+        currentPulseDuration = 0; // force pulse recalculation on next tick
     }
 
     private void showTimerPaused() {
         timerText.setAlpha(0.5f);
         stopProgressPulse();
-        progressBar.setAlpha(0.3f);
+        timelineBar.setPulseAlpha(1.0f); // fully opaque when paused
+        updateTimelineBar();
     }
 
-    // ---- Progressive pulse: off < 30min, then 1.5x faster every 30min ----
+    // ---- Progressive pulse: starts immediately, 1.5x faster every 30min ----
 
     private void updatePulseSpeed() {
-        int elapsed = getElapsedSeconds();
-        if (elapsed < PULSE_START_SECONDS) {
-            // Not yet time to pulse
-            if (currentPulseDuration != 0) {
-                stopProgressPulse();
-                progressBar.setAlpha(0f);
-                currentPulseDuration = 0;
-            }
-            return;
-        }
+        if (!isRunning) return;
 
-        // How many 30-min periods after the first 30 min?
-        int periods = (int) ((elapsed - PULSE_START_SECONDS) / PULSE_INTERVAL_SECONDS);
+        int elapsed = getElapsedSeconds();
+        // How many 30-min periods have passed?
+        int periods = (int) (elapsed / PULSE_INTERVAL_SECONDS);
         // duration = BASE / 1.5^periods (each period 1.5x faster)
         long targetDuration = (long) (BASE_PULSE_MS / Math.pow(1.5, periods));
         if (targetDuration < 400) targetDuration = 400; // floor
@@ -378,11 +362,14 @@ public class OverlayService extends Service {
         if (targetDuration != currentPulseDuration) {
             currentPulseDuration = targetDuration;
             stopProgressPulse();
-            pulseAnimator = ObjectAnimator.ofFloat(progressBar, "alpha", 1.0f, 0.3f);
-            pulseAnimator.setDuration(targetDuration / 2); // half-cycle
-            pulseAnimator.setRepeatCount(ValueAnimator.INFINITE);
-            pulseAnimator.setRepeatMode(ValueAnimator.REVERSE);
-            pulseAnimator.start();
+            ValueAnimator va = ValueAnimator.ofFloat(1.0f, 0.3f);
+            va.setDuration(targetDuration / 2); // half-cycle
+            va.setRepeatCount(ValueAnimator.INFINITE);
+            va.setRepeatMode(ValueAnimator.REVERSE);
+            va.addUpdateListener(animation ->
+                timelineBar.setPulseAlpha((float) animation.getAnimatedValue()));
+            pulseAnimator = va;
+            va.start();
         }
     }
 
@@ -406,6 +393,35 @@ public class OverlayService extends Service {
         if (elapsed % 5 == 0) updateNotification();
     }
 
+    // ---- Timeline bar (day history as colored segments) ----
+
+    private void loadTodaySegments() {
+        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+        List<ActivityEntry> entries = dbHelper.getEntriesByDate(today);
+        Collections.reverse(entries); // DB returns DESC; we need chronological
+        savedSegments.clear();
+        for (ActivityEntry e : entries) {
+            savedSegments.add(new TimelineBarView.Segment(e.getColor(), e.getDurationSeconds()));
+        }
+        updateTimelineBar();
+    }
+
+    private void updateTimelineBar() {
+        List<TimelineBarView.Segment> all = new ArrayList<>(savedSegments);
+        // Add the currently-running activity as a live segment
+        if (!currentActivityName.isEmpty()) {
+            int elapsed = getElapsedSeconds();
+            if (elapsed > 0) {
+                all.add(new TimelineBarView.Segment(currentActivityColor, elapsed));
+            }
+        }
+        if (!all.isEmpty()) {
+            timelineBar.setVisibility(View.VISIBLE);
+            int pulseIdx = (isRunning && !currentActivityName.isEmpty()) ? all.size() - 1 : -1;
+            timelineBar.setSegments(all, pulseIdx);
+        }
+    }
+
     // ---- Activity tracking ----
 
     private void saveCurrentActivity() {
@@ -424,14 +440,15 @@ public class OverlayService extends Service {
 
     private void startNewActivity(String name) {
         saveCurrentActivity();
+        loadTodaySegments(); // re-query DB now that previous activity is saved
         currentActivityName = name;
+        currentActivityColor = dbHelper.getColorForName(name);
         currentStartTime = System.currentTimeMillis();
         accumulatedMs = 0;
         virtualStartTimestamp = -1;
 
         timerText.setVisibility(View.VISIBLE);
         separator.setVisibility(View.VISIBLE);
-        progressContainer.setVisibility(View.VISIBLE);
 
         updateTimerDisplay();
         startTimer();

@@ -6,7 +6,8 @@
 - [ ] Verify GitHub Actions build succeeds after latest push
 
 ### Features to Implement
-_(none right now)_
+- [ ] Add separate opacity slider for the timeline bar
+- [ ] Live-update overlay when color/settings change (no restart needed)
 
 ### Bug Fixes
 _(none right now)_
@@ -24,7 +25,8 @@ _(none right now)_
 - [ ] Test color picker: changing color for one entry updates all entries with same name
 - [ ] Test reset button (↺) appears only in edit mode, saves + restarts timer
 - [ ] Test close button (×) appears only in edit mode, stops overlay service
-- [ ] Test progressive pulse: silent first 30min, then starts, speeds up 1.5x every 30min
+- [ ] Test timeline bar: shows day's activity history as colored segments, live segment grows
+- [ ] Test progressive pulse: starts immediately, speeds up 1.5x every 30min, only pulses live segment
 - [ ] Test entry grouping: multiple sessions with same name show as one grouped entry
 - [ ] Test week view: toggle Day/Week, verify Mon–Sun aggregation
 - [ ] Test export: creates valid JSON file via share sheet
@@ -35,7 +37,8 @@ _(none right now)_
 - [x] Fix overlay sizing bug — root changed from FrameLayout to LinearLayout, bg applied via setBackground() (2026-02-10)
 - [x] Fix keyboard reliability — per-child touch listeners instead of single root listener (2026-02-10)
 - [x] Add reset (↺) and close (×) buttons — only visible during edit mode (2026-02-10)
-- [x] Progressive pulse: off first 30min, starts pulsing, 1.5x faster every 30min (2026-02-10)
+- [x] Timeline bar: day history as colored segments, live segment grows in real-time (2026-02-10)
+- [x] Progressive pulse: starts immediately on live segment, 1.5x faster every 30min (2026-02-10)
 - [x] Group same-name entries in pie chart and history (durations summed) (2026-02-10)
 - [x] Add Day/Week view toggle (week = Mon–Sun aggregation) (2026-02-10)
 - [x] Add export/import via Android SAF (JSON format with duplicate detection) (2026-02-10)

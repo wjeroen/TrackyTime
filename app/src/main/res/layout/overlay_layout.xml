@@ -87,24 +87,12 @@
             android:visibility="gone" />
     </LinearLayout>
 
-    <!-- Thin accent line at bottom (hidden until timer starts) -->
-    <FrameLayout
-        android:id="@+id/progressContainer"
+    <!-- Day timeline bar: colored segments proportional to each activity's duration -->
+    <com.timetracker.overlay.TimelineBarView
+        android:id="@+id/timelineBar"
         android:layout_width="match_parent"
         android:layout_height="3dp"
         android:layout_marginTop="2dp"
-        android:visibility="gone">
-
-        <View
-            android:id="@+id/progressTrack"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-        <View
-            android:id="@+id/progressBar"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:alpha="0" />
-    </FrameLayout>
+        android:visibility="gone" />
 
 </LinearLayout>

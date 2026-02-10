@@ -10,7 +10,7 @@
 - **Tap background** → dismiss keyboard / exit edit mode
 - **↺ reset** → saves current session, restarts timer with same activity name (only visible in edit mode)
 - **× close** → stops the overlay service (only visible in edit mode)
-- **Progress bar** → thin accent-colored line at the bottom; starts pulsing after 30 minutes, speeds up 1.5x every 30 minutes as a gentle nudge
+- **Timeline bar** → thin colored bar at the bottom showing the day's activity history as proportional segments. Each activity session is a colored rectangle. The currently-running activity grows live. The live segment pulses immediately, speeding up 1.5x every 30 minutes as a gentle nudge. Not affected by the opacity slider.
 
 ### Timer
 - **Drift-proof**: uses `virtualStartTimestamp` pattern (elapsed = now − virtualStart) instead of incrementing a counter
@@ -37,7 +37,7 @@
 
 ### Opacity
 - The opacity slider in settings controls **only the background** of the overlay pill
-- Text, timer, and accent elements are always fully visible (100% alpha)
+- Text, timer, and timeline bar are always fully visible (100% alpha)
 
 ## Quick Reference File Structure
 
@@ -49,7 +49,8 @@
 | `app/build.gradle` | Android build config — SDK versions, package name, build types |
 | `app/proguard-rules.pro` | ProGuard rules for release builds (currently empty) |
 | `app/src/main/AndroidManifest.xml` | Permissions + component declarations |
-| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, edit mode, progressive pulse |
+| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, edit mode, timeline bar, progressive pulse |
+| `app/src/main/java/.../TimelineBarView.java` | Custom View: draws day timeline as proportional colored segments on a Canvas |
 | `app/src/main/java/.../MainActivity.java` | History view, pie chart, day/week toggle, date nav, color picker, entry grouping, export/import, settings |
 | `app/src/main/java/.../DatabaseHelper.java` | SQLite storage + `getColorForName()` / `updateColorByName()` / date range queries / export/import |
 | `app/src/main/java/.../ActivityEntry.java` | Data model |
@@ -81,7 +82,8 @@ TrackyTime/
 │       │   ├── MainActivity.java
 │       │   ├── OverlayPreferences.java
 │       │   ├── OverlayService.java
-│       │   └── PieChartView.java
+│       │   ├── PieChartView.java
+│       │   └── TimelineBarView.java
 │       └── res/
 │           ├── layout/          ← XML layouts
 │           └── values/          ← Strings, colors, styles
