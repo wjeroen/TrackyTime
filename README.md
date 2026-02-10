@@ -1,39 +1,5 @@
 # Time Tracker Overlay - AIDE Setup Guide
 
-## Quick Setup in AIDE
-
-1. **Create new project** in AIDE:
-   - Open AIDE → Menu → New Project → "Android App"
-   - Set package name: `com.timetracker.overlay`
-   - Set app name: `Time Tracker`
-   - Set minimum SDK: 26 (Android 8.0)
-   - Target SDK: 33 or higher
-
-2. **Replace files** — AIDE creates a default project structure.
-   Replace each file with the ones from this archive:
-   
-   ```
-   AndroidManifest.xml          → replace root AndroidManifest.xml
-   res/layout/activity_main.xml → replace (delete default layout)
-   res/layout/overlay_layout.xml         → create new
-   res/layout/item_activity_entry.xml    → create new
-   res/values/colors.xml        → replace
-   res/values/strings.xml       → replace
-   res/values/styles.xml        → replace
-   src/.../ActivityEntry.java   → create in src/com/timetracker/overlay/
-   src/.../DatabaseHelper.java  → create in same folder
-   src/.../MainActivity.java    → replace default
-   src/.../OverlayPreferences.java → create
-   src/.../OverlayService.java  → create
-   src/.../PieChartView.java    → create
-   ```
-
-3. **Build & Run** — Press the Play button in AIDE. It compiles and installs.
-
-4. **Grant permissions** when prompted:
-   - "Display over other apps" — tap the toggle ON
-   - Notification permission — allow
-
 ## How It Works
 
 - **Overlay**: Floating widget with timer + text field + play/pause
@@ -45,7 +11,7 @@
 - **App** → shows daily pie chart, history with color assignment, date navigation
 - **Settings** → customize overlay background, text, accent colors, opacity, size
 
-## File Summary
+## Quick Reference File Structure
 
 | File | Purpose |
 |------|---------|
