@@ -22,7 +22,9 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
+import android.text.InputType;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -40,8 +42,9 @@ public class OverlayService extends Service {
     private WindowManager.LayoutParams params;
 
     private TimelineBarView timelineBar;
-    private TextView timerText, separator, openAppBtn, closeBtn;
+    private TextView timerText, separator, openAppBtn, closeBtn, addBtn;
     private EditText editText;
+    private LinearLayout quickSelectContainer;
     private GradientDrawable overlayBg; // cached for pulse animation
 
     // Cached timeline segments (from DB, chronological order)
@@ -117,9 +120,11 @@ public class OverlayService extends Service {
         timerText = overlayView.findViewById(R.id.timerText);
         separator = overlayView.findViewById(R.id.separator);
         editText = overlayView.findViewById(R.id.activityInput);
+        addBtn = overlayView.findViewById(R.id.addBtn);
         openAppBtn = overlayView.findViewById(R.id.openAppBtn);
         closeBtn = overlayView.findViewById(R.id.closeBtn);
         timelineBar = overlayView.findViewById(R.id.timelineBar);
+        quickSelectContainer = overlayView.findViewById(R.id.quickSelectContainer);
 
         float density = getResources().getDisplayMetrics().density;
 
@@ -184,6 +189,7 @@ public class OverlayService extends Service {
         separator.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
         editText.setTextColor(textColor);
         editText.setHintTextColor((textColor & 0x00FFFFFF) | 0x55000000);
+        addBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
         openAppBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
         closeBtn.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
 
@@ -192,6 +198,7 @@ public class OverlayService extends Service {
         timerText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         editText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         separator.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+        addBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         openAppBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         closeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
 
@@ -244,6 +251,10 @@ public class OverlayService extends Service {
         timerText.setOnTouchListener((v, event) ->
             handleDragTouch(event, this::togglePause));
 
+        // Add quick-select: drag or tap-to-add
+        addBtn.setOnTouchListener((v, event) ->
+            handleDragTouch(event, this::addQuickSelectRow));
+
         // Open app: drag or tap-to-open
         openAppBtn.setOnTouchListener((v, event) ->
             handleDragTouch(event, this::openApp));
@@ -252,17 +263,11 @@ public class OverlayService extends Service {
         closeBtn.setOnTouchListener((v, event) ->
             handleDragTouch(event, this::stopSelf));
 
-        // Background (root): drag, tap-to-exit-edit, or outside touch exits edit
-        overlayView.setOnTouchListener((v, event) -> {
-            // ACTION_OUTSIDE fires when user taps outside the overlay window
-            if (event.getAction() == MotionEvent.ACTION_OUTSIDE) {
+        // Background (root): drag or tap-to-exit-edit
+        overlayView.setOnTouchListener((v, event) ->
+            handleDragTouch(event, () -> {
                 if (isInEditMode()) exitEditMode();
-                return true;
-            }
-            return handleDragTouch(event, () -> {
-                if (isInEditMode()) exitEditMode();
-            });
-        });
+            }));
     }
 
     private void openApp() {
@@ -304,15 +309,16 @@ public class OverlayService extends Service {
     }
 
     private void enterEditMode() {
-        // Allow focus + detect touches outside the overlay window
+        // Allow focus so EditText can receive input
         params.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-        params.flags |= WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
         windowManager.updateViewLayout(overlayView, params);
         editText.requestFocus();
         editText.setSelection(editText.getText().length());
-        // Show open-app + close buttons while editing
+        // Show edit-mode buttons and quick-select rows
+        addBtn.setVisibility(View.VISIBLE);
         openAppBtn.setVisibility(View.VISIBLE);
         closeBtn.setVisibility(View.VISIBLE);
+        rebuildQuickSelectRows();
         editText.postDelayed(() -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
             if (imm != null) imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT);
@@ -328,16 +334,19 @@ public class OverlayService extends Service {
     }
 
     private void closeEditingUI() {
+        // Save any quick-select names before closing
+        saveQuickSelectNames();
         editText.clearFocus();
         InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(editText.getWindowToken(), 0);
-        // Restore non-focusable, stop watching outside touches
+        // Restore non-focusable
         params.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-        params.flags &= ~WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
         windowManager.updateViewLayout(overlayView, params);
-        // Hide open-app + close buttons when not editing
+        // Hide edit-mode buttons and quick-select rows
+        addBtn.setVisibility(View.GONE);
         openAppBtn.setVisibility(View.GONE);
         closeBtn.setVisibility(View.GONE);
+        quickSelectContainer.setVisibility(View.GONE);
     }
 
     // ---- Timer (drift-proof) ----
@@ -450,35 +459,24 @@ public class OverlayService extends Service {
     }
 
     /**
-     * Animate overlay bg + border in sync with the timeline bar pulse.
-     * Pulse breathes between the user's opacity (ceiling) and 20% visible opacity (floor).
-     * This keeps the overlay always somewhat visible — never fully disappearing.
+     * Animate ONLY the border in sync with the timeline bar pulse.
+     * Background stays at the user's static opacity. Border breathes between
+     * the user's opacity (ceiling) and 20% visible opacity (floor).
      */
     private static final int PULSE_FLOOR_ALPHA = 51; // 20% of 255 ≈ 20% user-visible opacity
 
     private void applyOverlayPulse(float pulseAlpha) {
         if (!cachedOverlayPulseEnabled) return;
         if (overlayBg == null) return;
+        if (cachedBorderWidth <= 0) return; // no border = nothing to pulse
 
-        // If user's opacity is already at or below the floor, don't animate
         int floor = Math.min(PULSE_FLOOR_ALPHA, cachedBgOpacity);
-
-        // Map pulseAlpha (1.0→0.3) to bg alpha (cachedBgOpacity→floor)
-        // At pulseAlpha=1.0: bgAlpha=cachedBgOpacity (user's setting = ceiling)
-        // At pulseAlpha=0.3: bgAlpha=floor (20% visible, not invisible)
         int range = cachedBgOpacity - floor;
-        int bgAlpha = floor + (int) (range * (pulseAlpha - 0.3f) / 0.7f);
-        if (bgAlpha > cachedBgOpacity) bgAlpha = cachedBgOpacity;
-        if (bgAlpha < floor) bgAlpha = floor;
-        overlayBg.setColor((bgAlpha << 24) | (cachedBgColor & 0x00FFFFFF));
-
-        if (cachedBorderWidth > 0) {
-            int borderAlpha = floor + (int) (range * (pulseAlpha - 0.3f) / 0.7f);
-            if (borderAlpha > cachedBgOpacity) borderAlpha = cachedBgOpacity;
-            if (borderAlpha < floor) borderAlpha = floor;
-            overlayBg.setStroke((int) (cachedBorderWidth * cachedDensity),
-                (borderAlpha << 24) | (cachedAccentColor & 0x00FFFFFF));
-        }
+        int borderAlpha = floor + (int) (range * (pulseAlpha - 0.3f) / 0.7f);
+        if (borderAlpha > cachedBgOpacity) borderAlpha = cachedBgOpacity;
+        if (borderAlpha < floor) borderAlpha = floor;
+        overlayBg.setStroke((int) (cachedBorderWidth * cachedDensity),
+            (borderAlpha << 24) | (cachedAccentColor & 0x00FFFFFF));
     }
 
     private void stopProgressPulse() {
@@ -612,6 +610,128 @@ public class OverlayService extends Service {
 
     private void updateNotification() {
         notifManager.notify(NOTIF_ID, buildNotification());
+    }
+
+    // ---- Quick-select activity shortcuts ----
+
+    private void addQuickSelectRow() {
+        addQuickSelectRowWithName("", true);
+    }
+
+    private void addQuickSelectRowWithName(String name, boolean requestFocus) {
+        quickSelectContainer.setVisibility(View.VISIBLE);
+
+        OverlayPreferences prefs = new OverlayPreferences(this);
+        float density = getResources().getDisplayMetrics().density;
+        float textSize = prefs.getTextSize();
+        int textColor = prefs.getTextColor();
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, (int) (3 * density), 0, 0);
+
+        // Play button ▶
+        TextView playBtn = new TextView(this);
+        playBtn.setText("▶");
+        playBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+        playBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
+        playBtn.setPadding(0, 0, (int) (6 * density), 0);
+        playBtn.setIncludeFontPadding(false);
+
+        // Activity name
+        EditText nameField = new EditText(this);
+        nameField.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+        nameField.setTextColor(textColor);
+        nameField.setHintTextColor((textColor & 0x00FFFFFF) | 0x55000000);
+        nameField.setBackground(null);
+        nameField.setSingleLine(true);
+        nameField.setImeOptions(EditorInfo.IME_ACTION_DONE);
+        nameField.setInputType(InputType.TYPE_CLASS_TEXT);
+        nameField.setPadding(0, 0, 0, 0);
+        nameField.setHint("activity name");
+        nameField.setMinWidth((int) (60 * density));
+        nameField.setMaxWidth((int) (140 * density));
+        if (!name.isEmpty()) nameField.setText(name);
+        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(
+            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        nameField.setLayoutParams(nameParams);
+
+        // Remove button ✕
+        TextView removeBtn = new TextView(this);
+        removeBtn.setText("✕");
+        removeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+        removeBtn.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
+        removeBtn.setPadding((int) (6 * density), 0, 0, 0);
+        removeBtn.setIncludeFontPadding(false);
+
+        row.addView(playBtn);
+        row.addView(nameField);
+        row.addView(removeBtn);
+        quickSelectContainer.addView(row);
+
+        // Play: switch to this activity
+        playBtn.setOnTouchListener((v, event) ->
+            handleDragTouch(event, () -> {
+                String actName = nameField.getText().toString().trim();
+                if (!actName.isEmpty()) {
+                    saveQuickSelectNames();
+                    startNewActivity(actName);
+                    exitEditMode();
+                }
+            }));
+
+        // Done on keyboard: save the name and clear focus
+        nameField.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                saveQuickSelectNames();
+                nameField.clearFocus();
+                return true;
+            }
+            return false;
+        });
+
+        // Remove: delete this row
+        removeBtn.setOnTouchListener((v, event) ->
+            handleDragTouch(event, () -> {
+                quickSelectContainer.removeView(row);
+                saveQuickSelectNames();
+                if (quickSelectContainer.getChildCount() == 0) {
+                    quickSelectContainer.setVisibility(View.GONE);
+                }
+            }));
+
+        if (requestFocus) {
+            nameField.requestFocus();
+            nameField.postDelayed(() -> {
+                InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (imm != null) imm.showSoftInput(nameField, InputMethodManager.SHOW_IMPLICIT);
+            }, 200);
+        }
+    }
+
+    private void saveQuickSelectNames() {
+        List<String> names = new ArrayList<>();
+        for (int i = 0; i < quickSelectContainer.getChildCount(); i++) {
+            LinearLayout row = (LinearLayout) quickSelectContainer.getChildAt(i);
+            EditText nameField = (EditText) row.getChildAt(1);
+            String name = nameField.getText().toString().trim();
+            if (!name.isEmpty()) names.add(name);
+        }
+        new OverlayPreferences(this).setQuickActivities(names);
+    }
+
+    private void rebuildQuickSelectRows() {
+        quickSelectContainer.removeAllViews();
+        List<String> names = new OverlayPreferences(this).getQuickActivities();
+        if (names.isEmpty()) {
+            quickSelectContainer.setVisibility(View.GONE);
+        } else {
+            quickSelectContainer.setVisibility(View.VISIBLE);
+            for (String name : names) {
+                addQuickSelectRowWithName(name, false);
+            }
+        }
     }
 
     // ---- Lifecycle ----

@@ -51,6 +51,19 @@
             android:padding="0dp"
             android:visibility="gone" />
 
+        <!-- Add quick-select shortcut (shown only in edit mode) -->
+        <TextView
+            android:id="@+id/addBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="+"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:paddingLeft="6dp"
+            android:paddingRight="0dp"
+            android:visibility="gone" />
+
         <!-- Open full app (shown only in edit mode) -->
         <TextView
             android:id="@+id/openAppBtn"
@@ -84,6 +97,14 @@
         android:layout_width="match_parent"
         android:layout_height="6dp"
         android:layout_marginTop="3dp"
+        android:visibility="gone" />
+
+    <!-- Quick-select activity rows (populated programmatically, shown in edit mode) -->
+    <LinearLayout
+        android:id="@+id/quickSelectContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
         android:visibility="gone" />
 
 </LinearLayout>

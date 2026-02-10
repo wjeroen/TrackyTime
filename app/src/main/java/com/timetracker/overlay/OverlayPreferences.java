@@ -2,6 +2,9 @@ package com.timetracker.overlay;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class OverlayPreferences {
 
@@ -50,5 +53,15 @@ public class OverlayPreferences {
     /** Same as getTextSize() — timer matches activity text. */
     public float getTimerTextSize() {
         return getTextSize();
+    }
+
+    // Quick-select activity shortcuts (newline-delimited)
+    public List<String> getQuickActivities() {
+        String raw = sp.getString("quick_activities", "");
+        if (raw.isEmpty()) return new ArrayList<>();
+        return new ArrayList<>(Arrays.asList(raw.split("\n")));
+    }
+    public void setQuickActivities(List<String> activities) {
+        sp.edit().putString("quick_activities", String.join("\n", activities)).apply();
     }
 }

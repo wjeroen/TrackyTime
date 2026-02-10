@@ -25,10 +25,10 @@ _(none right now)_
 - [ ] Test color picker: 44 colors (vivid, warm, pastel, deep), changing color updates all entries with same name
 - [ ] Test open-app button (➚) appears only in edit mode, opens full app
 - [ ] Test close button (✕) appears only in edit mode, stops overlay service
-- [ ] Test tapping outside overlay exits edit mode and saves any typed text
+- [ ] Test quick-select: + adds row, ▶ switches activity, ✕ removes row, persists across sessions
 - [ ] Test timeline bar: colored segments, live segment grows, tick marks at hour (full) and half-hour (half, hidden >5h)
 - [ ] Test progressive pulse: starts immediately, speeds up 1.5x every 30min, pulses live segment + bg/border
-- [ ] Test breathing overlay toggle: on = bg+border pulse in sync, off = only timeline bar pulses
+- [ ] Test breathing overlay toggle: on = border pulses in sync, off = only timeline bar pulses (background stays static)
 - [ ] Test border: accent/border color applied, border width adjustable 0–6dp, alpha scales with bg opacity
 - [ ] Test live-update: changing settings in app immediately updates the overlay (no restart)
 - [ ] Test inline rename: tap entry name in history → edit → press Done → name + color update
@@ -41,8 +41,11 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Quick-select activity shortcuts: + button adds rows with ▶ play and ✕ remove, persists in prefs (2026-02-10)
+- [x] Border-only pulse: background stays static, only border breathes (20%→user's opacity) (2026-02-10)
+- [x] Revert tap-outside-exits-edit-mode (removed FLAG_WATCH_OUTSIDE_TOUCH) (2026-02-10)
 - [x] Fix pulse direction: breathes from invisible (0) up to user's opacity (ceiling), not the other way (2026-02-10)
-- [x] Fix default opacity to 60 (~24%), border follows same opacity as background (2026-02-10)
+- [x] Fix default opacity to 60% user-visible (internal 153), pulse floor at 20% (2026-02-10)
 - [x] Tick marks: 2px wide, half-hour fully opaque (only height differentiates from full-hour) (2026-02-10)
 - [x] Fix pulse: live-updates on toggle, respects opacity as ceiling (0→opacity) (2026-02-10)
 - [x] Border grows outward (dynamic padding), default width 1dp (2026-02-10)

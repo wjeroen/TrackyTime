@@ -5,14 +5,14 @@
 ### Overlay (floating pill)
 - **Compact pill shape**: activity name on the left, timer on the right, 10dp rounded corners
 - **Border**: configurable color (uses accent/border color setting) and width (0–6dp, default 1dp black). Border grows outward (content area stays the same size). Follows the same opacity as the background (both at rest and during pulse).
-- **Tap activity text** → enter edit mode (keyboard pops up, ➚ open-app + ✕ close buttons appear). Type a new name and press Done — the previous activity is saved and timer restarts.
+- **Tap activity text** → enter edit mode (keyboard pops up, + / ➚ / ✕ buttons appear, quick-select rows show). Type a new name and press Done — the previous activity is saved and timer restarts.
 - **Tap timer** → pause/resume (timer dims when paused)
 - **Drag anywhere** → reposition the pill on screen (clamped to screen bounds)
-- **Tap outside overlay** → saves any typed text and exits edit mode automatically
+- **+ add shortcut** → adds a quick-select row below the timeline (only visible in edit mode). Type an activity name, then tap ▶ to instantly switch to it. Tap ✕ on a row to remove it. Shortcuts persist across sessions.
 - **➚ open app** → opens the full TrackyTime app (only visible in edit mode)
 - **✕ close** → stops the overlay service (only visible in edit mode)
 - **Timeline bar** → 6dp colored bar at the bottom showing the day's activity history as proportional segments. Each activity session is a colored rectangle. The currently-running activity grows live. The live segment pulses immediately, speeding up 1.5x every 30 minutes as a gentle nudge. Not affected by the opacity slider. White tick marks (2px wide) at every hour (full height) and half-hour (bottom half). Both fully opaque. Half-hour marks are hidden once total tracked time exceeds 5 hours.
-- **Breathing overlay** → optional (default on): the entire background + border pulse in sync with the timeline bar. Breathes from invisible (0) up to the user's opacity setting — higher opacity = more visible pulse, lower opacity = subtler. Live-updates when toggled in settings.
+- **Breathing overlay** → optional (default on): the border pulses in sync with the timeline bar. Breathes from 20% visible up to the user's opacity setting — higher opacity = more visible pulse, lower opacity = subtler. Background stays static. Live-updates when toggled in settings.
 - **Live-update**: changing any setting (colors, size, border, opacity) updates the overlay instantly — no restart needed.
 
 ### Timer
@@ -41,9 +41,9 @@
 - Delete removes the individual entry (not all entries with the same name)
 
 ### Opacity
-- The opacity slider sets the **maximum opacity** of the overlay background and border (default ~24%)
-- With breathing enabled: overlay pulses from invisible (0) up to this opacity (the "ceiling")
-- Without breathing: background stays at the set opacity
+- The opacity slider sets the **opacity** of the overlay background and border (default ~60%)
+- With breathing enabled: border pulses from 20% up to this opacity (the "ceiling"); background stays static
+- Without breathing: everything stays at the set opacity
 - Text, timer, and timeline bar are always fully visible (100% alpha)
 
 ## Quick Reference File Structure
@@ -56,13 +56,13 @@
 | `app/build.gradle` | Android build config — SDK versions, package name, build types |
 | `app/proguard-rules.pro` | ProGuard rules for release builds (currently empty) |
 | `app/src/main/AndroidManifest.xml` | Permissions + component declarations |
-| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, edit mode, open-app button, timeline bar, progressive pulse, breathing overlay, border, live-update settings |
+| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, edit mode, open-app button, quick-select shortcuts, timeline bar, progressive pulse, breathing border, live-update settings |
 | `app/src/main/java/.../TimelineBarView.java` | Custom View: draws day timeline as proportional colored segments on a Canvas |
 | `app/src/main/java/.../MainActivity.java` | History view (individual entries, inline rename), pie chart, day/week toggle, date nav, color picker, export/import, settings (border color + width) |
 | `app/src/main/java/.../DatabaseHelper.java` | SQLite storage + `getColorForName()` / `updateColorByName()` / `updateEntryNameAndColor()` / date range queries / export/import |
 | `app/src/main/java/.../ActivityEntry.java` | Data model |
 | `app/src/main/java/.../PieChartView.java` | Custom canvas-drawn pie chart |
-| `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance (bg/text/border colors, border width, opacity, size, overlay pulse toggle) |
+| `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance (bg/text/border colors, border width, opacity, size, overlay pulse toggle, quick-select activities) |
 | `.github/workflows/android.yml` | GitHub Actions workflow — builds APK on every push |
 
 > **Note:** Java files live under `app/src/main/java/com/timetracker/overlay/`. The `...` above abbreviates that path.
