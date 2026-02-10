@@ -11,7 +11,7 @@
 - **Tap outside overlay** → saves any typed text and exits edit mode automatically
 - **↗ open app** → opens the full TrackyTime app (only visible in edit mode)
 - **✕ close** → stops the overlay service (only visible in edit mode)
-- **Timeline bar** → thin colored bar at the bottom showing the day's activity history as proportional segments. Each activity session is a colored rectangle. The currently-running activity grows live. The live segment pulses immediately, speeding up 1.5x every 30 minutes as a gentle nudge. Not affected by the opacity slider.
+- **Timeline bar** → 6dp colored bar at the bottom showing the day's activity history as proportional segments. Each activity session is a colored rectangle. The currently-running activity grows live. The live segment pulses immediately, speeding up 1.5x every 30 minutes as a gentle nudge. Not affected by the opacity slider. White tick marks at every hour (full height, 100% white) and half-hour (bottom half, 50% white). Half-hour marks are hidden once total tracked time exceeds 5 hours.
 - **Breathing overlay** → optional (default on): the entire background + border pulse in sync with the timeline bar, making activity tracking more noticeable. Configurable in settings.
 - **Live-update**: changing any setting (colors, size, border, opacity) updates the overlay instantly — no restart needed.
 

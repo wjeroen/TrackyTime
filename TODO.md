@@ -7,7 +7,6 @@
 
 ### Features to Implement
 - [ ] Add separate opacity slider for the timeline bar
-- [ ] Add timeline bar time markers (vertical lines at hour/half-hour of tracked time)
 - [ ] Expand background/border color picker (more color options like activity picker)
 
 ### Bug Fixes
@@ -27,7 +26,7 @@ _(none right now)_
 - [ ] Test open-app button (↗) appears only in edit mode, opens full app
 - [ ] Test close button (✕) appears only in edit mode, stops overlay service
 - [ ] Test tapping outside overlay exits edit mode and saves any typed text
-- [ ] Test timeline bar: shows day's activity history as colored segments, live segment grows
+- [ ] Test timeline bar: colored segments, live segment grows, tick marks at hour (full) and half-hour (half, hidden >5h)
 - [ ] Test progressive pulse: starts immediately, speeds up 1.5x every 30min, pulses live segment + bg/border
 - [ ] Test breathing overlay toggle: on = bg+border pulse in sync, off = only timeline bar pulses
 - [ ] Test border: accent/border color applied, border width adjustable 0–6dp, alpha scales with bg opacity
@@ -42,6 +41,7 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Timeline bar tick marks: hour (full height, 100% white) + half-hour (bottom half, 50% white, hidden >5h) (2026-02-10)
 - [x] Remove reset button, add ↗ open-app button to overlay edit mode (2026-02-10)
 - [x] Exit edit mode when tapping outside overlay (FLAG_WATCH_OUTSIDE_TOUCH + ACTION_OUTSIDE) (2026-02-10)
 - [x] Breathing overlay: bg + border pulse in sync with timeline bar, optional setting (default on) (2026-02-10)
