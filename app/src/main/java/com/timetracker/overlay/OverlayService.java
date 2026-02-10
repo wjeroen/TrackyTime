@@ -143,7 +143,7 @@ public class OverlayService extends Service {
         windowManager.addView(overlayView, params);
     }
 
-    // ---- Visual preferences (opacity ONLY on background, border follows opacity) ----
+    // ---- Visual preferences (opacity applies to both background and border) ----
 
     private static final int BASE_PADDING_DP = 5;
 
@@ -165,9 +165,10 @@ public class OverlayService extends Service {
         overlayBg.setColor(bgWithAlpha);
 
         if (borderWidth > 0) {
-            // Border uses accent color, fully opaque (not tied to bg opacity)
+            // Border follows same opacity as background
             int accentColor = prefs.getAccentColor();
-            overlayBg.setStroke(borderWidthPx, accentColor);
+            int borderColor = (bgOpacity << 24) | (accentColor & 0x00FFFFFF);
+            overlayBg.setStroke(borderWidthPx, borderColor);
         }
         overlayView.setBackground(overlayBg);
 

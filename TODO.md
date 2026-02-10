@@ -20,7 +20,7 @@ _(none right now)_
 
 ### Testing
 - [ ] Test overlay pill: drag, tap-to-edit, tap-timer-to-pause all work
-- [ ] Test that opacity slider only affects background (text stays fully visible)
+- [ ] Test that opacity slider affects background + border (text stays fully visible)
 - [ ] Test consistent colors: create "Coding" twice on different days, verify same color
 - [ ] Test color picker: 44 colors (vivid, warm, pastel, deep), changing color updates all entries with same name
 - [ ] Test open-app button (↗) appears only in edit mode, opens full app
@@ -41,10 +41,12 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
-- [x] Fix pulse: live-updates on toggle, respects opacity as floor (255→opacity), border fully opaque at rest (2026-02-10)
-- [x] Border grows outward (dynamic padding), default width 1dp, default opacity 50% (2026-02-10)
+- [x] Fix default opacity to 60 (~24%), border follows same opacity as background (2026-02-10)
+- [x] Tick marks: 2px wide, half-hour fully opaque (only height differentiates from full-hour) (2026-02-10)
+- [x] Fix pulse: live-updates on toggle, respects opacity as floor (255→opacity) (2026-02-10)
+- [x] Border grows outward (dynamic padding), default width 1dp (2026-02-10)
 - [x] Open-app icon (↗) sized larger (+4sp) to match ✕ visually (2026-02-10)
-- [x] Timeline bar tick marks: hour (full height, 100% white) + half-hour (bottom half, 50% white, hidden >5h) (2026-02-10)
+- [x] Timeline bar tick marks: hour (full height) + half-hour (bottom half, hidden >5h), both 2px fully opaque (2026-02-10)
 - [x] Remove reset button, add ↗ open-app button to overlay edit mode (2026-02-10)
 - [x] Exit edit mode when tapping outside overlay (FLAG_WATCH_OUTSIDE_TOUCH + ACTION_OUTSIDE) (2026-02-10)
 - [x] Breathing overlay: bg + border pulse in sync with timeline bar, optional setting (default on) (2026-02-10)
