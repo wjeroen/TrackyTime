@@ -117,18 +117,11 @@
             android:layout_gravity="center"
             android:layout_marginBottom="16dp" />
 
-        <LinearLayout
-            android:id="@+id/historyContainer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical" />
-
-        <!-- Bottom buttons -->
+        <!-- Controls row: export, import, settings — above history -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginTop="20dp"
             android:layout_marginBottom="8dp">
 
             <Button
@@ -147,16 +140,24 @@
                 android:layout_weight="1"
                 android:text="Import"
                 android:textSize="13sp"
+                android:layout_marginLeft="4dp"
+                android:layout_marginRight="4dp" />
+
+            <Button
+                android:id="@+id/settingsBtn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="⚙ Settings"
+                android:textSize="13sp"
                 android:layout_marginLeft="4dp" />
         </LinearLayout>
 
-        <Button
-            android:id="@+id/settingsBtn"
+        <LinearLayout
+            android:id="@+id/historyContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="⚙ Customize Overlay"
-            android:textSize="14sp"
-            android:layout_marginBottom="16dp" />
+            android:orientation="vertical" />
 
     </LinearLayout>
 </ScrollView>

@@ -147,9 +147,21 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         if (found) return color;
 
         int[] palette = {
-            0xFFE53935, 0xFFEC407A, 0xFFAB47BC, 0xFF7E57C2,
-            0xFF42A5F5, 0xFF26C6DA, 0xFF26A69A, 0xFF66BB6A,
-            0xFFD4E157, 0xFFFFEE58, 0xFFFFA726, 0xFF8D6E63
+            // Vivid
+            0xFFE53935, 0xFFD81B60, 0xFF8E24AA, 0xFF5E35B1,
+            0xFF3949AB, 0xFF1E88E5, 0xFF039BE5, 0xFF00ACC1,
+            0xFF00897B, 0xFF43A047, 0xFF7CB342, 0xFFC0CA33,
+            // Warm + earthy
+            0xFFFDD835, 0xFFFFB300, 0xFFFB8C00, 0xFFF4511E,
+            0xFF6D4C41, 0xFF757575, 0xFF546E7A, 0xFFEC407A,
+            // Pastel
+            0xFFEF9A9A, 0xFFF48FB1, 0xFFCE93D8, 0xFFB39DDB,
+            0xFF9FA8DA, 0xFF90CAF9, 0xFF81D4FA, 0xFF80DEEA,
+            0xFF80CBC4, 0xFFA5D6A7, 0xFFC5E1A5, 0xFFE6EE9C,
+            // Deep / dark
+            0xFFB71C1C, 0xFF880E4F, 0xFF4A148C, 0xFF1A237E,
+            0xFF0D47A1, 0xFF006064, 0xFF1B5E20, 0xFF33691E,
+            0xFFE65100, 0xFF3E2723, 0xFF263238, 0xFF212121
         };
         int hash = name.toLowerCase(java.util.Locale.US).hashCode();
         return palette[Math.abs(hash) % palette.length];

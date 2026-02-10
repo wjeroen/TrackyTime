@@ -21,6 +21,7 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.CheckBox;
 import android.widget.Toast;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -44,9 +45,21 @@ public class MainActivity extends Activity {
     private static final int IMPORT_FILE_CODE = 201;
 
     private static final int[] ENTRY_COLORS = {
-        0xFFE53935, 0xFFEC407A, 0xFFAB47BC, 0xFF7E57C2,
-        0xFF42A5F5, 0xFF26C6DA, 0xFF26A69A, 0xFF66BB6A,
-        0xFFD4E157, 0xFFFFEE58, 0xFFFFA726, 0xFF8D6E63
+        // Row 1: Vivid / saturated
+        0xFFE53935, 0xFFD81B60, 0xFF8E24AA, 0xFF5E35B1,
+        0xFF3949AB, 0xFF1E88E5, 0xFF039BE5, 0xFF00ACC1,
+        0xFF00897B, 0xFF43A047, 0xFF7CB342, 0xFFC0CA33,
+        // Row 2: Warm + earthy
+        0xFFFDD835, 0xFFFFB300, 0xFFFB8C00, 0xFFF4511E,
+        0xFF6D4C41, 0xFF757575, 0xFF546E7A, 0xFFEC407A,
+        // Row 3: Pastel / lighter
+        0xFFEF9A9A, 0xFFF48FB1, 0xFFCE93D8, 0xFFB39DDB,
+        0xFF9FA8DA, 0xFF90CAF9, 0xFF81D4FA, 0xFF80DEEA,
+        0xFF80CBC4, 0xFFA5D6A7, 0xFFC5E1A5, 0xFFE6EE9C,
+        // Row 4: Deep / dark
+        0xFFB71C1C, 0xFF880E4F, 0xFF4A148C, 0xFF1A237E,
+        0xFF0D47A1, 0xFF006064, 0xFF1B5E20, 0xFF33691E,
+        0xFFE65100, 0xFF3E2723, 0xFF263238, 0xFF212121
     };
 
     private static final int[] SETTINGS_COLORS = {
@@ -385,22 +398,22 @@ public class MainActivity extends Activity {
         AlertDialog dialog = new AlertDialog.Builder(this).create();
 
         GridLayout grid = new GridLayout(this);
-        grid.setColumnCount(4);
+        grid.setColumnCount(6);
         float d = getResources().getDisplayMetrics().density;
-        int pad = (int)(16 * d);
+        int pad = (int)(12 * d);
         grid.setPadding(pad, pad, pad, pad);
 
         for (int color : ENTRY_COLORS) {
             View sw = new View(this);
             GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-            lp.width = (int)(56 * d);
-            lp.height = (int)(56 * d);
-            lp.setMargins((int)(6*d), (int)(6*d), (int)(6*d), (int)(6*d));
+            lp.width = (int)(40 * d);
+            lp.height = (int)(40 * d);
+            lp.setMargins((int)(4*d), (int)(4*d), (int)(4*d), (int)(4*d));
             sw.setLayoutParams(lp);
 
             GradientDrawable bg = new GradientDrawable();
             bg.setShape(GradientDrawable.RECTANGLE);
-            bg.setCornerRadius(8 * d);
+            bg.setCornerRadius(6 * d);
             bg.setColor(color);
             if (color == entry.getColor()) bg.setStroke((int)(3*d), 0xFFFFFFFF);
             sw.setBackground(bg);
@@ -584,6 +597,16 @@ public class MainActivity extends Activity {
         sizeGroup.check(prefs.getSize());
         sizeGroup.setOnCheckedChangeListener((g, id) -> prefs.setSize(id));
         layout.addView(sizeGroup);
+
+        // Overlay pulse toggle
+        addSpacer(layout, 14);
+        CheckBox pulseCb = new CheckBox(this);
+        pulseCb.setText("Breathing overlay (bg + border pulse)");
+        pulseCb.setTextColor(0xFFCDD6F4);
+        pulseCb.setTextSize(14f);
+        pulseCb.setChecked(prefs.isOverlayPulseEnabled());
+        pulseCb.setOnCheckedChangeListener((btn, checked) -> prefs.setOverlayPulseEnabled(checked));
+        layout.addView(pulseCb);
 
         new AlertDialog.Builder(this)
             .setTitle("Overlay Settings")

@@ -40,8 +40,9 @@ public class OverlayService extends Service {
     private WindowManager.LayoutParams params;
 
     private TimelineBarView timelineBar;
-    private TextView timerText, separator, resetBtn, closeBtn;
+    private TextView timerText, separator, openAppBtn, closeBtn;
     private EditText editText;
+    private GradientDrawable overlayBg; // cached for pulse animation
 
     // Cached timeline segments (from DB, chronological order)
     private List<TimelineBarView.Segment> savedSegments = new ArrayList<>();
@@ -62,6 +63,11 @@ public class OverlayService extends Service {
 
     private ValueAnimator pulseAnimator;
     private long currentPulseDuration = 0; // 0 = no pulse active
+
+    // Cached values for overlay pulse (avoid reading prefs every animation frame)
+    private boolean cachedOverlayPulseEnabled = true;
+    private int cachedBgColor, cachedBgOpacity, cachedAccentColor, cachedBorderWidth;
+    private float cachedDensity;
 
     // Live-update: listen for pref changes from the settings dialog
     private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
@@ -106,7 +112,7 @@ public class OverlayService extends Service {
         timerText = overlayView.findViewById(R.id.timerText);
         separator = overlayView.findViewById(R.id.separator);
         editText = overlayView.findViewById(R.id.activityInput);
-        resetBtn = overlayView.findViewById(R.id.resetBtn);
+        openAppBtn = overlayView.findViewById(R.id.openAppBtn);
         closeBtn = overlayView.findViewById(R.id.closeBtn);
         timelineBar = overlayView.findViewById(R.id.timelineBar);
 
@@ -142,20 +148,20 @@ public class OverlayService extends Service {
         int bgOpacity = prefs.getOpacity();
         int bgWithAlpha = (bgOpacity << 24) | (bgColor & 0x00FFFFFF);
 
-        // Background: rounded rect with optional border
-        GradientDrawable bg = new GradientDrawable();
-        bg.setShape(GradientDrawable.RECTANGLE);
-        bg.setCornerRadius(10 * density); // 10dp, matching FCT
-        bg.setColor(bgWithAlpha);
+        // Background: rounded rect with optional border — cached for pulse animation
+        overlayBg = new GradientDrawable();
+        overlayBg.setShape(GradientDrawable.RECTANGLE);
+        overlayBg.setCornerRadius(10 * density); // 10dp, matching FCT
+        overlayBg.setColor(bgWithAlpha);
 
         int borderWidth = prefs.getBorderWidth();
         if (borderWidth > 0) {
             // Border uses accent color, alpha scales with background opacity
             int accentColor = prefs.getAccentColor();
             int borderColor = (bgOpacity << 24) | (accentColor & 0x00FFFFFF);
-            bg.setStroke((int) (borderWidth * density), borderColor);
+            overlayBg.setStroke((int) (borderWidth * density), borderColor);
         }
-        overlayView.setBackground(bg);
+        overlayView.setBackground(overlayBg);
 
         // Text: always fully opaque
         int textColor = prefs.getTextColor();
@@ -164,7 +170,7 @@ public class OverlayService extends Service {
         separator.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
         editText.setTextColor(textColor);
         editText.setHintTextColor((textColor & 0x00FFFFFF) | 0x55000000);
-        resetBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
+        openAppBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
         closeBtn.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
 
         // Unified text size for everything
@@ -172,7 +178,7 @@ public class OverlayService extends Service {
         timerText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         editText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         separator.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
-        resetBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+        openAppBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         closeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
 
         // Timeline bar corner radius (not affected by opacity)
@@ -224,19 +230,32 @@ public class OverlayService extends Service {
         timerText.setOnTouchListener((v, event) ->
             handleDragTouch(event, this::togglePause));
 
-        // Reset: drag or tap-to-reset
-        resetBtn.setOnTouchListener((v, event) ->
-            handleDragTouch(event, this::resetTimer));
+        // Open app: drag or tap-to-open
+        openAppBtn.setOnTouchListener((v, event) ->
+            handleDragTouch(event, this::openApp));
 
         // Close: drag or tap-to-close
         closeBtn.setOnTouchListener((v, event) ->
             handleDragTouch(event, this::stopSelf));
 
-        // Background (root): drag or tap-to-exit-edit
-        overlayView.setOnTouchListener((v, event) ->
-            handleDragTouch(event, () -> {
+        // Background (root): drag, tap-to-exit-edit, or outside touch exits edit
+        overlayView.setOnTouchListener((v, event) -> {
+            // ACTION_OUTSIDE fires when user taps outside the overlay window
+            if (event.getAction() == MotionEvent.ACTION_OUTSIDE) {
                 if (isInEditMode()) exitEditMode();
-            }));
+                return true;
+            }
+            return handleDragTouch(event, () -> {
+                if (isInEditMode()) exitEditMode();
+            });
+        });
+    }
+
+    private void openApp() {
+        closeEditingUI();
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
     }
 
     private void clampToScreen() {
@@ -252,25 +271,6 @@ public class OverlayService extends Service {
     private void togglePause() {
         if (currentActivityName.isEmpty()) return;
         if (isRunning) pauseTimer(); else resumeTimer();
-    }
-
-    private void resetTimer() {
-        if (currentActivityName.isEmpty()) return;
-        // Save current session, reset to 00:00 but DON'T auto-start
-        saveCurrentActivity();
-        loadTodaySegments();
-        currentStartTime = System.currentTimeMillis();
-        accumulatedMs = 0;
-        virtualStartTimestamp = -1;
-        if (isRunning) {
-            isRunning = false;
-            timerHandler.removeCallbacks(timerRunnable);
-        }
-        stopProgressPulse();
-        currentPulseDuration = 0;
-        updateTimerDisplay();
-        showTimerPaused();
-        updateNotification();
     }
 
     // ---- EditText / focus management ----
@@ -290,12 +290,14 @@ public class OverlayService extends Service {
     }
 
     private void enterEditMode() {
+        // Allow focus + detect touches outside the overlay window
         params.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        params.flags |= WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
         windowManager.updateViewLayout(overlayView, params);
         editText.requestFocus();
         editText.setSelection(editText.getText().length());
-        // Show reset (if tracking) and close buttons while editing
-        if (!currentActivityName.isEmpty()) resetBtn.setVisibility(View.VISIBLE);
+        // Show open-app + close buttons while editing
+        openAppBtn.setVisibility(View.VISIBLE);
         closeBtn.setVisibility(View.VISIBLE);
         editText.postDelayed(() -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
@@ -315,10 +317,12 @@ public class OverlayService extends Service {
         editText.clearFocus();
         InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
         if (imm != null) imm.hideSoftInputFromWindow(editText.getWindowToken(), 0);
+        // Restore non-focusable, stop watching outside touches
         params.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        params.flags &= ~WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
         windowManager.updateViewLayout(overlayView, params);
-        // Hide reset + close buttons when not editing
-        resetBtn.setVisibility(View.GONE);
+        // Hide open-app + close buttons when not editing
+        openAppBtn.setVisibility(View.GONE);
         closeBtn.setVisibility(View.GONE);
     }
 
@@ -331,6 +335,9 @@ public class OverlayService extends Service {
                 updateTimerDisplay();
                 updateTimelineBar();
                 updatePulseSpeed();
+                // Refresh segments from DB every ~30s to pick up color changes from the app
+                int elapsed = getElapsedSeconds();
+                if (elapsed > 0 && elapsed % 30 == 0) loadTodaySegments();
                 timerHandler.postDelayed(this, 500);
             }
         }
@@ -377,11 +384,13 @@ public class OverlayService extends Service {
     private void showTimerPaused() {
         timerText.setAlpha(0.5f);
         stopProgressPulse();
+        currentPulseDuration = 0; // force pulse recalculation on resume
         timelineBar.setPulseAlpha(1.0f); // fully opaque when paused
         updateTimelineBar();
     }
 
     // ---- Progressive pulse: starts immediately, 1.5x faster every 30min ----
+    // Pulse affects the timeline bar's live segment AND (optionally) the entire overlay bg+border.
 
     private void updatePulseSpeed() {
         if (!isRunning) return;
@@ -397,14 +406,43 @@ public class OverlayService extends Service {
         if (targetDuration != currentPulseDuration) {
             currentPulseDuration = targetDuration;
             stopProgressPulse();
+            // Cache prefs at pulse start so we don't read SharedPreferences every frame
+            OverlayPreferences prefs = new OverlayPreferences(this);
+            cachedOverlayPulseEnabled = prefs.isOverlayPulseEnabled();
+            cachedBgColor = prefs.getBgColor();
+            cachedBgOpacity = prefs.getOpacity();
+            cachedAccentColor = prefs.getAccentColor();
+            cachedBorderWidth = prefs.getBorderWidth();
+            cachedDensity = getResources().getDisplayMetrics().density;
+
             ValueAnimator va = ValueAnimator.ofFloat(1.0f, 0.3f);
             va.setDuration(targetDuration / 2); // half-cycle
             va.setRepeatCount(ValueAnimator.INFINITE);
             va.setRepeatMode(ValueAnimator.REVERSE);
-            va.addUpdateListener(animation ->
-                timelineBar.setPulseAlpha((float) animation.getAnimatedValue()));
+            va.addUpdateListener(animation -> {
+                float alpha = (float) animation.getAnimatedValue();
+                timelineBar.setPulseAlpha(alpha);
+                // Also pulse the overlay bg + border if enabled
+                applyOverlayPulse(alpha);
+            });
             pulseAnimator = va;
             va.start();
+        }
+    }
+
+    /** Animate overlay bg + border alpha in sync with the timeline bar pulse. */
+    private void applyOverlayPulse(float pulseAlpha) {
+        if (!cachedOverlayPulseEnabled) return;
+        if (overlayBg == null) return;
+
+        // Scale bg alpha between full and 30% (matching pulse range 1.0→0.3)
+        int scaledBgAlpha = (int) (cachedBgOpacity * pulseAlpha);
+        overlayBg.setColor((scaledBgAlpha << 24) | (cachedBgColor & 0x00FFFFFF));
+
+        if (cachedBorderWidth > 0) {
+            int scaledBorderAlpha = (int) (cachedBgOpacity * pulseAlpha);
+            overlayBg.setStroke((int) (cachedBorderWidth * cachedDensity),
+                (scaledBorderAlpha << 24) | (cachedAccentColor & 0x00FFFFFF));
         }
     }
 
@@ -412,6 +450,10 @@ public class OverlayService extends Service {
         if (pulseAnimator != null) {
             pulseAnimator.cancel();
             pulseAnimator = null;
+        }
+        // Reset overlay bg to full opacity when pulse stops
+        if (overlayBg != null) {
+            applyPreferences(); // restore normal appearance
         }
     }
 
@@ -437,6 +479,10 @@ public class OverlayService extends Service {
         savedSegments.clear();
         for (ActivityEntry e : entries) {
             savedSegments.add(new TimelineBarView.Segment(e.getColor(), e.getDurationSeconds()));
+        }
+        // Refresh live segment color in case the user changed it via the app
+        if (!currentActivityName.isEmpty()) {
+            currentActivityColor = dbHelper.getColorForName(currentActivityName);
         }
         updateTimelineBar();
     }

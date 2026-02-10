@@ -30,6 +30,10 @@ public class OverlayPreferences {
     public int getBorderWidth() { return sp.getInt("border_width", 3); }
     public void setBorderWidth(int w) { sp.edit().putInt("border_width", w).apply(); }
 
+    // Overlay pulse (bg + border breathe in sync with timeline bar)
+    public boolean isOverlayPulseEnabled() { return sp.getBoolean("overlay_pulse", true); }
+    public void setOverlayPulseEnabled(boolean on) { sp.edit().putBoolean("overlay_pulse", on).apply(); }
+
     // 0=small, 1=medium, 2=large
     public int getSize() { return sp.getInt("size", 0); }
     public void setSize(int s) { sp.edit().putInt("size", s).apply(); }

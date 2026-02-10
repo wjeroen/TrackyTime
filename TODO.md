@@ -7,6 +7,8 @@
 
 ### Features to Implement
 - [ ] Add separate opacity slider for the timeline bar
+- [ ] Add timeline bar time markers (vertical lines at hour/half-hour of tracked time)
+- [ ] Expand background/border color picker (more color options like activity picker)
 
 ### Bug Fixes
 _(none right now)_
@@ -21,11 +23,13 @@ _(none right now)_
 - [ ] Test overlay pill: drag, tap-to-edit, tap-timer-to-pause all work
 - [ ] Test that opacity slider only affects background (text stays fully visible)
 - [ ] Test consistent colors: create "Coding" twice on different days, verify same color
-- [ ] Test color picker: changing color for one entry updates all entries with same name
-- [ ] Test reset button (↺) appears only in edit mode, saves + pauses (does NOT auto-start)
-- [ ] Test close button (×) appears only in edit mode, stops overlay service
+- [ ] Test color picker: 44 colors (vivid, warm, pastel, deep), changing color updates all entries with same name
+- [ ] Test open-app button (↗) appears only in edit mode, opens full app
+- [ ] Test close button (✕) appears only in edit mode, stops overlay service
+- [ ] Test tapping outside overlay exits edit mode and saves any typed text
 - [ ] Test timeline bar: shows day's activity history as colored segments, live segment grows
-- [ ] Test progressive pulse: starts immediately, speeds up 1.5x every 30min, only pulses live segment
+- [ ] Test progressive pulse: starts immediately, speeds up 1.5x every 30min, pulses live segment + bg/border
+- [ ] Test breathing overlay toggle: on = bg+border pulse in sync, off = only timeline bar pulses
 - [ ] Test border: accent/border color applied, border width adjustable 0–6dp, alpha scales with bg opacity
 - [ ] Test live-update: changing settings in app immediately updates the overlay (no restart)
 - [ ] Test inline rename: tap entry name in history → edit → press Done → name + color update
@@ -38,6 +42,13 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Remove reset button, add ↗ open-app button to overlay edit mode (2026-02-10)
+- [x] Exit edit mode when tapping outside overlay (FLAG_WATCH_OUTSIDE_TOUCH + ACTION_OUTSIDE) (2026-02-10)
+- [x] Breathing overlay: bg + border pulse in sync with timeline bar, optional setting (default on) (2026-02-10)
+- [x] Expand activity color palette from 12 to 44 colors (vivid, warm, pastel, deep) with smaller swatches (2026-02-10)
+- [x] Move export/import/settings above history list for quick access (2026-02-10)
+- [x] Fix timeline bar color: refresh from DB every 30s + on segment reload (2026-02-10)
+- [x] Fix button alignment: consistent gravity/includeFontPadding on ↗ and ✕ (2026-02-10)
 - [x] Overlay visual redesign: white bg default, black text/border, 10dp corners, 5dp padding, unified text sizes (2026-02-10)
 - [x] Add configurable border using accent color (default black, 3dp, adjustable 0–6dp) (2026-02-10)
 - [x] Live-update overlay when settings change (SharedPreferences listener, 100ms debounce) (2026-02-10)
