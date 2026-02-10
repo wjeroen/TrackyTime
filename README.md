@@ -4,7 +4,7 @@
 
 ### Overlay (floating pill)
 - **Compact pill shape**: activity name on the left, timer on the right, 10dp rounded corners
-- **Border**: configurable color (uses accent/border color setting) and width (0–6dp, default 3dp black). Border alpha scales with background opacity.
+- **Border**: configurable color (uses accent/border color setting) and width (0–6dp, default 1dp black). Border grows outward (content area stays the same size). Always fully opaque at rest.
 - **Tap activity text** → enter edit mode (keyboard pops up, ↗ open-app + ✕ close buttons appear). Type a new name and press Done — the previous activity is saved and timer restarts.
 - **Tap timer** → pause/resume (timer dims when paused)
 - **Drag anywhere** → reposition the pill on screen (clamped to screen bounds)
@@ -12,7 +12,7 @@
 - **↗ open app** → opens the full TrackyTime app (only visible in edit mode)
 - **✕ close** → stops the overlay service (only visible in edit mode)
 - **Timeline bar** → 6dp colored bar at the bottom showing the day's activity history as proportional segments. Each activity session is a colored rectangle. The currently-running activity grows live. The live segment pulses immediately, speeding up 1.5x every 30 minutes as a gentle nudge. Not affected by the opacity slider. White tick marks at every hour (full height, 100% white) and half-hour (bottom half, 50% white). Half-hour marks are hidden once total tracked time exceeds 5 hours.
-- **Breathing overlay** → optional (default on): the entire background + border pulse in sync with the timeline bar, making activity tracking more noticeable. Configurable in settings.
+- **Breathing overlay** → optional (default on): the entire background + border pulse in sync with the timeline bar. Breathes from fully opaque down to the user's opacity setting — lower opacity = more dramatic pulse, higher opacity = subtler. Live-updates when toggled in settings.
 - **Live-update**: changing any setting (colors, size, border, opacity) updates the overlay instantly — no restart needed.
 
 ### Timer
@@ -41,7 +41,9 @@
 - Delete removes the individual entry (not all entries with the same name)
 
 ### Opacity
-- The opacity slider in settings controls **only the background** of the overlay pill
+- The opacity slider sets the **minimum opacity** of the overlay background (default 50%)
+- With breathing enabled: overlay pulses from fully opaque down to this opacity (the "floor")
+- Without breathing: background stays at the set opacity
 - Text, timer, and timeline bar are always fully visible (100% alpha)
 
 ## Quick Reference File Structure

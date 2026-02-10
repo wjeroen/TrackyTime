@@ -19,15 +19,15 @@ public class OverlayPreferences {
     public void setTextColor(int c) { sp.edit().putInt("text_color", c).apply(); }
 
     // 0-255
-    public int getOpacity() { return sp.getInt("opacity", 230); }
+    public int getOpacity() { return sp.getInt("opacity", 128); }
     public void setOpacity(int o) { sp.edit().putInt("opacity", o).apply(); }
 
     // Border color (accent) — used for the overlay border
     public int getAccentColor() { return sp.getInt("accent_color", 0xFF000000); }
     public void setAccentColor(int c) { sp.edit().putInt("accent_color", c).apply(); }
 
-    // 0-4 dp (0 = no border)
-    public int getBorderWidth() { return sp.getInt("border_width", 3); }
+    // 0-6 dp (0 = no border)
+    public int getBorderWidth() { return sp.getInt("border_width", 1); }
     public void setBorderWidth(int w) { sp.edit().putInt("border_width", w).apply(); }
 
     // Overlay pulse (bg + border breathe in sync with timeline bar)

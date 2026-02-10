@@ -71,7 +71,12 @@ public class OverlayService extends Service {
 
     // Live-update: listen for pref changes from the settings dialog
     private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
-    private Runnable applyPrefsRunnable = () -> applyPreferences();
+    private Runnable applyPrefsRunnable = () -> {
+        applyPreferences();
+        // Force pulse to pick up new values (toggle, opacity, colors)
+        refreshPulseCache();
+        currentPulseDuration = 0; // force restart on next tick
+    };
 
     private static final int NOTIF_ID = 1001;
     private static final String CHANNEL_ID = "timetracker_channel";
@@ -140,6 +145,8 @@ public class OverlayService extends Service {
 
     // ---- Visual preferences (opacity ONLY on background, border follows opacity) ----
 
+    private static final int BASE_PADDING_DP = 5;
+
     private void applyPreferences() {
         OverlayPreferences prefs = new OverlayPreferences(this);
         float density = getResources().getDisplayMetrics().density;
@@ -148,20 +155,26 @@ public class OverlayService extends Service {
         int bgOpacity = prefs.getOpacity();
         int bgWithAlpha = (bgOpacity << 24) | (bgColor & 0x00FFFFFF);
 
+        int borderWidth = prefs.getBorderWidth();
+        int borderWidthPx = (int) (borderWidth * density);
+
         // Background: rounded rect with optional border — cached for pulse animation
         overlayBg = new GradientDrawable();
         overlayBg.setShape(GradientDrawable.RECTANGLE);
         overlayBg.setCornerRadius(10 * density); // 10dp, matching FCT
         overlayBg.setColor(bgWithAlpha);
 
-        int borderWidth = prefs.getBorderWidth();
         if (borderWidth > 0) {
-            // Border uses accent color, alpha scales with background opacity
+            // Border uses accent color, fully opaque (not tied to bg opacity)
             int accentColor = prefs.getAccentColor();
-            int borderColor = (bgOpacity << 24) | (accentColor & 0x00FFFFFF);
-            overlayBg.setStroke((int) (borderWidth * density), borderColor);
+            overlayBg.setStroke(borderWidthPx, accentColor);
         }
         overlayView.setBackground(overlayBg);
+
+        // Border grows outward: add border width to padding so content area stays the same
+        int basePad = (int) (BASE_PADDING_DP * density);
+        int pad = basePad + borderWidthPx;
+        overlayView.setPadding(pad, pad, pad, pad);
 
         // Text: always fully opaque
         int textColor = prefs.getTextColor();
@@ -173,12 +186,12 @@ public class OverlayService extends Service {
         openAppBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
         closeBtn.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
 
-        // Unified text size for everything
+        // Unified text size for everything, open-app icon slightly larger to match ✕ visually
         float textSize = prefs.getTextSize();
         timerText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         editText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         separator.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
-        openAppBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+        openAppBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize + 4);
         closeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
 
         // Timeline bar corner radius (not affected by opacity)
@@ -391,6 +404,19 @@ public class OverlayService extends Service {
 
     // ---- Progressive pulse: starts immediately, 1.5x faster every 30min ----
     // Pulse affects the timeline bar's live segment AND (optionally) the entire overlay bg+border.
+    // The user's opacity setting is the FLOOR — pulse breathes from fully opaque (255) down to
+    // the opacity setting. Lower opacity = more dramatic pulse. Higher opacity = subtler pulse.
+
+    /** Refresh cached pulse values from current preferences (called on pref change). */
+    private void refreshPulseCache() {
+        OverlayPreferences prefs = new OverlayPreferences(this);
+        cachedOverlayPulseEnabled = prefs.isOverlayPulseEnabled();
+        cachedBgColor = prefs.getBgColor();
+        cachedBgOpacity = prefs.getOpacity();
+        cachedAccentColor = prefs.getAccentColor();
+        cachedBorderWidth = prefs.getBorderWidth();
+        cachedDensity = getResources().getDisplayMetrics().density;
+    }
 
     private void updatePulseSpeed() {
         if (!isRunning) return;
@@ -406,14 +432,7 @@ public class OverlayService extends Service {
         if (targetDuration != currentPulseDuration) {
             currentPulseDuration = targetDuration;
             stopProgressPulse();
-            // Cache prefs at pulse start so we don't read SharedPreferences every frame
-            OverlayPreferences prefs = new OverlayPreferences(this);
-            cachedOverlayPulseEnabled = prefs.isOverlayPulseEnabled();
-            cachedBgColor = prefs.getBgColor();
-            cachedBgOpacity = prefs.getOpacity();
-            cachedAccentColor = prefs.getAccentColor();
-            cachedBorderWidth = prefs.getBorderWidth();
-            cachedDensity = getResources().getDisplayMetrics().density;
+            refreshPulseCache();
 
             ValueAnimator va = ValueAnimator.ofFloat(1.0f, 0.3f);
             va.setDuration(targetDuration / 2); // half-cycle
@@ -422,7 +441,6 @@ public class OverlayService extends Service {
             va.addUpdateListener(animation -> {
                 float alpha = (float) animation.getAnimatedValue();
                 timelineBar.setPulseAlpha(alpha);
-                // Also pulse the overlay bg + border if enabled
                 applyOverlayPulse(alpha);
             });
             pulseAnimator = va;
@@ -430,19 +448,31 @@ public class OverlayService extends Service {
         }
     }
 
-    /** Animate overlay bg + border alpha in sync with the timeline bar pulse. */
+    /**
+     * Animate overlay bg + border in sync with the timeline bar pulse.
+     * Opacity setting is the FLOOR: pulse goes from 255 (full) down to the user's opacity.
+     * This makes low opacity = dramatic breathing, high opacity = subtle breathing.
+     */
     private void applyOverlayPulse(float pulseAlpha) {
         if (!cachedOverlayPulseEnabled) return;
         if (overlayBg == null) return;
 
-        // Scale bg alpha between full and 30% (matching pulse range 1.0→0.3)
-        int scaledBgAlpha = (int) (cachedBgOpacity * pulseAlpha);
-        overlayBg.setColor((scaledBgAlpha << 24) | (cachedBgColor & 0x00FFFFFF));
+        // Map pulseAlpha (1.0→0.3) to bg alpha (255→cachedBgOpacity)
+        // At pulseAlpha=1.0: bgAlpha=255 (fully opaque)
+        // At pulseAlpha=0.3: bgAlpha=cachedBgOpacity (user's setting = floor)
+        int range = 255 - cachedBgOpacity;
+        int bgAlpha = cachedBgOpacity + (int) (range * (pulseAlpha - 0.3f) / 0.7f);
+        if (bgAlpha > 255) bgAlpha = 255;
+        if (bgAlpha < cachedBgOpacity) bgAlpha = cachedBgOpacity;
+        overlayBg.setColor((bgAlpha << 24) | (cachedBgColor & 0x00FFFFFF));
 
         if (cachedBorderWidth > 0) {
-            int scaledBorderAlpha = (int) (cachedBgOpacity * pulseAlpha);
+            // Border: same alpha scaling
+            int borderAlpha = cachedBgOpacity + (int) (range * (pulseAlpha - 0.3f) / 0.7f);
+            if (borderAlpha > 255) borderAlpha = 255;
+            if (borderAlpha < cachedBgOpacity) borderAlpha = cachedBgOpacity;
             overlayBg.setStroke((int) (cachedBorderWidth * cachedDensity),
-                (scaledBorderAlpha << 24) | (cachedAccentColor & 0x00FFFFFF));
+                (borderAlpha << 24) | (cachedAccentColor & 0x00FFFFFF));
         }
     }
 
@@ -451,9 +481,9 @@ public class OverlayService extends Service {
             pulseAnimator.cancel();
             pulseAnimator = null;
         }
-        // Reset overlay bg to full opacity when pulse stops
+        // Reset overlay bg to resting state
         if (overlayBg != null) {
-            applyPreferences(); // restore normal appearance
+            applyPreferences();
         }
     }
 

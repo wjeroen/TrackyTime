@@ -41,6 +41,9 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Fix pulse: live-updates on toggle, respects opacity as floor (255→opacity), border fully opaque at rest (2026-02-10)
+- [x] Border grows outward (dynamic padding), default width 1dp, default opacity 50% (2026-02-10)
+- [x] Open-app icon (↗) sized larger (+4sp) to match ✕ visually (2026-02-10)
 - [x] Timeline bar tick marks: hour (full height, 100% white) + half-hour (bottom half, 50% white, hidden >5h) (2026-02-10)
 - [x] Remove reset button, add ↗ open-app button to overlay edit mode (2026-02-10)
 - [x] Exit edit mode when tapping outside overlay (FLAG_WATCH_OUTSIDE_TOUCH + ACTION_OUTSIDE) (2026-02-10)
