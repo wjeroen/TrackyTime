@@ -117,7 +117,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     public void deleteEntriesByNameAndDate(String name, String date) {
         SQLiteDatabase db = getWritableDatabase();
-        db.delete(TABLE, "LOWER(name) = LOWER(?) AND date = ?",
+        db.delete(TABLE, "LOWER(TRIM(name)) = LOWER(TRIM(?)) AND date = ?",
             new String[]{name, date});
         db.close();
     }
@@ -125,7 +125,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public void deleteEntriesByNameInRange(String name, String startDate, String endDate) {
         SQLiteDatabase db = getWritableDatabase();
         db.delete(TABLE,
-            "LOWER(name) = LOWER(?) AND date >= ? AND date <= ?",
+            "LOWER(TRIM(name)) = LOWER(TRIM(?)) AND date >= ? AND date <= ?",
             new String[]{name, startDate, endDate});
         db.close();
     }
@@ -134,7 +134,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         SQLiteDatabase db = getReadableDatabase();
         Cursor c = db.rawQuery(
             "SELECT color FROM " + TABLE +
-            " WHERE LOWER(name) = LOWER(?) ORDER BY id DESC LIMIT 1",
+            " WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) ORDER BY id DESC LIMIT 1",
             new String[]{name});
         int color = 0;
         boolean found = false;
@@ -163,7 +163,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             0xFF0D47A1, 0xFF006064, 0xFF1B5E20, 0xFF33691E,
             0xFFE65100, 0xFF3E2723, 0xFF263238, 0xFF212121
         };
-        int hash = name.toLowerCase(java.util.Locale.US).hashCode();
+        int hash = ActivityEntry.normalizeName(name).hashCode();
         return palette[Math.abs(hash) % palette.length];
     }
 
@@ -171,7 +171,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues cv = new ContentValues();
         cv.put("color", color);
-        db.update(TABLE, cv, "LOWER(name) = LOWER(?)", new String[]{name});
+        db.update(TABLE, cv, "LOWER(TRIM(name)) = LOWER(TRIM(?))", new String[]{name});
         db.close();
     }
 
@@ -182,7 +182,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         for (ActivityEntry entry : entries) {
             Cursor c = db.rawQuery(
                 "SELECT COUNT(*) FROM " + TABLE +
-                " WHERE name = ? AND start_time = ?",
+                " WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) AND start_time = ?",
                 new String[]{entry.getName(), String.valueOf(entry.getStartTime())});
             c.moveToFirst();
             boolean exists = c.getInt(0) > 0;

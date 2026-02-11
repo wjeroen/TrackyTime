@@ -57,7 +57,10 @@ public class ColorBarView extends View {
 
     @Override
     protected void onMeasure(int widthSpec, int heightSpec) {
-        int width = MeasureSpec.getSize(widthSpec);
+        int parentWidth = MeasureSpec.getSize(widthSpec);
+        // Pie chart caps at 600px; bar is ~1.4x that, then shrinks on small screens
+        int maxBarWidth = (int) (600 * 1.4f);
+        int width = Math.min(parentWidth, maxBarWidth);
         float density = getResources().getDisplayMetrics().density;
         int height = (int) (32 * density); // 32dp tall
         setMeasuredDimension(width, height);

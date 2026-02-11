@@ -3,10 +3,8 @@ package com.timetracker.overlay;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.Gravity;
@@ -40,7 +38,6 @@ import org.json.JSONObject;
 public class MainActivity extends Activity {
 
     private static final int OVERLAY_PERM_CODE = 100;
-    private static final int NOTIF_PERM_CODE = 101;
     private static final int EXPORT_FILE_CODE = 200;
     private static final int IMPORT_FILE_CODE = 201;
 
@@ -116,8 +113,6 @@ public class MainActivity extends Activity {
         settingsBtn.setOnClickListener(v -> showSettingsDialog());
         exportBtn.setOnClickListener(v -> exportData());
         importBtn.setOnClickListener(v -> importData());
-
-        checkNotificationPermission();
     }
 
     @Override
@@ -165,17 +160,6 @@ public class MainActivity extends Activity {
         }
         if (req == IMPORT_FILE_CODE && res == RESULT_OK && data != null) {
             readImportFromUri(data.getData());
-        }
-    }
-
-    private void checkNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= 33) {
-            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-                    != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(
-                    new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
-                    NOTIF_PERM_CODE);
-            }
         }
     }
 
@@ -304,7 +288,7 @@ public class MainActivity extends Activity {
     private List<ActivityEntry> groupEntries(List<ActivityEntry> raw) {
         Map<String, ActivityEntry> map = new LinkedHashMap<>();
         for (ActivityEntry e : raw) {
-            String key = e.getName().toLowerCase(Locale.US);
+            String key = ActivityEntry.normalizeName(e.getName());
             if (map.containsKey(key)) {
                 ActivityEntry existing = map.get(key);
                 existing.setDurationSeconds(
@@ -359,7 +343,8 @@ public class MainActivity extends Activity {
         nameEdit.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_DONE) {
                 String newName = nameEdit.getText().toString().trim();
-                if (!newName.isEmpty() && !newName.equals(entry.getName())) {
+                if (!newName.isEmpty() && !ActivityEntry.normalizeName(newName).equals(
+                        ActivityEntry.normalizeName(entry.getName()))) {
                     int color = dbHelper.getColorForName(newName);
                     dbHelper.updateEntryNameAndColor(entry.getId(), newName, color);
                     loadData();

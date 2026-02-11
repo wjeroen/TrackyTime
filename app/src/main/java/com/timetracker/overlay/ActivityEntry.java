@@ -31,6 +31,11 @@ public class ActivityEntry {
     public String getDate() { return date; }
     public void setDate(String date) { this.date = date; }
 
+    /** Normalize for comparison: trim, collapse spaces, lowercase. "Coding  Time" = "coding time". */
+    public static String normalizeName(String name) {
+        return name.trim().replaceAll("\\s+", " ").toLowerCase(java.util.Locale.US);
+    }
+
     public String getFormattedDuration() {
         int h = durationSeconds / 3600;
         int m = (durationSeconds % 3600) / 60;

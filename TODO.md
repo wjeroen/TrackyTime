@@ -22,6 +22,7 @@ _(none right now)_
 - [ ] Test overlay pill: drag, tap-to-edit, tap-timer-to-pause all work
 - [ ] Test that opacity slider affects background + border (text stays fully visible)
 - [ ] Test consistent colors: create "Coding" twice on different days, verify same color
+- [ ] Test name normalization: "Coding", "coding", "CODING", "Coding  Time" and "coding time" should all group together and share colors
 - [ ] Test color picker: 44 colors (vivid, warm, pastel, deep), changing color updates all entries with same name
 - [ ] Test open-app button (➚) appears in expanded mode, opens full app (keeps overlay expanded)
 - [ ] Test collapse button (−) appears in expanded mode, collapses overlay
@@ -44,6 +45,9 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Cap color bar width at ~1.4x pie chart size, centered (2026-02-11)
+- [x] Remove notification permission + stop updating notification text (2026-02-11)
+- [x] Normalize activity name grouping: case-insensitive + space-insensitive everywhere (2026-02-11)
 - [x] Fix quick-select row colors not live-updating when settings change (2026-02-11)
 - [x] Add color bar chart below pie chart — groups time by color, shows percentages (2026-02-11)
 - [x] Reverse breathing bg pulse: darkest when border is gone, normal when border visible (2026-02-11)

@@ -4,7 +4,6 @@ import android.animation.ValueAnimator;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -65,7 +64,6 @@ public class OverlayService extends Service {
     private long currentStartTime = 0;
 
     private DatabaseHelper dbHelper;
-    private NotificationManager notifManager;
 
     private ValueAnimator pulseAnimator;
     private long currentPulseDuration = 0; // 0 = no pulse active
@@ -100,7 +98,6 @@ public class OverlayService extends Service {
         super.onCreate();
         dbHelper = new DatabaseHelper(this);
         timerHandler = new Handler(Looper.getMainLooper());
-        notifManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 
         createNotificationChannel();
         startForeground(NOTIF_ID, buildNotification());
@@ -391,7 +388,8 @@ public class OverlayService extends Service {
     /** Collapse: save activity if changed, save quick-select, release focus, hide expanded UI. */
     private void collapseOverlay() {
         String newText = editText.getText().toString().trim();
-        if (!newText.isEmpty() && !newText.equals(currentActivityName)) {
+        if (!newText.isEmpty() && !ActivityEntry.normalizeName(newText).equals(
+                ActivityEntry.normalizeName(currentActivityName))) {
             startNewActivity(newText);
         }
         isExpanded = false;
@@ -441,7 +439,6 @@ public class OverlayService extends Service {
         timerHandler.removeCallbacks(timerRunnable);
         showTimerPaused();
         updateTimerDisplay();
-        updateNotification();
     }
 
     private void resumeTimer() {
@@ -450,7 +447,6 @@ public class OverlayService extends Service {
         timerHandler.removeCallbacks(timerRunnable);
         timerHandler.post(timerRunnable);
         showTimerRunning();
-        updateNotification();
     }
 
     private void showTimerRunning() {
@@ -581,7 +577,8 @@ public class OverlayService extends Service {
         } else {
             timerText.setText(String.format(Locale.US, "%02d:%02d", m, s));
         }
-        if (elapsed % 5 == 0) updateNotification();
+
+
     }
 
     // ---- Timeline bar (day history as colored segments) ----
@@ -648,50 +645,24 @@ public class OverlayService extends Service {
 
         updateTimerDisplay();
         startTimer();
-        updateNotification();
     }
 
-    // ---- Notification ----
+    // ---- Notification (minimal — required by Android for foreground service) ----
 
     private void createNotificationChannel() {
         NotificationChannel channel = new NotificationChannel(
-            CHANNEL_ID, "TrackyTime", NotificationManager.IMPORTANCE_LOW);
-        channel.setDescription("Active time tracking overlay");
+            CHANNEL_ID, "TrackyTime", NotificationManager.IMPORTANCE_MIN);
         channel.setShowBadge(false);
-        notifManager.createNotificationChannel(channel);
+        ((NotificationManager) getSystemService(NOTIFICATION_SERVICE))
+            .createNotificationChannel(channel);
     }
 
     private Notification buildNotification() {
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        PendingIntent pi = PendingIntent.getActivity(this, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
-        String text;
-        if (currentActivityName.isEmpty()) {
-            text = "Ready to track";
-        } else {
-            int elapsed = getElapsedSeconds();
-            int h = elapsed / 3600;
-            int m = (elapsed % 3600) / 60;
-            int s = elapsed % 60;
-            String time = h > 0
-                ? String.format(Locale.US, "%d:%02d:%02d", h, m, s)
-                : String.format(Locale.US, "%02d:%02d", m, s);
-            text = currentActivityName + " " + time + (isRunning ? "" : " (paused)");
-        }
-
         return new Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("TrackyTime")
-            .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_recent_history)
-            .setContentIntent(pi)
             .setOngoing(true)
             .build();
-    }
-
-    private void updateNotification() {
-        notifManager.notify(NOTIF_ID, buildNotification());
     }
 
     // ---- Quick-select activity shortcuts ----
