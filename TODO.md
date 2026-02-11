@@ -37,12 +37,18 @@ _(none right now)_
 - [ ] Test delete removes individual entry (not all entries with same name)
 - [ ] Test pie chart still groups entries by name
 - [ ] Test week view: toggle Day/Week, verify Mon–Sun aggregation
-- [ ] Test export: creates valid JSON file via share sheet
-- [ ] Test import: restores data from JSON backup, skips duplicates
+- [ ] Test export: creates valid JSON file via share sheet (includes quick-select shortcuts)
+- [ ] Test import: restores data from JSON backup, skips duplicates, restores shortcuts if present
+- [ ] Test color bar: shows below pie chart, groups time by color, percentages on wide segments
+- [ ] Test live-update quick-select rows: changing text color/size in settings updates existing rows
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
-- [x] Fix border: real stroke instead of filled rectangle behind bg; breathing darkens bg + border in sync (2026-02-11)
+- [x] Fix quick-select row colors not live-updating when settings change (2026-02-11)
+- [x] Add color bar chart below pie chart — groups time by color, shows percentages (2026-02-11)
+- [x] Reverse breathing bg pulse: darkest when border is gone, normal when border visible (2026-02-11)
+- [x] Export/import quick-select shortcuts (backward-compatible with older backups) (2026-02-11)
+- [x] Fix border: stroke-only layer + inset bg fill; breathing darkens/brightens bg (2026-02-11)
 - [x] Expand/focus split: expanded UI stays visible independently of keyboard focus (2026-02-11)
 - [x] Replace ✕ close with − collapse, remove stop-service from overlay (2026-02-11)
 - [x] Border on outside: LayerDrawable (outer border fill + inner bg fill), no stroke overlap (2026-02-11)

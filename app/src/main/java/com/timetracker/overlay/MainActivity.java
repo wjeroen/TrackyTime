@@ -75,6 +75,7 @@ public class MainActivity extends Activity {
     private Button dayViewBtn, weekViewBtn, exportBtn, importBtn;
     private TextView dateText, totalTimeText;
     private PieChartView pieChart;
+    private ColorBarView colorBar;
     private LinearLayout historyContainer;
 
     private DatabaseHelper dbHelper;
@@ -106,6 +107,7 @@ public class MainActivity extends Activity {
         dateText = findViewById(R.id.dateText);
         totalTimeText = findViewById(R.id.totalTimeText);
         pieChart = findViewById(R.id.pieChart);
+        colorBar = findViewById(R.id.colorBar);
         historyContainer = findViewById(R.id.historyContainer);
 
         setupToggle();
@@ -267,6 +269,7 @@ public class MainActivity extends Activity {
         // Pie chart uses grouped data (same name = one slice)
         List<ActivityEntry> grouped = groupEntries(rawEntries);
         pieChart.setEntries(grouped);
+        colorBar.setEntries(grouped);
 
         int totalSec = 0;
         for (ActivityEntry e : rawEntries) totalSec += e.getDurationSeconds();
@@ -461,9 +464,15 @@ public class MainActivity extends Activity {
                 obj.put("date", e.getDate());
                 arr.put(obj);
             }
+            // Quick-select shortcuts (backward-compatible: older imports just ignore this)
+            List<String> shortcuts = new OverlayPreferences(this).getQuickActivities();
+            JSONArray shortcutsArr = new JSONArray();
+            for (String s : shortcuts) shortcutsArr.put(s);
+
             JSONObject root = new JSONObject();
             root.put("version", 1);
             root.put("entries", arr);
+            root.put("quick_activities", shortcutsArr);
 
             OutputStream os = getContentResolver().openOutputStream(uri);
             if (os != null) {
@@ -501,9 +510,21 @@ public class MainActivity extends Activity {
                 entries.add(e);
             }
 
+            // Restore quick-select shortcuts if present (backward-compatible)
+            JSONArray shortcutsArr = root.optJSONArray("quick_activities");
+            if (shortcutsArr != null && shortcutsArr.length() > 0) {
+                List<String> shortcuts = new ArrayList<>();
+                for (int i = 0; i < shortcutsArr.length(); i++) {
+                    shortcuts.add(shortcutsArr.getString(i));
+                }
+                new OverlayPreferences(this).setQuickActivities(shortcuts);
+            }
+
             int count = dbHelper.importEntries(entries);
+            String shortcutMsg = (shortcutsArr != null && shortcutsArr.length() > 0)
+                ? ", " + shortcutsArr.length() + " shortcuts" : "";
             Toast.makeText(this,
-                "Imported " + count + " new entries" +
+                "Imported " + count + " new entries" + shortcutMsg +
                 (count < entries.size() ? " (" + (entries.size() - count) + " duplicates skipped)" : ""),
                 Toast.LENGTH_SHORT).show();
             loadData();

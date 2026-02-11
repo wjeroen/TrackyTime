@@ -223,6 +223,21 @@ public class OverlayService extends Service {
 
         // Timeline bar corner radius (not affected by opacity)
         timelineBar.setCornerRadius(2 * density);
+
+        // Live-update quick-select row colors + sizes
+        for (int i = 0; i < quickSelectContainer.getChildCount(); i++) {
+            LinearLayout row = (LinearLayout) quickSelectContainer.getChildAt(i);
+            TextView playBtn = (TextView) row.getChildAt(0);
+            EditText nameField = (EditText) row.getChildAt(1);
+            TextView removeBtn = (TextView) row.getChildAt(2);
+            playBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
+            playBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+            nameField.setTextColor(textColor);
+            nameField.setHintTextColor((textColor & 0x00FFFFFF) | 0x55000000);
+            nameField.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+            removeBtn.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
+            removeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+        }
     }
 
     // ---- Touch handling: each child handles drag + its own tap action ----
@@ -514,9 +529,10 @@ public class OverlayService extends Service {
                 (borderAlpha << 24) | (cachedAccentColor & 0x00FFFFFF));
         }
 
-        // 2. Background shift: darken light colors, brighten dark colors + increase opacity
+        // 2. Background shift: inverted — darkest/brightest when border is gone
+        float bgFactor = 1f - factor;
         float maxShift = 0.25f;
-        float shift = factor * maxShift;
+        float shift = bgFactor * maxShift;
 
         int r = (cachedBgColor >> 16) & 0xFF;
         int g = (cachedBgColor >> 8) & 0xFF;
@@ -537,8 +553,8 @@ public class OverlayService extends Service {
             db = (int) (b * (1 - shift));
         }
 
-        // Alpha: from user's opacity toward more opaque (30% of remaining range)
-        int alphaBoost = (int) (factor * (255 - cachedBgOpacity) * 0.3f);
+        // Alpha: from user's opacity toward more opaque (30% of remaining range), inverted with bg
+        int alphaBoost = (int) (bgFactor * (255 - cachedBgOpacity) * 0.3f);
         int newAlpha = Math.min(255, cachedBgOpacity + alphaBoost);
 
         overlayBgFill.setColor((newAlpha << 24) | (dr << 16) | (dg << 8) | db);
