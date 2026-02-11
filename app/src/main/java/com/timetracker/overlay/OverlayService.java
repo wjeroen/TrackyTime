@@ -10,7 +10,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
-import android.graphics.drawable.LayerDrawable;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -46,8 +45,7 @@ public class OverlayService extends Service {
     private TextView timerText, separator, openAppBtn, closeBtn, addBtn;
     private EditText editText;
     private LinearLayout quickSelectContainer;
-    private GradientDrawable overlayBgFill;     // inner layer: background color
-    private GradientDrawable overlayBorderFill; // outer layer: border color (pulsed)
+    private GradientDrawable overlayBgFill;     // background fill + border stroke
     private boolean isExpanded = false;
 
     // Cached timeline segments (from DB, chronological order)
@@ -167,30 +165,19 @@ public class OverlayService extends Service {
         int borderWidthPx = (int) (borderWidth * density);
         int cornerRadiusPx = (int) (10 * density);
 
-        // Inner layer: background fill
+        // Single drawable: background fill + border as stroke (no filled rectangle behind bg)
         overlayBgFill = new GradientDrawable();
         overlayBgFill.setShape(GradientDrawable.RECTANGLE);
         overlayBgFill.setCornerRadius(cornerRadiusPx);
         overlayBgFill.setColor(bgWithAlpha);
 
         if (borderWidth > 0) {
-            // Outer layer: solid border color (border is truly outside, no overlap)
             int accentColor = prefs.getAccentColor();
             int borderColor = (bgOpacity << 24) | (accentColor & 0x00FFFFFF);
-            overlayBorderFill = new GradientDrawable();
-            overlayBorderFill.setShape(GradientDrawable.RECTANGLE);
-            overlayBorderFill.setCornerRadius(cornerRadiusPx + borderWidthPx);
-            overlayBorderFill.setColor(borderColor);
-
-            LayerDrawable layered = new LayerDrawable(
-                new GradientDrawable[]{ overlayBorderFill, overlayBgFill });
-            layered.setLayerInset(1, borderWidthPx, borderWidthPx,
-                borderWidthPx, borderWidthPx);
-            overlayView.setBackground(layered);
-        } else {
-            overlayBorderFill = null;
-            overlayView.setBackground(overlayBgFill);
+            overlayBgFill.setStroke(borderWidthPx, borderColor);
         }
+
+        overlayView.setBackground(overlayBgFill);
 
         // Border grows outward: add border width to padding so content area stays the same
         int basePad = (int) (BASE_PADDING_DP * density);
@@ -492,21 +479,41 @@ public class OverlayService extends Service {
         }
     }
 
-    /** Animate ONLY the border (outer fill). Background stays static. */
-    private static final int PULSE_FLOOR_ALPHA = 0; // border pulses from fully transparent
-
+    /** Animate border stroke + darken background in sync. Works with any border width. */
     private void applyOverlayPulse(float pulseAlpha) {
         if (!cachedOverlayPulseEnabled) return;
-        if (overlayBorderFill == null) return;
-        if (cachedBorderWidth <= 0) return;
+        if (overlayBgFill == null) return;
 
-        int floor = Math.min(PULSE_FLOOR_ALPHA, cachedBgOpacity);
-        int range = cachedBgOpacity - floor;
-        int borderAlpha = floor + (int) (range * (pulseAlpha - 0.3f) / 0.7f);
-        if (borderAlpha > cachedBgOpacity) borderAlpha = cachedBgOpacity;
-        if (borderAlpha < floor) borderAlpha = floor;
-        overlayBorderFill.setColor(
-            (borderAlpha << 24) | (cachedAccentColor & 0x00FFFFFF));
+        // Normalized factor: 0.0 (pulse dim/transparent) to 1.0 (pulse bright/opaque)
+        float factor = (pulseAlpha - 0.3f) / 0.7f;
+        if (factor < 0f) factor = 0f;
+        if (factor > 1f) factor = 1f;
+
+        // 1. Border pulse: fully transparent → user's opacity (only when border exists)
+        if (cachedBorderWidth > 0) {
+            int borderAlpha = (int) (cachedBgOpacity * factor);
+            int borderWidthPx = (int) (cachedBorderWidth * cachedDensity);
+            overlayBgFill.setStroke(borderWidthPx,
+                (borderAlpha << 24) | (cachedAccentColor & 0x00FFFFFF));
+        }
+
+        // 2. Background darkening: blend toward black + increase opacity
+        float maxDarken = 0.5f; // equivalent to 50% opacity black overlay at peak
+        float darken = factor * maxDarken;
+
+        int r = (cachedBgColor >> 16) & 0xFF;
+        int g = (cachedBgColor >> 8) & 0xFF;
+        int b = cachedBgColor & 0xFF;
+
+        int dr = (int) (r * (1 - darken));
+        int dg = (int) (g * (1 - darken));
+        int db = (int) (b * (1 - darken));
+
+        // Alpha: from user's opacity toward more opaque (30% of remaining range)
+        int alphaBoost = (int) (factor * (255 - cachedBgOpacity) * 0.3f);
+        int newAlpha = Math.min(255, cachedBgOpacity + alphaBoost);
+
+        overlayBgFill.setColor((newAlpha << 24) | (dr << 16) | (dg << 8) | db);
     }
 
     private void stopProgressPulse() {

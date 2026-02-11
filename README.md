@@ -4,7 +4,7 @@
 
 ### Overlay (floating pill)
 - **Compact pill shape**: activity name on the left, timer on the right, 10dp rounded corners
-- **Border**: configurable color (uses accent/border color setting) and width (0–6dp, default 2dp black). Border renders fully outside the background (no overlap). Uses LayerDrawable: outer fill = border color, inner fill = bg color inset by border width.
+- **Border**: configurable color (uses accent/border color setting) and width (0–6dp, default 2dp black). Rendered as a real stroke on the background drawable (no filled rectangle behind the bg). Padding offsets content so the border doesn't overlap it.
 - **Tap activity text** → expand overlay (keyboard pops up, +/➚/− buttons appear, quick-select rows show). Type a new name and press Done — the previous activity is saved, timer restarts, and overlay collapses.
 - **Tap timer** → pause/resume (timer dims when paused)
 - **Drag anywhere** → reposition the pill on screen (clamped to screen bounds)
@@ -13,7 +13,7 @@
 - **➚ open app** → opens the full TrackyTime app (releases focus, overlay stays expanded)
 - **− collapse** → collapses the expanded overlay back to the compact pill
 - **Timeline bar** → 6dp colored bar at the bottom showing the day's activity history as proportional segments. Each activity session is a colored rectangle. The currently-running activity grows live. The live segment pulses immediately, speeding up 1.5x every 30 minutes as a gentle nudge. Not affected by the opacity slider. White tick marks (2px wide) at every hour (full height) and half-hour (bottom half). Both fully opaque. Half-hour marks are hidden once total tracked time exceeds 5 hours.
-- **Breathing border** → optional (default on): the border pulses in sync with the timeline bar. Breathes from fully transparent up to the user's opacity setting — higher opacity = more visible pulse, lower opacity = subtler. Background stays static. Live-updates when toggled in settings.
+- **Breathing overlay** → optional (default on): the border and background pulse in sync with the timeline bar. Border breathes from fully transparent up to the user's opacity setting. Background darkens toward black (up to 50%) and becomes more opaque at the pulse peak. Works regardless of border width (even 0). Live-updates when toggled in settings.
 - **Live-update**: changing any setting (colors, size, border, opacity) updates the overlay instantly — no restart needed.
 
 ### Timer
@@ -43,7 +43,7 @@
 
 ### Opacity
 - The opacity slider sets the **opacity** of the overlay background and border (default ~60%)
-- With breathing enabled: border pulses from fully transparent up to this opacity; background stays static
+- With breathing enabled: border pulses from fully transparent up to this opacity; background darkens and becomes more opaque at pulse peak
 - Without breathing: everything stays at the set opacity
 - Text, timer, and timeline bar are always fully visible (100% alpha)
 
@@ -57,7 +57,7 @@
 | `app/build.gradle` | Android build config — SDK versions, package name, build types |
 | `app/proguard-rules.pro` | ProGuard rules for release builds (currently empty) |
 | `app/src/main/AndroidManifest.xml` | Permissions + component declarations |
-| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, expand/collapse/focus model, quick-select shortcuts, timeline bar, progressive pulse, breathing border (LayerDrawable), live-update settings |
+| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, expand/collapse/focus model, quick-select shortcuts, timeline bar, progressive pulse, breathing overlay (stroke border + bg darkening), live-update settings |
 | `app/src/main/java/.../TimelineBarView.java` | Custom View: draws day timeline as proportional colored segments on a Canvas |
 | `app/src/main/java/.../MainActivity.java` | History view (individual entries, inline rename), pie chart, day/week toggle, date nav, color picker, export/import, settings (border color + width) |
 | `app/src/main/java/.../DatabaseHelper.java` | SQLite storage + `getColorForName()` / `updateColorByName()` / `updateEntryNameAndColor()` / date range queries / export/import |

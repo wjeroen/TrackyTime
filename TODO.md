@@ -42,6 +42,7 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Fix border: real stroke instead of filled rectangle behind bg; breathing darkens bg + border in sync (2026-02-11)
 - [x] Expand/focus split: expanded UI stays visible independently of keyboard focus (2026-02-11)
 - [x] Replace ✕ close with − collapse, remove stop-service from overlay (2026-02-11)
 - [x] Border on outside: LayerDrawable (outer border fill + inner bg fill), no stroke overlap (2026-02-11)
