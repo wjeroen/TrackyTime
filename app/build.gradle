@@ -1,0 +1,28 @@
+plugins {
+    id 'com.android.application' version '8.1.4'
+}
+
+android {
+    namespace 'com.timetracker.overlay'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.timetracker.overlay"
+        minSdk 26          // From SETUP.md
+        targetSdk 33       // From SETUP.md
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
