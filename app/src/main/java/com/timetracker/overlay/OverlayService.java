@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -45,7 +46,9 @@ public class OverlayService extends Service {
     private TextView timerText, separator, openAppBtn, closeBtn, addBtn;
     private EditText editText;
     private LinearLayout quickSelectContainer;
-    private GradientDrawable overlayBg; // cached for pulse animation
+    private GradientDrawable overlayBgFill;     // inner layer: background color
+    private GradientDrawable overlayBorderFill; // outer layer: border color (pulsed)
+    private boolean isExpanded = false;
 
     // Cached timeline segments (from DB, chronological order)
     private List<TimelineBarView.Segment> savedSegments = new ArrayList<>();
@@ -162,20 +165,32 @@ public class OverlayService extends Service {
 
         int borderWidth = prefs.getBorderWidth();
         int borderWidthPx = (int) (borderWidth * density);
+        int cornerRadiusPx = (int) (10 * density);
 
-        // Background: rounded rect with optional border — cached for pulse animation
-        overlayBg = new GradientDrawable();
-        overlayBg.setShape(GradientDrawable.RECTANGLE);
-        overlayBg.setCornerRadius(10 * density); // 10dp, matching FCT
-        overlayBg.setColor(bgWithAlpha);
+        // Inner layer: background fill
+        overlayBgFill = new GradientDrawable();
+        overlayBgFill.setShape(GradientDrawable.RECTANGLE);
+        overlayBgFill.setCornerRadius(cornerRadiusPx);
+        overlayBgFill.setColor(bgWithAlpha);
 
         if (borderWidth > 0) {
-            // Border follows same opacity as background
+            // Outer layer: solid border color (border is truly outside, no overlap)
             int accentColor = prefs.getAccentColor();
             int borderColor = (bgOpacity << 24) | (accentColor & 0x00FFFFFF);
-            overlayBg.setStroke(borderWidthPx, borderColor);
+            overlayBorderFill = new GradientDrawable();
+            overlayBorderFill.setShape(GradientDrawable.RECTANGLE);
+            overlayBorderFill.setCornerRadius(cornerRadiusPx + borderWidthPx);
+            overlayBorderFill.setColor(borderColor);
+
+            LayerDrawable layered = new LayerDrawable(
+                new GradientDrawable[]{ overlayBorderFill, overlayBgFill });
+            layered.setLayerInset(1, borderWidthPx, borderWidthPx,
+                borderWidthPx, borderWidthPx);
+            overlayView.setBackground(layered);
+        } else {
+            overlayBorderFill = null;
+            overlayView.setBackground(overlayBgFill);
         }
-        overlayView.setBackground(overlayBg);
 
         // Border grows outward: add border width to padding so content area stays the same
         int basePad = (int) (BASE_PADDING_DP * density);
@@ -240,11 +255,15 @@ public class OverlayService extends Service {
     }
 
     private void setupTouchHandlers() {
-        // EditText: when NOT editing, drag or tap-to-enter-edit.
-        // When editing, pass through so EditText handles cursor/selection natively.
+        // EditText: behavior depends on expanded + focused state
         editText.setOnTouchListener((v, event) -> {
-            if (isInEditMode()) return false; // native EditText handling
-            return handleDragTouch(event, this::enterEditMode);
+            if (isExpanded && isOverlayFocusable()) return false; // native handling
+            if (isExpanded) {
+                // Expanded but unfocused: tap to re-gain focus
+                return handleDragTouch(event, () -> gainFocus(editText));
+            }
+            // Collapsed: tap to expand
+            return handleDragTouch(event, this::expandOverlay);
         });
 
         // Timer: drag or tap-to-pause
@@ -255,23 +274,28 @@ public class OverlayService extends Service {
         addBtn.setOnTouchListener((v, event) ->
             handleDragTouch(event, this::addQuickSelectRow));
 
-        // Open app: drag or tap-to-open
+        // Open app: release focus + open (keep expanded)
         openAppBtn.setOnTouchListener((v, event) ->
             handleDragTouch(event, this::openApp));
 
-        // Close: drag or tap-to-close
+        // Collapse (−): drag or tap-to-collapse
         closeBtn.setOnTouchListener((v, event) ->
-            handleDragTouch(event, this::stopSelf));
+            handleDragTouch(event, this::collapseOverlay));
 
-        // Background (root): drag or tap-to-exit-edit
-        overlayView.setOnTouchListener((v, event) ->
-            handleDragTouch(event, () -> {
-                if (isInEditMode()) exitEditMode();
-            }));
+        // Background (root): outside touch releases focus; bg tap releases focus
+        overlayView.setOnTouchListener((v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_OUTSIDE) {
+                if (isOverlayFocusable()) releaseFocus();
+                return true;
+            }
+            return handleDragTouch(event, () -> {
+                if (isOverlayFocusable()) releaseFocus();
+            });
+        });
     }
 
     private void openApp() {
-        closeEditingUI();
+        releaseFocus();
         Intent intent = new Intent(this, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(intent);
@@ -292,57 +316,68 @@ public class OverlayService extends Service {
         if (isRunning) pauseTimer(); else resumeTimer();
     }
 
-    // ---- EditText / focus management ----
+    // ---- Expanded / Focus management (independent states) ----
 
-    private boolean isInEditMode() {
+    /** Whether the overlay currently captures keyboard input. */
+    private boolean isOverlayFocusable() {
         return (params.flags & WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) == 0;
     }
 
     private void setupEditText() {
         editText.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_DONE) {
-                exitEditMode();
+                collapseOverlay(); // Enter on main text → save + collapse
                 return true;
             }
             return false;
         });
     }
 
-    private void enterEditMode() {
-        // Allow focus so EditText can receive input
-        params.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-        windowManager.updateViewLayout(overlayView, params);
-        editText.requestFocus();
-        editText.setSelection(editText.getText().length());
-        // Show edit-mode buttons and quick-select rows
+    /** Expand: show buttons + quick-select, gain focus, show keyboard. */
+    private void expandOverlay() {
+        isExpanded = true;
         addBtn.setVisibility(View.VISIBLE);
         openAppBtn.setVisibility(View.VISIBLE);
         closeBtn.setVisibility(View.VISIBLE);
         rebuildQuickSelectRows();
-        editText.postDelayed(() -> {
+        gainFocus(editText);
+    }
+
+    /** Give the overlay keyboard focus on the specified view. */
+    private void gainFocus(View target) {
+        params.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        params.flags |= WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
+        windowManager.updateViewLayout(overlayView, params);
+        target.requestFocus();
+        if (target instanceof EditText) {
+            ((EditText) target).setSelection(((EditText) target).getText().length());
+        }
+        target.postDelayed(() -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-            if (imm != null) imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT);
+            if (imm != null) imm.showSoftInput(target, InputMethodManager.SHOW_IMPLICIT);
         }, 200);
     }
 
-    private void exitEditMode() {
+    /** Release keyboard focus but keep expanded UI visible. */
+    private void releaseFocus() {
+        View focused = overlayView.findFocus();
+        if (focused != null) focused.clearFocus();
+        InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (imm != null) imm.hideSoftInputFromWindow(overlayView.getWindowToken(), 0);
+        params.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        params.flags &= ~WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
+        windowManager.updateViewLayout(overlayView, params);
+    }
+
+    /** Collapse: save activity if changed, save quick-select, release focus, hide expanded UI. */
+    private void collapseOverlay() {
         String newText = editText.getText().toString().trim();
         if (!newText.isEmpty() && !newText.equals(currentActivityName)) {
             startNewActivity(newText);
         }
-        closeEditingUI();
-    }
-
-    private void closeEditingUI() {
-        // Save any quick-select names before closing
+        isExpanded = false;
         saveQuickSelectNames();
-        editText.clearFocus();
-        InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-        if (imm != null) imm.hideSoftInputFromWindow(editText.getWindowToken(), 0);
-        // Restore non-focusable
-        params.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-        windowManager.updateViewLayout(overlayView, params);
-        // Hide edit-mode buttons and quick-select rows
+        releaseFocus();
         addBtn.setVisibility(View.GONE);
         openAppBtn.setVisibility(View.GONE);
         closeBtn.setVisibility(View.GONE);
@@ -413,9 +448,8 @@ public class OverlayService extends Service {
     }
 
     // ---- Progressive pulse: starts immediately, 1.5x faster every 30min ----
-    // Pulse affects the timeline bar's live segment AND (optionally) the entire overlay bg+border.
-    // The user's opacity setting is the CEILING — pulse breathes from 20% visible (floor) up to
-    // the opacity setting. Lower opacity = subtler pulse. Higher opacity = more visible pulse.
+    // Pulse affects the timeline bar's live segment AND (optionally) the border.
+    // Border breathes from fully transparent (0) up to the user's opacity setting.
 
     /** Refresh cached pulse values from current preferences (called on pref change). */
     private void refreshPulseCache() {
@@ -458,24 +492,20 @@ public class OverlayService extends Service {
         }
     }
 
-    /**
-     * Animate ONLY the border in sync with the timeline bar pulse.
-     * Background stays at the user's static opacity. Border breathes between
-     * the user's opacity (ceiling) and 20% visible opacity (floor).
-     */
-    private static final int PULSE_FLOOR_ALPHA = 51; // 20% of 255 ≈ 20% user-visible opacity
+    /** Animate ONLY the border (outer fill). Background stays static. */
+    private static final int PULSE_FLOOR_ALPHA = 0; // border pulses from fully transparent
 
     private void applyOverlayPulse(float pulseAlpha) {
         if (!cachedOverlayPulseEnabled) return;
-        if (overlayBg == null) return;
-        if (cachedBorderWidth <= 0) return; // no border = nothing to pulse
+        if (overlayBorderFill == null) return;
+        if (cachedBorderWidth <= 0) return;
 
         int floor = Math.min(PULSE_FLOOR_ALPHA, cachedBgOpacity);
         int range = cachedBgOpacity - floor;
         int borderAlpha = floor + (int) (range * (pulseAlpha - 0.3f) / 0.7f);
         if (borderAlpha > cachedBgOpacity) borderAlpha = cachedBgOpacity;
         if (borderAlpha < floor) borderAlpha = floor;
-        overlayBg.setStroke((int) (cachedBorderWidth * cachedDensity),
+        overlayBorderFill.setColor(
             (borderAlpha << 24) | (cachedAccentColor & 0x00FFFFFF));
     }
 
@@ -485,7 +515,7 @@ public class OverlayService extends Service {
             pulseAnimator = null;
         }
         // Reset overlay bg to resting state
-        if (overlayBg != null) {
+        if (overlayBgFill != null) {
             applyPreferences();
         }
     }
@@ -556,6 +586,7 @@ public class OverlayService extends Service {
         saveCurrentActivity();
         loadTodaySegments(); // re-query DB now that previous activity is saved
         currentActivityName = name;
+        editText.setText(name);
         currentActivityColor = dbHelper.getColorForName(name);
         currentStartTime = System.currentTimeMillis();
         accumulatedMs = 0;
@@ -670,25 +701,33 @@ public class OverlayService extends Service {
         row.addView(removeBtn);
         quickSelectContainer.addView(row);
 
-        // Play: switch to this activity
+        // Play: switch to this activity, release focus (keep expanded)
         playBtn.setOnTouchListener((v, event) ->
             handleDragTouch(event, () -> {
                 String actName = nameField.getText().toString().trim();
                 if (!actName.isEmpty()) {
                     saveQuickSelectNames();
                     startNewActivity(actName);
-                    exitEditMode();
+                    releaseFocus();
                 }
             }));
 
-        // Done on keyboard: save the name and clear focus
+        // Done on keyboard: save the name, release focus (keep expanded)
         nameField.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_DONE) {
                 saveQuickSelectNames();
-                nameField.clearFocus();
+                releaseFocus();
                 return true;
             }
             return false;
+        });
+
+        // Tap name field when expanded but unfocused: re-gain focus
+        nameField.setOnTouchListener((v, event) -> {
+            if (isExpanded && !isOverlayFocusable()) {
+                return handleDragTouch(event, () -> gainFocus(nameField));
+            }
+            return false; // native EditText handling when focused
         });
 
         // Remove: delete this row
@@ -702,11 +741,7 @@ public class OverlayService extends Service {
             }));
 
         if (requestFocus) {
-            nameField.requestFocus();
-            nameField.postDelayed(() -> {
-                InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-                if (imm != null) imm.showSoftInput(nameField, InputMethodManager.SHOW_IMPLICIT);
-            }, 200);
+            gainFocus(nameField);
         }
     }
 

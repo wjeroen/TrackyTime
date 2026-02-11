@@ -30,7 +30,7 @@ public class OverlayPreferences {
     public void setAccentColor(int c) { sp.edit().putInt("accent_color", c).apply(); }
 
     // 0-6 dp (0 = no border)
-    public int getBorderWidth() { return sp.getInt("border_width", 1); }
+    public int getBorderWidth() { return sp.getInt("border_width", 2); }
     public void setBorderWidth(int w) { sp.edit().putInt("border_width", w).apply(); }
 
     // Overlay pulse (bg + border breathe in sync with timeline bar)

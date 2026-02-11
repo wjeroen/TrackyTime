@@ -23,13 +23,14 @@ _(none right now)_
 - [ ] Test that opacity slider affects background + border (text stays fully visible)
 - [ ] Test consistent colors: create "Coding" twice on different days, verify same color
 - [ ] Test color picker: 44 colors (vivid, warm, pastel, deep), changing color updates all entries with same name
-- [ ] Test open-app button (➚) appears only in edit mode, opens full app
-- [ ] Test close button (✕) appears only in edit mode, stops overlay service
+- [ ] Test open-app button (➚) appears in expanded mode, opens full app (keeps overlay expanded)
+- [ ] Test collapse button (−) appears in expanded mode, collapses overlay
 - [ ] Test quick-select: + adds row, ▶ switches activity, ✕ removes row, persists across sessions
 - [ ] Test timeline bar: colored segments, live segment grows, tick marks at hour (full) and half-hour (half, hidden >5h)
-- [ ] Test progressive pulse: starts immediately, speeds up 1.5x every 30min, pulses live segment + bg/border
-- [ ] Test breathing overlay toggle: on = border pulses in sync, off = only timeline bar pulses (background stays static)
-- [ ] Test border: accent/border color applied, border width adjustable 0–6dp, alpha scales with bg opacity
+- [ ] Test progressive pulse: starts immediately, speeds up 1.5x every 30min, pulses live segment + border
+- [ ] Test breathing border toggle: on = border pulses 0%→opacity, off = only timeline bar pulses
+- [ ] Test border: fully outside bg (LayerDrawable, no overlap), width adjustable 0–6dp (default 2dp)
+- [ ] Test expand/focus split: tap outside → releases focus but keeps expanded; − collapses; Enter on quick-select → releases focus, stays expanded
 - [ ] Test live-update: changing settings in app immediately updates the overlay (no restart)
 - [ ] Test inline rename: tap entry name in history → edit → press Done → name + color update
 - [ ] Test individual history entries: each session shown separately with time range ("10:00 – 11:00 · 1h 00m")
@@ -41,8 +42,14 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Expand/focus split: expanded UI stays visible independently of keyboard focus (2026-02-11)
+- [x] Replace ✕ close with − collapse, remove stop-service from overlay (2026-02-11)
+- [x] Border on outside: LayerDrawable (outer border fill + inner bg fill), no stroke overlap (2026-02-11)
+- [x] Fix quick-select ▶ not updating displayed activity text (editText.setText) (2026-02-11)
+- [x] Default border width 2dp, pulse floor 0% (fully transparent → user opacity) (2026-02-11)
+- [x] Tap outside overlay → release focus only (keep expanded, phone usable) (2026-02-11)
 - [x] Quick-select activity shortcuts: + button adds rows with ▶ play and ✕ remove, persists in prefs (2026-02-10)
-- [x] Border-only pulse: background stays static, only border breathes (20%→user's opacity) (2026-02-10)
+- [x] Border-only pulse: background stays static, only border breathes (2026-02-10)
 - [x] Revert tap-outside-exits-edit-mode (removed FLAG_WATCH_OUTSIDE_TOUCH) (2026-02-10)
 - [x] Fix pulse direction: breathes from invisible (0) up to user's opacity (ceiling), not the other way (2026-02-10)
 - [x] Fix default opacity to 60% user-visible (internal 153), pulse floor at 20% (2026-02-10)
