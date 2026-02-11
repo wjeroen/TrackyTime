@@ -4,7 +4,7 @@
 
 ### Overlay (floating pill)
 - **Compact pill shape**: activity name on the left, timer on the right, 10dp rounded corners
-- **Border**: configurable color (uses accent/border color setting) and width (0–6dp, default 2dp black). Rendered as a real stroke on the background drawable (no filled rectangle behind the bg). Padding offsets content so the border doesn't overlap it.
+- **Border**: configurable color (uses accent/border color setting) and width (0–6dp, default 2dp black). Uses LayerDrawable: bottom layer = bg fill (inset by border width), top layer = stroke-only drawable (transparent fill + stroke). This avoids both the filled-rectangle-behind-bg bug and the stroke/fill overlap bug. Padding offsets content so the border doesn't overlap it.
 - **Tap activity text** → expand overlay (keyboard pops up, +/➚/− buttons appear, quick-select rows show). Type a new name and press Done — the previous activity is saved, timer restarts, and overlay collapses.
 - **Tap timer** → pause/resume (timer dims when paused)
 - **Drag anywhere** → reposition the pill on screen (clamped to screen bounds)
@@ -57,7 +57,7 @@
 | `app/build.gradle` | Android build config — SDK versions, package name, build types |
 | `app/proguard-rules.pro` | ProGuard rules for release builds (currently empty) |
 | `app/src/main/AndroidManifest.xml` | Permissions + component declarations |
-| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, expand/collapse/focus model, quick-select shortcuts, timeline bar, progressive pulse, breathing overlay (stroke border + bg darkening), live-update settings |
+| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, expand/collapse/focus model, quick-select shortcuts, timeline bar, progressive pulse, breathing overlay (stroke-only border layer + bg darkening), live-update settings |
 | `app/src/main/java/.../TimelineBarView.java` | Custom View: draws day timeline as proportional colored segments on a Canvas |
 | `app/src/main/java/.../MainActivity.java` | History view (individual entries, inline rename), pie chart, day/week toggle, date nav, color picker, export/import, settings (border color + width) |
 | `app/src/main/java/.../DatabaseHelper.java` | SQLite storage + `getColorForName()` / `updateColorByName()` / `updateEntryNameAndColor()` / date range queries / export/import |

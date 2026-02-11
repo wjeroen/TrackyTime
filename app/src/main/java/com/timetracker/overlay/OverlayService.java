@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -45,7 +46,8 @@ public class OverlayService extends Service {
     private TextView timerText, separator, openAppBtn, closeBtn, addBtn;
     private EditText editText;
     private LinearLayout quickSelectContainer;
-    private GradientDrawable overlayBgFill;     // background fill + border stroke
+    private GradientDrawable overlayBgFill;        // background fill (inset when border > 0)
+    private GradientDrawable overlayBorderDrawable; // stroke-only border layer (null when border = 0)
     private boolean isExpanded = false;
 
     // Cached timeline segments (from DB, chronological order)
@@ -165,7 +167,7 @@ public class OverlayService extends Service {
         int borderWidthPx = (int) (borderWidth * density);
         int cornerRadiusPx = (int) (10 * density);
 
-        // Single drawable: background fill + border as stroke (no filled rectangle behind bg)
+        // Background fill (no stroke on this drawable — avoids stroke/fill overlap)
         overlayBgFill = new GradientDrawable();
         overlayBgFill.setShape(GradientDrawable.RECTANGLE);
         overlayBgFill.setCornerRadius(cornerRadiusPx);
@@ -174,10 +176,25 @@ public class OverlayService extends Service {
         if (borderWidth > 0) {
             int accentColor = prefs.getAccentColor();
             int borderColor = (bgOpacity << 24) | (accentColor & 0x00FFFFFF);
-            overlayBgFill.setStroke(borderWidthPx, borderColor);
-        }
 
-        overlayView.setBackground(overlayBgFill);
+            // Stroke-only layer: transparent fill, just the border line
+            // Corner radius set so inner edge of stroke matches bg fill's radius
+            overlayBorderDrawable = new GradientDrawable();
+            overlayBorderDrawable.setShape(GradientDrawable.RECTANGLE);
+            overlayBorderDrawable.setCornerRadius(cornerRadiusPx + borderWidthPx / 2f);
+            overlayBorderDrawable.setColor(0x00000000);
+            overlayBorderDrawable.setStroke(borderWidthPx, borderColor);
+
+            LayerDrawable layered = new LayerDrawable(
+                new GradientDrawable[]{ overlayBgFill, overlayBorderDrawable });
+            // Inset bg fill by border width so it sits inside the stroke, no overlap
+            layered.setLayerInset(0, borderWidthPx, borderWidthPx,
+                borderWidthPx, borderWidthPx);
+            overlayView.setBackground(layered);
+        } else {
+            overlayBorderDrawable = null;
+            overlayView.setBackground(overlayBgFill);
+        }
 
         // Border grows outward: add border width to padding so content area stays the same
         int basePad = (int) (BASE_PADDING_DP * density);
@@ -490,10 +507,10 @@ public class OverlayService extends Service {
         if (factor > 1f) factor = 1f;
 
         // 1. Border pulse: fully transparent → user's opacity (only when border exists)
-        if (cachedBorderWidth > 0) {
+        if (cachedBorderWidth > 0 && overlayBorderDrawable != null) {
             int borderAlpha = (int) (cachedBgOpacity * factor);
             int borderWidthPx = (int) (cachedBorderWidth * cachedDensity);
-            overlayBgFill.setStroke(borderWidthPx,
+            overlayBorderDrawable.setStroke(borderWidthPx,
                 (borderAlpha << 24) | (cachedAccentColor & 0x00FFFFFF));
         }
 
