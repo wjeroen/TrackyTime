@@ -496,7 +496,7 @@ public class OverlayService extends Service {
         }
     }
 
-    /** Animate border stroke + darken background in sync. Works with any border width. */
+    /** Animate border stroke + shift background (darken or brighten) in sync. */
     private void applyOverlayPulse(float pulseAlpha) {
         if (!cachedOverlayPulseEnabled) return;
         if (overlayBgFill == null) return;
@@ -514,17 +514,28 @@ public class OverlayService extends Service {
                 (borderAlpha << 24) | (cachedAccentColor & 0x00FFFFFF));
         }
 
-        // 2. Background darkening: blend toward black + increase opacity
-        float maxDarken = 0.5f; // equivalent to 50% opacity black overlay at peak
-        float darken = factor * maxDarken;
+        // 2. Background shift: darken light colors, brighten dark colors + increase opacity
+        float maxShift = 0.25f;
+        float shift = factor * maxShift;
 
         int r = (cachedBgColor >> 16) & 0xFF;
         int g = (cachedBgColor >> 8) & 0xFF;
         int b = cachedBgColor & 0xFF;
 
-        int dr = (int) (r * (1 - darken));
-        int dg = (int) (g * (1 - darken));
-        int db = (int) (b * (1 - darken));
+        // Perceived brightness (simple average, 0–255). Below ~75 → brighten instead
+        int brightness = (r + g + b) / 3;
+        int dr, dg, db;
+        if (brightness < 75) {
+            // Brighten: blend toward white
+            dr = r + (int) ((255 - r) * shift);
+            dg = g + (int) ((255 - g) * shift);
+            db = b + (int) ((255 - b) * shift);
+        } else {
+            // Darken: blend toward black
+            dr = (int) (r * (1 - shift));
+            dg = (int) (g * (1 - shift));
+            db = (int) (b * (1 - shift));
+        }
 
         // Alpha: from user's opacity toward more opaque (30% of remaining range)
         int alphaBoost = (int) (factor * (255 - cachedBgOpacity) * 0.3f);
