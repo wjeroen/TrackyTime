@@ -51,19 +51,20 @@ public class StrokeEditText extends EditText {
 
         // Save paint state
         Paint paint = getPaint();
+        int originalColor = paint.getColor();
         Paint.Style originalStyle = paint.getStyle();
         float originalStrokeWidth = paint.getStrokeWidth();
 
         // Draw stroke first
+        paint.setColor(strokeColor);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(4f); // 4px stroke
-        setTextColor(strokeColor);
         super.onDraw(canvas);
 
         // Then draw fill on top
+        paint.setColor(originalColor);
         paint.setStyle(Paint.Style.FILL);
         paint.setStrokeWidth(originalStrokeWidth);
-        setTextColor(textColor);
         super.onDraw(canvas);
 
         // Restore paint state
