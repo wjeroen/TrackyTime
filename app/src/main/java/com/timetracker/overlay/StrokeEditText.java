@@ -40,29 +40,32 @@ public class StrokeEditText extends EditText {
 
         // Get text color and calculate brightness
         int textColor = getCurrentTextColor();
+
+        // CRITICAL: Extract RGB from the color (ignoring alpha)
         int r = (textColor >> 16) & 0xFF;
         int g = (textColor >> 8) & 0xFF;
         int b = textColor & 0xFF;
 
-        // ITU BT.601 weighted brightness
-        float brightness = (0.299f * r + 0.587f * g + 0.114f * b) / 255f;
+        // ITU BT.601 weighted brightness (0-255 range)
+        float brightnessByte = (0.299f * r) + (0.587f * g) + (0.114f * b);
 
-        // Auto-contrast: black stroke for light text, white for dark
-        int strokeColor = brightness > 0.5f ? 0xFF000000 : 0xFFFFFFFF;
+        // Auto-contrast: black stroke for light text (>=128), white for dark text (<128)
+        // Force FULL OPACITY for stroke color
+        int strokeColor = (brightnessByte >= 128f) ? 0xFF000000 : 0xFFFFFFFF;
 
-        // Save paint state
+        // Save paint AND view state
         Paint paint = getPaint();
         Paint.Style originalStyle = paint.getStyle();
         float originalStrokeWidth = paint.getStrokeWidth();
 
-        // Draw stroke first
-        paint.setColor(strokeColor);
+        // Draw stroke: change VIEW's color so super.onDraw() uses it
+        setTextColor(strokeColor);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(4f); // 4px stroke
         super.onDraw(canvas);
 
-        // Then draw fill on top with the actual text color
-        paint.setColor(textColor);
+        // Draw fill: restore VIEW's original color
+        setTextColor(textColor);
         paint.setStyle(Paint.Style.FILL);
         paint.setStrokeWidth(originalStrokeWidth);
         super.onDraw(canvas);

@@ -215,6 +215,8 @@ public class OverlayService extends Service {
         separator.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
         editText.setTextColor(textColor);
         editText.setHintTextColor((textColor & 0x00FFFFFF) | 0x55000000);
+        // Force EditText to redraw after color change (needed for stroke updates)
+        editText.invalidate();
         addBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
         openAppBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
         closeBtn.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
@@ -251,6 +253,8 @@ public class OverlayService extends Service {
             playBtn.setStrokeEnabled(strokeEnabled);
             nameField.setTextColor(textColor);
             nameField.setHintTextColor((textColor & 0x00FFFFFF) | 0x55000000);
+            // Force EditText to redraw after color change (needed for stroke updates)
+            nameField.invalidate();
             nameField.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
             nameField.setStrokeEnabled(strokeEnabled);
             removeBtn.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
