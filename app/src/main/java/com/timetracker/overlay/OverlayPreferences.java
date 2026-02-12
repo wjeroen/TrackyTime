@@ -10,9 +10,11 @@ public class OverlayPreferences {
 
     private static final String PREFS = "overlay_prefs";
     private SharedPreferences sp;
+    private SharedPreferences crashSp; // separate file — avoids triggering live-update listener
 
     public OverlayPreferences(Context ctx) {
         sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        crashSp = ctx.getSharedPreferences("crash_recovery", Context.MODE_PRIVATE);
     }
 
     public int getBgColor() { return sp.getInt("bg_color", 0xFFFFFFFF); }
@@ -68,6 +70,33 @@ public class OverlayPreferences {
     }
     public void setQuickActivities(List<String> activities) {
         sp.edit().putString("quick_activities", String.join("\n", activities)).apply();
+    }
+
+    // ---- Crash recovery (uses separate SharedPreferences file) ----
+
+    /** Set a crash recovery checkpoint when an activity starts. */
+    public void setCrashRecovery(String name, long startTime) {
+        crashSp.edit()
+            .putBoolean("active", true)
+            .putString("name", name)
+            .putLong("start_time", startTime)
+            .putInt("elapsed_seconds", 0)
+            .apply();
+    }
+
+    /** Update the heartbeat with current elapsed seconds (called every 5s). */
+    public void updateCrashHeartbeat(int elapsedSeconds) {
+        crashSp.edit().putInt("elapsed_seconds", elapsedSeconds).apply();
+    }
+
+    public boolean hasCrashRecovery() { return crashSp.getBoolean("active", false); }
+    public String getCrashName() { return crashSp.getString("name", ""); }
+    public long getCrashStartTime() { return crashSp.getLong("start_time", 0); }
+    public int getCrashElapsedSeconds() { return crashSp.getInt("elapsed_seconds", 0); }
+
+    /** Clear the checkpoint (called after successful save or intentional discard). */
+    public void clearCrashRecovery() {
+        crashSp.edit().clear().apply();
     }
 
     /**

@@ -20,6 +20,7 @@
 ### Timer
 - **Drift-proof**: uses `virtualStartTimestamp` pattern (elapsed = now − virtualStart) instead of incrementing a counter
 - **Compact format**: shows `MM:SS` under 1 hour, `H:MM:SS` at 1 hour+
+- **Crash recovery**: a heartbeat writes the running activity's name, start time, and elapsed seconds to a separate SharedPreferences file (`crash_recovery`) every 5 seconds. If the app crashes, is force-stopped, or the phone reboots without calling `onDestroy()`, the next service startup detects the dangling checkpoint and saves the activity to the database with the duration up to the last heartbeat. Max data loss: 5 seconds. Activities under 10 seconds are still discarded. The checkpoint is cleared on normal save or activity switch.
 
 ### App
 - Daily pie chart with color-coded slices (entries grouped by name)
@@ -73,7 +74,7 @@
 | `app/src/main/java/.../PieChartView.java` | Custom canvas-drawn pie chart |
 | `app/src/main/java/.../StrokeTextView.java` | Custom TextView with TV subtitle-style text stroke/outline — auto-contrast via ITU BT.601 brightness (black stroke for light text, white for dark) |
 | `app/src/main/java/.../StrokeEditText.java` | Custom EditText with same stroke/outline — uses Layout.draw() directly to bypass Editor's hardware-acceleration cache |
-| `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance (bg/text/border colors, border width, opacity, size, overlay pulse toggle, text stroke toggle, quick-select activities) |
+| `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance (bg/text/border colors, border width, opacity, size, overlay pulse toggle, text stroke toggle, quick-select activities) + crash recovery checkpoint (separate `crash_recovery` file) |
 | `.github/workflows/android.yml` | GitHub Actions workflow — builds APK on every push |
 
 > **Note:** Java files live under `app/src/main/java/com/timetracker/overlay/`. The `...` above abbreviates that path.

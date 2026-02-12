@@ -83,6 +83,11 @@ public class OverlayService extends Service {
     private static final long FRAME_INTERVAL_MS = 33;
     private long lastFrameTime = 0;
 
+    // Crash recovery: heartbeat saves running activity state every 5s
+    private static final int HEARTBEAT_INTERVAL_MS = 5000;
+    private Handler heartbeatHandler;
+    private Runnable heartbeatRunnable;
+
     // Live-update: listen for pref changes from the settings dialog
     private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
     private Runnable applyPrefsRunnable = () -> {
@@ -108,6 +113,22 @@ public class OverlayService extends Service {
         super.onCreate();
         dbHelper = new DatabaseHelper(this);
         timerHandler = new Handler(Looper.getMainLooper());
+
+        // Crash recovery heartbeat (saves running activity state every 5s)
+        heartbeatHandler = new Handler(Looper.getMainLooper());
+        heartbeatRunnable = () -> {
+            if (!currentActivityName.isEmpty()) {
+                new OverlayPreferences(this).updateCrashHeartbeat(getElapsedSeconds());
+            }
+            heartbeatHandler.postDelayed(heartbeatRunnable, HEARTBEAT_INTERVAL_MS);
+        };
+
+        // Recover activity from previous crash (if any) — before setupOverlay
+        // so the recovered entry appears in the timeline
+        OverlayPreferences crashPrefs = new OverlayPreferences(this);
+        if (crashPrefs.hasCrashRecovery()) {
+            recoverCrashedActivity(crashPrefs);
+        }
 
         createNotificationChannel();
         startForeground(NOTIF_ID, buildNotification());
@@ -466,6 +487,8 @@ public class OverlayService extends Service {
         showTimerPaused();
         updateTimerDisplay();
         updateLiveStatics();
+        // Snapshot paused duration to crash recovery (don't wait for next heartbeat)
+        new OverlayPreferences(this).updateCrashHeartbeat(getElapsedSeconds());
     }
 
     private void resumeTimer() {
@@ -651,7 +674,10 @@ public class OverlayService extends Service {
 
     private void saveCurrentActivity() {
         int elapsed = getElapsedSeconds();
-        if (currentActivityName.isEmpty() || elapsed < MIN_ACTIVITY_SECONDS) return;
+        if (currentActivityName.isEmpty() || elapsed < MIN_ACTIVITY_SECONDS) {
+            new OverlayPreferences(this).clearCrashRecovery();
+            return;
+        }
         String date = new SimpleDateFormat("yyyy-MM-dd", Locale.US)
             .format(new Date(currentStartTime));
 
@@ -659,6 +685,22 @@ public class OverlayService extends Service {
 
         ActivityEntry entry = new ActivityEntry(
             currentActivityName, elapsed, currentStartTime, date);
+        entry.setColor(color);
+        dbHelper.insertActivity(entry);
+        new OverlayPreferences(this).clearCrashRecovery();
+    }
+
+    /** Recover an activity that was running when the service crashed. */
+    private void recoverCrashedActivity(OverlayPreferences prefs) {
+        String name = prefs.getCrashName();
+        long startTime = prefs.getCrashStartTime();
+        int elapsed = prefs.getCrashElapsedSeconds();
+        prefs.clearCrashRecovery();
+        if (name.isEmpty() || elapsed < MIN_ACTIVITY_SECONDS) return;
+        String date = new SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            .format(new Date(startTime));
+        int color = dbHelper.getColorForName(name);
+        ActivityEntry entry = new ActivityEntry(name, elapsed, startTime, date);
         entry.setColor(color);
         dbHelper.insertActivity(entry);
     }
@@ -679,6 +721,11 @@ public class OverlayService extends Service {
         updateTimerDisplay();
         startTimer();
         updateLiveStatics();
+
+        // Set crash recovery checkpoint and start heartbeat
+        new OverlayPreferences(this).setCrashRecovery(name, currentStartTime);
+        heartbeatHandler.removeCallbacks(heartbeatRunnable);
+        heartbeatHandler.post(heartbeatRunnable);
     }
 
     private void updateLiveStatics() {
@@ -853,6 +900,7 @@ public class OverlayService extends Service {
         saveCurrentActivity();
         timerHandler.removeCallbacks(timerRunnable);
         timerHandler.removeCallbacks(applyPrefsRunnable);
+        heartbeatHandler.removeCallbacks(heartbeatRunnable);
         stopProgressPulse();
         // Unregister pref listener
         getSharedPreferences("overlay_prefs", MODE_PRIVATE)
