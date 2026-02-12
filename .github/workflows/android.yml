@@ -14,11 +14,22 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Decode debug keystore
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > $GITHUB_WORKSPACE/debug.keystore
+
       - name: Build with Gradle
+        env:
+          DEBUG_KEYSTORE_PATH: ${{ github.workspace }}/debug.keystore
+          DEBUG_KEYSTORE_PASSWORD: ${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
+          DEBUG_KEY_ALIAS: ${{ secrets.DEBUG_KEY_ALIAS }}
+          DEBUG_KEY_PASSWORD: ${{ secrets.DEBUG_KEY_PASSWORD }}
         run: ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: TrackyTime-debug
+          path: app/build/outputs/apk/debug/TrackyTime-*.apk
