@@ -51,7 +51,6 @@ public class StrokeTextView extends TextView {
 
         // Save paint state
         Paint paint = getPaint();
-        int originalColor = paint.getColor();
         Paint.Style originalStyle = paint.getStyle();
         float originalStrokeWidth = paint.getStrokeWidth();
 
@@ -61,8 +60,8 @@ public class StrokeTextView extends TextView {
         paint.setStrokeWidth(4f); // 4px stroke
         super.onDraw(canvas);
 
-        // Then draw fill on top
-        paint.setColor(originalColor);
+        // Then draw fill on top with the actual text color
+        paint.setColor(textColor);
         paint.setStyle(Paint.Style.FILL);
         paint.setStrokeWidth(originalStrokeWidth);
         super.onDraw(canvas);
