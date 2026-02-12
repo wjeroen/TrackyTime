@@ -37,6 +37,12 @@ public class OverlayService extends Service {
 
     public static boolean isServiceRunning = false;
 
+    // Live activity data (readable by MainActivity for showing current activity)
+    public static String liveActivityName = "";
+    public static long liveStartTime = 0;
+    public static boolean liveIsRunning = false;
+    public static int liveActivityColor = 0;
+
     private WindowManager windowManager;
     private View overlayView;
     private WindowManager.LayoutParams params;
@@ -72,6 +78,10 @@ public class OverlayService extends Service {
     private boolean cachedOverlayPulseEnabled = true;
     private int cachedBgColor, cachedBgOpacity, cachedAccentColor, cachedBorderWidth;
     private float cachedDensity;
+
+    // Throttle animation updates to 30fps (~33ms between frames)
+    private static final long FRAME_INTERVAL_MS = 33;
+    private long lastFrameTime = 0;
 
     // Live-update: listen for pref changes from the settings dialog
     private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
@@ -439,6 +449,7 @@ public class OverlayService extends Service {
         timerHandler.removeCallbacks(timerRunnable);
         showTimerPaused();
         updateTimerDisplay();
+        updateLiveStatics();
     }
 
     private void resumeTimer() {
@@ -447,6 +458,7 @@ public class OverlayService extends Service {
         timerHandler.removeCallbacks(timerRunnable);
         timerHandler.post(timerRunnable);
         showTimerRunning();
+        updateLiveStatics();
     }
 
     private void showTimerRunning() {
@@ -462,7 +474,7 @@ public class OverlayService extends Service {
         updateTimelineBar();
     }
 
-    // ---- Progressive pulse: starts immediately, 1.5x faster every 30min ----
+    // ---- Progressive pulse: starts immediately, 2x faster every 30min ----
     // Pulse affects the timeline bar's live segment AND (optionally) the border.
     // Border breathes from fully transparent (0) up to the user's opacity setting.
 
@@ -483,8 +495,8 @@ public class OverlayService extends Service {
         int elapsed = getElapsedSeconds();
         // How many 30-min periods have passed?
         int periods = (int) (elapsed / PULSE_INTERVAL_SECONDS);
-        // duration = BASE / 1.5^periods (each period 1.5x faster)
-        long targetDuration = (long) (BASE_PULSE_MS / Math.pow(1.5, periods));
+        // duration = BASE / 2^periods (each period 2x faster — doubles speed)
+        long targetDuration = (long) (BASE_PULSE_MS / Math.pow(2.0, periods));
         if (targetDuration < 400) targetDuration = 400; // floor
 
         // Only restart animation if speed changed
@@ -498,6 +510,9 @@ public class OverlayService extends Service {
             va.setRepeatCount(ValueAnimator.INFINITE);
             va.setRepeatMode(ValueAnimator.REVERSE);
             va.addUpdateListener(animation -> {
+                long now = System.currentTimeMillis();
+                if (now - lastFrameTime < FRAME_INTERVAL_MS) return;
+                lastFrameTime = now;
                 float alpha = (float) animation.getAnimatedValue();
                 timelineBar.setPulseAlpha(alpha);
                 applyOverlayPulse(alpha);
@@ -616,9 +631,11 @@ public class OverlayService extends Service {
 
     // ---- Activity tracking ----
 
+    private static final int MIN_ACTIVITY_SECONDS = 10;
+
     private void saveCurrentActivity() {
         int elapsed = getElapsedSeconds();
-        if (currentActivityName.isEmpty() || elapsed <= 0) return;
+        if (currentActivityName.isEmpty() || elapsed < MIN_ACTIVITY_SECONDS) return;
         String date = new SimpleDateFormat("yyyy-MM-dd", Locale.US)
             .format(new Date(currentStartTime));
 
@@ -645,6 +662,14 @@ public class OverlayService extends Service {
 
         updateTimerDisplay();
         startTimer();
+        updateLiveStatics();
+    }
+
+    private void updateLiveStatics() {
+        liveActivityName = currentActivityName;
+        liveStartTime = currentStartTime;
+        liveIsRunning = isRunning;
+        liveActivityColor = currentActivityColor;
     }
 
     // ---- Notification (minimal — required by Android for foreground service) ----
@@ -801,6 +826,10 @@ public class OverlayService extends Service {
     @Override
     public void onDestroy() {
         isServiceRunning = false;
+        liveActivityName = "";
+        liveStartTime = 0;
+        liveIsRunning = false;
+        liveActivityColor = 0;
         saveCurrentActivity();
         timerHandler.removeCallbacks(timerRunnable);
         timerHandler.removeCallbacks(applyPrefsRunnable);

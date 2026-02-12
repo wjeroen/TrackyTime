@@ -19,6 +19,12 @@ _(none right now)_
 _(none right now)_
 
 ### Testing
+- [ ] Test pulse animation runs at 30fps (should look smooth but use less battery)
+- [ ] Test pulse speed doubles every 30 minutes (noticeably faster each period)
+- [ ] Test activities under 10 seconds are not saved (switch quickly, verify no micro-entries)
+- [ ] Test duration editing: tap time text on entry → edit hours/mins/secs → end time recalculates
+- [ ] Test tap date text → jumps back to today; tap week text → jumps to current week
+- [ ] Test live activity "● REC" appears at top of history when overlay is recording today
 - [ ] Test overlay pill: drag, tap-to-edit, tap-timer-to-pause all work
 - [ ] Test that opacity slider affects background + border (text stays fully visible)
 - [ ] Test consistent colors: create "Coding" twice on different days, verify same color
@@ -28,7 +34,7 @@ _(none right now)_
 - [ ] Test collapse button (−) appears in expanded mode, collapses overlay
 - [ ] Test quick-select: + adds row, ▶ switches activity, ✕ removes row, persists across sessions
 - [ ] Test timeline bar: colored segments, live segment grows, tick marks at hour (full) and half-hour (half, hidden >5h)
-- [ ] Test progressive pulse: starts immediately, speeds up 1.5x every 30min, pulses live segment + border
+- [ ] Test progressive pulse: starts immediately, speeds up 2x every 30min, pulses live segment + border
 - [ ] Test breathing border toggle: on = border pulses 0%→opacity, off = only timeline bar pulses
 - [ ] Test border: fully outside bg (LayerDrawable, no overlap), width adjustable 0–6dp (default 2dp)
 - [ ] Test expand/focus split: tap outside → releases focus but keeps expanded; − collapses; Enter on quick-select → releases focus, stays expanded
@@ -45,6 +51,12 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Reduce pulse animation framerate to 30fps for battery savings (2026-02-12)
+- [x] Change pulse speed increase from 1.5x to 2x every 30 minutes (2026-02-12)
+- [x] Add inline duration editing (tap time text → edit hours/mins/secs) (2026-02-12)
+- [x] Tap date/week text to return to present day/week (2026-02-12)
+- [x] Auto-discard activities shorter than 10 seconds (2026-02-12)
+- [x] Show live "● REC" activity at top of history list when recording (2026-02-12)
 - [x] Cap color bar width at ~1.4x pie chart size, centered (2026-02-11)
 - [x] Remove notification permission + stop updating notification text (2026-02-11)
 - [x] Normalize activity name grouping: case-insensitive + space-insensitive everywhere (2026-02-11)

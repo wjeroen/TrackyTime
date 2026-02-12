@@ -12,8 +12,9 @@
 - **+ add shortcut** → adds a quick-select row below the timeline. Type an activity name, then tap ▶ to instantly switch to it (overlay stays expanded, focus released). Tap ✕ on a row to remove it. Shortcuts persist across sessions.
 - **➚ open app** → opens the full TrackyTime app (releases focus, overlay stays expanded)
 - **− collapse** → collapses the expanded overlay back to the compact pill
-- **Timeline bar** → 6dp colored bar at the bottom showing the day's activity history as proportional segments. Each activity session is a colored rectangle. The currently-running activity grows live. The live segment pulses immediately, speeding up 1.5x every 30 minutes as a gentle nudge. Not affected by the opacity slider. White tick marks (2px wide) at every hour (full height) and half-hour (bottom half). Both fully opaque. Half-hour marks are hidden once total tracked time exceeds 5 hours.
-- **Breathing overlay** → optional (default on): the border and background pulse in opposing sync with the timeline bar. Border breathes from fully transparent up to the user's opacity setting. Background shifts inversely (darkest/brightest when border is gone, normal when border is fully visible) by up to 25%: light colors darken toward black, dark colors (brightness < 30%) brighten toward white. Works regardless of border width (even 0). Live-updates when toggled in settings.
+- **Timeline bar** → 6dp colored bar at the bottom showing the day's activity history as proportional segments. Each activity session is a colored rectangle. The currently-running activity grows live. The live segment pulses immediately, speeding up 2x every 30 minutes as a gentle nudge. Not affected by the opacity slider. White tick marks (2px wide) at every hour (full height) and half-hour (bottom half). Both fully opaque. Half-hour marks are hidden once total tracked time exceeds 5 hours.
+- **Breathing overlay** → optional (default on): the border and background pulse in opposing sync with the timeline bar. Border breathes from fully transparent up to the user's opacity setting. Background shifts inversely (darkest/brightest when border is gone, normal when border is fully visible) by up to 25%: light colors darken toward black, dark colors (brightness < 30%) brighten toward white. Works regardless of border width (even 0). Live-updates when toggled in settings. All pulse animations run at 30fps to reduce battery/compositor load.
+- **Minimum activity duration** → activities shorter than 10 seconds are automatically discarded (not saved). Prevents accidental micro-entries when switching activities quickly.
 - **Live-update**: changing any setting (colors, size, border, opacity) updates the overlay instantly — no restart needed. Includes quick-select row text/icon colors and sizes.
 
 ### Timer
@@ -26,6 +27,9 @@
 - **Week view**: toggle between Day/Week; week view aggregates Mon-Sun
 - History list shows **individual entries** with time range (e.g. "10:00 – 11:00 · 1h 00m"), color dot, color picker, delete
 - **Inline rename**: tap an entry's name → it becomes editable. Press Done → saves new name and auto-assigns a matching color.
+- **Inline duration edit**: tap an entry's duration/time text → dialog appears with hours/minutes/seconds fields. Save updates the duration (start time stays the same, end time recalculates).
+- **Live activity indicator**: when the overlay is recording, a "● REC" entry appears at the top of today's history list showing the current activity name, start time, and elapsed duration in green.
+- **Tap date to return to today**: tapping the date/week text in the header jumps back to the present day or current week.
 - Date navigation (prev/next day or week)
 - Export/Import/Settings buttons at the top (above history) for quick access
 - Settings: background color, text color, border color (accent), border width (0–6dp), background opacity, text size, breathing overlay toggle

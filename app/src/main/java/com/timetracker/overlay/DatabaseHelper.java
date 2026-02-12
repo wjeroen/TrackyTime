@@ -101,6 +101,15 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.close();
     }
 
+    /** Update the duration of a single entry. */
+    public void updateEntryDuration(long id, int durationSeconds) {
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues cv = new ContentValues();
+        cv.put("duration_seconds", durationSeconds);
+        db.update(TABLE, cv, "id = ?", new String[]{String.valueOf(id)});
+        db.close();
+    }
+
     public void updateColor(long id, int color) {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues cv = new ContentValues();
