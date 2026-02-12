@@ -49,10 +49,12 @@ public class StrokeEditText extends EditText {
         // Auto-contrast: black stroke for light text, white for dark
         int strokeColor = brightness > 0.5f ? 0xFF000000 : 0xFFFFFFFF;
 
-        // Draw stroke first
+        // Save paint state
         Paint paint = getPaint();
         Paint.Style originalStyle = paint.getStyle();
+        float originalStrokeWidth = paint.getStrokeWidth();
 
+        // Draw stroke first
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(4f); // 4px stroke
         setTextColor(strokeColor);
@@ -60,10 +62,11 @@ public class StrokeEditText extends EditText {
 
         // Then draw fill on top
         paint.setStyle(Paint.Style.FILL);
+        paint.setStrokeWidth(originalStrokeWidth);
         setTextColor(textColor);
         super.onDraw(canvas);
 
-        // Restore original style
+        // Restore paint state
         paint.setStyle(originalStyle);
     }
 }
