@@ -116,12 +116,25 @@ The project uses **Gradle** with the Android Gradle Plugin. There are two ways t
 ### GitHub Actions (automatic)
 Every push triggers a build. The APK is uploaded as a downloadable artifact on the Actions tab.
 
+**⚠️ GitHub Secrets Required:**
+For consistent signing (so updates install without uninstalling), you need to configure these secrets in your repo:
+
+| Secret | Description |
+|--------|-------------|
+| `DEBUG_KEYSTORE_BASE64` | Base64-encoded debug.keystore file |
+| `DEBUG_KEYSTORE_PASSWORD` | Keystore password (default: `android`) |
+| `DEBUG_KEY_ALIAS` | Key alias (default: `androiddebugkey`) |
+| `DEBUG_KEY_PASSWORD` | Key password (default: `android`) |
+
+**APK naming:** The build automatically names the APK with a UTC timestamp:
+`TrackyTime-debug-2026-02-12-143052.apk`
+
 ### Locally (manual)
 You need JDK 17. The Gradle wrapper handles the rest — no separate Gradle install needed:
 ```bash
 ./gradlew assembleDebug
 ```
-The APK will be at `app/build/outputs/apk/debug/app-debug.apk`.
+The APK will be at `app/build/outputs/apk/debug/TrackyTime-debug-<timestamp>.apk`.
 
 ## Notes
 

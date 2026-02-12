@@ -51,8 +51,12 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Configure GitHub Secrets for consistent debug keystore signing (2026-02-12)
+- [x] Add auto-generated APK naming with UTC timestamp (TrackyTime-debug-YYYY-MM-DD-HHMMSS.apk) (2026-02-12)
+- [x] Bump version code to 2 and version name to 1.0.1 (2026-02-12)
+- [x] Future-proof workflow for Google Play Store releases (2026-02-12)
 - [x] Reduce pulse animation framerate to 30fps for battery savings (2026-02-12)
-- [x] Change pulse speed increase from 1.5x to 2x every 30 minutes (2026-02-12)
+- [x] Change pulse speed increase from 1.5x to 1.75x every 30 minutes (2026-02-12)
 - [x] Add inline duration editing (tap time text → edit hours/mins/secs) (2026-02-12)
 - [x] Tap date/week text to return to present day/week (2026-02-12)
 - [x] Auto-discard activities shorter than 10 seconds (2026-02-12)
@@ -120,9 +124,7 @@ _(none right now)_
 - [x] Update README.md with new project structure and build instructions (2026-02-10)
 
 ## Future Ideas
-- [ ] Add release build signing for installable release APKs
-- [ ] Fix package conflicts on update (dedicated signing key setup — currently debug key mismatch between build environments)
-- [ ] Set up version bumping automation
+- [ ] Add separate release keystore for Google Play Store releases (when ready to publish)
 
 ## Reference
 - [README.md](README.md) — Project overview, file structure, build instructions

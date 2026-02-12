@@ -658,10 +658,14 @@ public class MainActivity extends Activity {
             JSONArray shortcutsArr = new JSONArray();
             for (String s : shortcuts) shortcutsArr.put(s);
 
+            // Customization preferences (backward-compatible: older imports just ignore this)
+            String prefsData = new OverlayPreferences(this).exportToString();
+
             JSONObject root = new JSONObject();
             root.put("version", 1);
             root.put("entries", arr);
             root.put("quick_activities", shortcutsArr);
+            root.put("preferences", prefsData);
 
             OutputStream os = getContentResolver().openOutputStream(uri);
             if (os != null) {
@@ -709,11 +713,18 @@ public class MainActivity extends Activity {
                 new OverlayPreferences(this).setQuickActivities(shortcuts);
             }
 
+            // Restore customization preferences if present (backward-compatible)
+            String prefsData = root.optString("preferences", null);
+            if (prefsData != null && !prefsData.isEmpty()) {
+                new OverlayPreferences(this).importFromString(prefsData);
+            }
+
             int count = dbHelper.importEntries(entries);
             String shortcutMsg = (shortcutsArr != null && shortcutsArr.length() > 0)
                 ? ", " + shortcutsArr.length() + " shortcuts" : "";
+            String prefsMsg = (prefsData != null && !prefsData.isEmpty()) ? ", settings" : "";
             Toast.makeText(this,
-                "Imported " + count + " new entries" + shortcutMsg +
+                "Imported " + count + " new entries" + shortcutMsg + prefsMsg +
                 (count < entries.size() ? " (" + (entries.size() - count) + " duplicates skipped)" : ""),
                 Toast.LENGTH_SHORT).show();
             loadData();
@@ -796,7 +807,7 @@ public class MainActivity extends Activity {
 
         RadioGroup sizeGroup = new RadioGroup(this);
         sizeGroup.setOrientation(RadioGroup.HORIZONTAL);
-        String[] sizes = {"Small", "Medium", "Large"};
+        String[] sizes = {"Small", "Medium", "Large", "Extra Large"};
         for (int i = 0; i < sizes.length; i++) {
             RadioButton rb = new RadioButton(this);
             rb.setText(sizes[i]);
@@ -817,6 +828,15 @@ public class MainActivity extends Activity {
         pulseCb.setChecked(prefs.isOverlayPulseEnabled());
         pulseCb.setOnCheckedChangeListener((btn, checked) -> prefs.setOverlayPulseEnabled(checked));
         layout.addView(pulseCb);
+
+        // Text stroke toggle
+        CheckBox strokeCb = new CheckBox(this);
+        strokeCb.setText("Text stroke/outline (TV subtitle style)");
+        strokeCb.setTextColor(0xFFCDD6F4);
+        strokeCb.setTextSize(14f);
+        strokeCb.setChecked(prefs.isTextStrokeEnabled());
+        strokeCb.setOnCheckedChangeListener((btn, checked) -> prefs.setTextStrokeEnabled(checked));
+        layout.addView(strokeCb);
 
         new AlertDialog.Builder(this)
             .setTitle("Overlay Settings")
