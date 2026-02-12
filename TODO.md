@@ -51,6 +51,8 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Add crash recovery heartbeat — saves running activity to SharedPreferences every 5s, recovers on next startup (2026-02-12)
+- [x] Fix StrokeEditText stroke not rendering — use Layout.draw() to bypass Editor hardware-acceleration cache (2026-02-12)
 - [x] Configure GitHub Secrets for consistent debug keystore signing (2026-02-12)
 - [x] Add auto-generated APK naming with UTC timestamp (TrackyTime-debug-YYYY-MM-DD-HHMMSS.apk) (2026-02-12)
 - [x] Bump version code to 2 and version name to 1.0.1 (2026-02-12)
