@@ -28,6 +28,7 @@ public class StrokeEditText extends EditText {
     public void setStrokeEnabled(boolean enabled) {
         this.strokeEnabled = enabled;
         invalidate();
+        postInvalidate(); // Force redraw on UI thread (EditText caches rendering)
     }
 
     @Override
