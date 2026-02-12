@@ -241,7 +241,6 @@ public class OverlayService extends Service {
         timelineBar.setCornerRadius(2 * density);
 
         // Live-update quick-select row colors + sizes + stroke
-        boolean strokeEnabled = prefs.isTextStrokeEnabled();
         for (int i = 0; i < quickSelectContainer.getChildCount(); i++) {
             LinearLayout row = (LinearLayout) quickSelectContainer.getChildAt(i);
             StrokeTextView playBtn = (StrokeTextView) row.getChildAt(0);
