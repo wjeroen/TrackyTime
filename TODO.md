@@ -56,7 +56,7 @@ _(none right now)_
 - [x] Bump version code to 2 and version name to 1.0.1 (2026-02-12)
 - [x] Future-proof workflow for Google Play Store releases (2026-02-12)
 - [x] Reduce pulse animation framerate to 30fps for battery savings (2026-02-12)
-- [x] Change pulse speed increase from 1.5x to 2x every 30 minutes (2026-02-12)
+- [x] Change pulse speed increase from 1.5x to 1.75x every 30 minutes (2026-02-12)
 - [x] Add inline duration editing (tap time text → edit hours/mins/secs) (2026-02-12)
 - [x] Tap date/week text to return to present day/week (2026-02-12)
 - [x] Auto-discard activities shorter than 10 seconds (2026-02-12)
