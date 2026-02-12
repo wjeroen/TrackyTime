@@ -495,8 +495,8 @@ public class OverlayService extends Service {
         int elapsed = getElapsedSeconds();
         // How many 30-min periods have passed?
         int periods = (int) (elapsed / PULSE_INTERVAL_SECONDS);
-        // duration = BASE / 2^periods (each period 2x faster — doubles speed)
-        long targetDuration = (long) (BASE_PULSE_MS / Math.pow(2.0, periods));
+        // duration = BASE / 1.75^periods (each period 1.75x faster)
+        long targetDuration = (long) (BASE_PULSE_MS / Math.pow(1.75, periods));
         if (targetDuration < 400) targetDuration = 400; // floor
 
         // Only restart animation if speed changed

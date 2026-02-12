@@ -71,7 +71,7 @@ public class TimelineBarView extends View {
 
     /**
      * Draw vertical tick marks at hour and half-hour intervals of tracked time.
-     * - Full-hour: full bar height, 100% white, 2px wide
+     * - Full-hour: 10px tall (extends 2px above and below timeline), 100% white, 2px wide
      * - Half-hour: half bar height (bottom-aligned), 100% white, 2px wide
      * - Half-hour marks are dropped once total tracked time exceeds 5 hours
      */
@@ -80,6 +80,9 @@ public class TimelineBarView extends View {
 
         boolean showHalfHour = totalDuration <= 5 * 3600;
         float halfH = h / 2f;
+
+        // Hour marks extend beyond timeline (10px total: 2px above + 6dp timeline + 2px below)
+        float hourExtension = 2f;
 
         tickPaint.setStrokeWidth(2f); // 2px
 
@@ -92,7 +95,7 @@ public class TimelineBarView extends View {
 
             if (isFullHour) {
                 tickPaint.setColor(0xFFFFFFFF); // 100% white
-                canvas.drawLine(tickX, 0, tickX, h, tickPaint);
+                canvas.drawLine(tickX, -hourExtension, tickX, h + hourExtension, tickPaint);
             } else {
                 tickPaint.setColor(0xFFFFFFFF); // fully opaque white
                 canvas.drawLine(tickX, halfH, tickX, h, tickPaint);
@@ -141,9 +144,9 @@ public class TimelineBarView extends View {
             x += segWidth;
         }
 
-        // Draw time tick marks on top of segments
-        drawTickMarks(canvas, totalDuration, w, h);
-
         canvas.restore();
+
+        // Draw time tick marks on top of segments (outside clipping so hour marks can extend)
+        drawTickMarks(canvas, totalDuration, w, h);
     }
 }
