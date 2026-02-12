@@ -4,7 +4,6 @@ import android.animation.ValueAnimator;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -38,6 +37,12 @@ public class OverlayService extends Service {
 
     public static boolean isServiceRunning = false;
 
+    // Live activity data (readable by MainActivity for showing current activity)
+    public static String liveActivityName = "";
+    public static long liveStartTime = 0;
+    public static boolean liveIsRunning = false;
+    public static int liveActivityColor = 0;
+
     private WindowManager windowManager;
     private View overlayView;
     private WindowManager.LayoutParams params;
@@ -46,8 +51,8 @@ public class OverlayService extends Service {
     private TextView timerText, separator, openAppBtn, closeBtn, addBtn;
     private EditText editText;
     private LinearLayout quickSelectContainer;
-    private GradientDrawable overlayBgFill;     // inner layer: background color
-    private GradientDrawable overlayBorderFill; // outer layer: border color (pulsed)
+    private GradientDrawable overlayBgFill;        // background fill (inset when border > 0)
+    private GradientDrawable overlayBorderDrawable; // stroke-only border layer (null when border = 0)
     private boolean isExpanded = false;
 
     // Cached timeline segments (from DB, chronological order)
@@ -65,7 +70,6 @@ public class OverlayService extends Service {
     private long currentStartTime = 0;
 
     private DatabaseHelper dbHelper;
-    private NotificationManager notifManager;
 
     private ValueAnimator pulseAnimator;
     private long currentPulseDuration = 0; // 0 = no pulse active
@@ -74,6 +78,10 @@ public class OverlayService extends Service {
     private boolean cachedOverlayPulseEnabled = true;
     private int cachedBgColor, cachedBgOpacity, cachedAccentColor, cachedBorderWidth;
     private float cachedDensity;
+
+    // Throttle animation updates to 30fps (~33ms between frames)
+    private static final long FRAME_INTERVAL_MS = 33;
+    private long lastFrameTime = 0;
 
     // Live-update: listen for pref changes from the settings dialog
     private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
@@ -100,7 +108,6 @@ public class OverlayService extends Service {
         super.onCreate();
         dbHelper = new DatabaseHelper(this);
         timerHandler = new Handler(Looper.getMainLooper());
-        notifManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 
         createNotificationChannel();
         startForeground(NOTIF_ID, buildNotification());
@@ -167,28 +174,32 @@ public class OverlayService extends Service {
         int borderWidthPx = (int) (borderWidth * density);
         int cornerRadiusPx = (int) (10 * density);
 
-        // Inner layer: background fill
+        // Background fill (no stroke on this drawable — avoids stroke/fill overlap)
         overlayBgFill = new GradientDrawable();
         overlayBgFill.setShape(GradientDrawable.RECTANGLE);
         overlayBgFill.setCornerRadius(cornerRadiusPx);
         overlayBgFill.setColor(bgWithAlpha);
 
         if (borderWidth > 0) {
-            // Outer layer: solid border color (border is truly outside, no overlap)
             int accentColor = prefs.getAccentColor();
             int borderColor = (bgOpacity << 24) | (accentColor & 0x00FFFFFF);
-            overlayBorderFill = new GradientDrawable();
-            overlayBorderFill.setShape(GradientDrawable.RECTANGLE);
-            overlayBorderFill.setCornerRadius(cornerRadiusPx + borderWidthPx);
-            overlayBorderFill.setColor(borderColor);
+
+            // Stroke-only layer: transparent fill, just the border line
+            // Corner radius set so inner edge of stroke matches bg fill's radius
+            overlayBorderDrawable = new GradientDrawable();
+            overlayBorderDrawable.setShape(GradientDrawable.RECTANGLE);
+            overlayBorderDrawable.setCornerRadius(cornerRadiusPx + borderWidthPx / 2f);
+            overlayBorderDrawable.setColor(0x00000000);
+            overlayBorderDrawable.setStroke(borderWidthPx, borderColor);
 
             LayerDrawable layered = new LayerDrawable(
-                new GradientDrawable[]{ overlayBorderFill, overlayBgFill });
-            layered.setLayerInset(1, borderWidthPx, borderWidthPx,
+                new GradientDrawable[]{ overlayBgFill, overlayBorderDrawable });
+            // Inset bg fill by border width so it sits inside the stroke, no overlap
+            layered.setLayerInset(0, borderWidthPx, borderWidthPx,
                 borderWidthPx, borderWidthPx);
             overlayView.setBackground(layered);
         } else {
-            overlayBorderFill = null;
+            overlayBorderDrawable = null;
             overlayView.setBackground(overlayBgFill);
         }
 
@@ -219,6 +230,21 @@ public class OverlayService extends Service {
 
         // Timeline bar corner radius (not affected by opacity)
         timelineBar.setCornerRadius(2 * density);
+
+        // Live-update quick-select row colors + sizes
+        for (int i = 0; i < quickSelectContainer.getChildCount(); i++) {
+            LinearLayout row = (LinearLayout) quickSelectContainer.getChildAt(i);
+            TextView playBtn = (TextView) row.getChildAt(0);
+            EditText nameField = (EditText) row.getChildAt(1);
+            TextView removeBtn = (TextView) row.getChildAt(2);
+            playBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
+            playBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+            nameField.setTextColor(textColor);
+            nameField.setHintTextColor((textColor & 0x00FFFFFF) | 0x55000000);
+            nameField.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+            removeBtn.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
+            removeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+        }
     }
 
     // ---- Touch handling: each child handles drag + its own tap action ----
@@ -372,7 +398,8 @@ public class OverlayService extends Service {
     /** Collapse: save activity if changed, save quick-select, release focus, hide expanded UI. */
     private void collapseOverlay() {
         String newText = editText.getText().toString().trim();
-        if (!newText.isEmpty() && !newText.equals(currentActivityName)) {
+        if (!newText.isEmpty() && !ActivityEntry.normalizeName(newText).equals(
+                ActivityEntry.normalizeName(currentActivityName))) {
             startNewActivity(newText);
         }
         isExpanded = false;
@@ -422,7 +449,7 @@ public class OverlayService extends Service {
         timerHandler.removeCallbacks(timerRunnable);
         showTimerPaused();
         updateTimerDisplay();
-        updateNotification();
+        updateLiveStatics();
     }
 
     private void resumeTimer() {
@@ -431,7 +458,7 @@ public class OverlayService extends Service {
         timerHandler.removeCallbacks(timerRunnable);
         timerHandler.post(timerRunnable);
         showTimerRunning();
-        updateNotification();
+        updateLiveStatics();
     }
 
     private void showTimerRunning() {
@@ -447,7 +474,7 @@ public class OverlayService extends Service {
         updateTimelineBar();
     }
 
-    // ---- Progressive pulse: starts immediately, 1.5x faster every 30min ----
+    // ---- Progressive pulse: starts immediately, 2x faster every 30min ----
     // Pulse affects the timeline bar's live segment AND (optionally) the border.
     // Border breathes from fully transparent (0) up to the user's opacity setting.
 
@@ -468,8 +495,8 @@ public class OverlayService extends Service {
         int elapsed = getElapsedSeconds();
         // How many 30-min periods have passed?
         int periods = (int) (elapsed / PULSE_INTERVAL_SECONDS);
-        // duration = BASE / 1.5^periods (each period 1.5x faster)
-        long targetDuration = (long) (BASE_PULSE_MS / Math.pow(1.5, periods));
+        // duration = BASE / 2^periods (each period 2x faster — doubles speed)
+        long targetDuration = (long) (BASE_PULSE_MS / Math.pow(2.0, periods));
         if (targetDuration < 400) targetDuration = 400; // floor
 
         // Only restart animation if speed changed
@@ -483,6 +510,9 @@ public class OverlayService extends Service {
             va.setRepeatCount(ValueAnimator.INFINITE);
             va.setRepeatMode(ValueAnimator.REVERSE);
             va.addUpdateListener(animation -> {
+                long now = System.currentTimeMillis();
+                if (now - lastFrameTime < FRAME_INTERVAL_MS) return;
+                lastFrameTime = now;
                 float alpha = (float) animation.getAnimatedValue();
                 timelineBar.setPulseAlpha(alpha);
                 applyOverlayPulse(alpha);
@@ -492,21 +522,53 @@ public class OverlayService extends Service {
         }
     }
 
-    /** Animate ONLY the border (outer fill). Background stays static. */
-    private static final int PULSE_FLOOR_ALPHA = 0; // border pulses from fully transparent
-
+    /** Animate border stroke + shift background (darken or brighten) in sync. */
     private void applyOverlayPulse(float pulseAlpha) {
         if (!cachedOverlayPulseEnabled) return;
-        if (overlayBorderFill == null) return;
-        if (cachedBorderWidth <= 0) return;
+        if (overlayBgFill == null) return;
 
-        int floor = Math.min(PULSE_FLOOR_ALPHA, cachedBgOpacity);
-        int range = cachedBgOpacity - floor;
-        int borderAlpha = floor + (int) (range * (pulseAlpha - 0.3f) / 0.7f);
-        if (borderAlpha > cachedBgOpacity) borderAlpha = cachedBgOpacity;
-        if (borderAlpha < floor) borderAlpha = floor;
-        overlayBorderFill.setColor(
-            (borderAlpha << 24) | (cachedAccentColor & 0x00FFFFFF));
+        // Normalized factor: 0.0 (pulse dim/transparent) to 1.0 (pulse bright/opaque)
+        float factor = (pulseAlpha - 0.3f) / 0.7f;
+        if (factor < 0f) factor = 0f;
+        if (factor > 1f) factor = 1f;
+
+        // 1. Border pulse: fully transparent → user's opacity (only when border exists)
+        if (cachedBorderWidth > 0 && overlayBorderDrawable != null) {
+            int borderAlpha = (int) (cachedBgOpacity * factor);
+            int borderWidthPx = (int) (cachedBorderWidth * cachedDensity);
+            overlayBorderDrawable.setStroke(borderWidthPx,
+                (borderAlpha << 24) | (cachedAccentColor & 0x00FFFFFF));
+        }
+
+        // 2. Background shift: inverted — darkest/brightest when border is gone
+        float bgFactor = 1f - factor;
+        float maxShift = 0.25f;
+        float shift = bgFactor * maxShift;
+
+        int r = (cachedBgColor >> 16) & 0xFF;
+        int g = (cachedBgColor >> 8) & 0xFF;
+        int b = cachedBgColor & 0xFF;
+
+        // Perceived brightness (simple average, 0–255). Below ~75 → brighten instead
+        int brightness = (r + g + b) / 3;
+        int dr, dg, db;
+        if (brightness < 75) {
+            // Brighten: blend toward white
+            dr = r + (int) ((255 - r) * shift);
+            dg = g + (int) ((255 - g) * shift);
+            db = b + (int) ((255 - b) * shift);
+        } else {
+            // Darken: blend toward black
+            dr = (int) (r * (1 - shift));
+            dg = (int) (g * (1 - shift));
+            db = (int) (b * (1 - shift));
+        }
+
+        // Alpha: from user's opacity toward more opaque (30% of remaining range), inverted with bg
+        int alphaBoost = (int) (bgFactor * (255 - cachedBgOpacity) * 0.3f);
+        int newAlpha = Math.min(255, cachedBgOpacity + alphaBoost);
+
+        overlayBgFill.setColor((newAlpha << 24) | (dr << 16) | (dg << 8) | db);
     }
 
     private void stopProgressPulse() {
@@ -530,7 +592,8 @@ public class OverlayService extends Service {
         } else {
             timerText.setText(String.format(Locale.US, "%02d:%02d", m, s));
         }
-        if (elapsed % 5 == 0) updateNotification();
+
+
     }
 
     // ---- Timeline bar (day history as colored segments) ----
@@ -568,9 +631,11 @@ public class OverlayService extends Service {
 
     // ---- Activity tracking ----
 
+    private static final int MIN_ACTIVITY_SECONDS = 10;
+
     private void saveCurrentActivity() {
         int elapsed = getElapsedSeconds();
-        if (currentActivityName.isEmpty() || elapsed <= 0) return;
+        if (currentActivityName.isEmpty() || elapsed < MIN_ACTIVITY_SECONDS) return;
         String date = new SimpleDateFormat("yyyy-MM-dd", Locale.US)
             .format(new Date(currentStartTime));
 
@@ -597,50 +662,32 @@ public class OverlayService extends Service {
 
         updateTimerDisplay();
         startTimer();
-        updateNotification();
+        updateLiveStatics();
     }
 
-    // ---- Notification ----
+    private void updateLiveStatics() {
+        liveActivityName = currentActivityName;
+        liveStartTime = currentStartTime;
+        liveIsRunning = isRunning;
+        liveActivityColor = currentActivityColor;
+    }
+
+    // ---- Notification (minimal — required by Android for foreground service) ----
 
     private void createNotificationChannel() {
         NotificationChannel channel = new NotificationChannel(
-            CHANNEL_ID, "TrackyTime", NotificationManager.IMPORTANCE_LOW);
-        channel.setDescription("Active time tracking overlay");
+            CHANNEL_ID, "TrackyTime", NotificationManager.IMPORTANCE_MIN);
         channel.setShowBadge(false);
-        notifManager.createNotificationChannel(channel);
+        ((NotificationManager) getSystemService(NOTIFICATION_SERVICE))
+            .createNotificationChannel(channel);
     }
 
     private Notification buildNotification() {
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        PendingIntent pi = PendingIntent.getActivity(this, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
-        String text;
-        if (currentActivityName.isEmpty()) {
-            text = "Ready to track";
-        } else {
-            int elapsed = getElapsedSeconds();
-            int h = elapsed / 3600;
-            int m = (elapsed % 3600) / 60;
-            int s = elapsed % 60;
-            String time = h > 0
-                ? String.format(Locale.US, "%d:%02d:%02d", h, m, s)
-                : String.format(Locale.US, "%02d:%02d", m, s);
-            text = currentActivityName + " " + time + (isRunning ? "" : " (paused)");
-        }
-
         return new Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("TrackyTime")
-            .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_recent_history)
-            .setContentIntent(pi)
             .setOngoing(true)
             .build();
-    }
-
-    private void updateNotification() {
-        notifManager.notify(NOTIF_ID, buildNotification());
     }
 
     // ---- Quick-select activity shortcuts ----
@@ -779,6 +826,10 @@ public class OverlayService extends Service {
     @Override
     public void onDestroy() {
         isServiceRunning = false;
+        liveActivityName = "";
+        liveStartTime = 0;
+        liveIsRunning = false;
+        liveActivityColor = 0;
         saveCurrentActivity();
         timerHandler.removeCallbacks(timerRunnable);
         timerHandler.removeCallbacks(applyPrefsRunnable);

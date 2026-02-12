@@ -3,12 +3,11 @@ package com.timetracker.overlay;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
@@ -40,7 +39,6 @@ import org.json.JSONObject;
 public class MainActivity extends Activity {
 
     private static final int OVERLAY_PERM_CODE = 100;
-    private static final int NOTIF_PERM_CODE = 101;
     private static final int EXPORT_FILE_CODE = 200;
     private static final int IMPORT_FILE_CODE = 201;
 
@@ -75,6 +73,7 @@ public class MainActivity extends Activity {
     private Button dayViewBtn, weekViewBtn, exportBtn, importBtn;
     private TextView dateText, totalTimeText;
     private PieChartView pieChart;
+    private ColorBarView colorBar;
     private LinearLayout historyContainer;
 
     private DatabaseHelper dbHelper;
@@ -106,6 +105,7 @@ public class MainActivity extends Activity {
         dateText = findViewById(R.id.dateText);
         totalTimeText = findViewById(R.id.totalTimeText);
         pieChart = findViewById(R.id.pieChart);
+        colorBar = findViewById(R.id.colorBar);
         historyContainer = findViewById(R.id.historyContainer);
 
         setupToggle();
@@ -114,8 +114,6 @@ public class MainActivity extends Activity {
         settingsBtn.setOnClickListener(v -> showSettingsDialog());
         exportBtn.setOnClickListener(v -> exportData());
         importBtn.setOnClickListener(v -> importData());
-
-        checkNotificationPermission();
     }
 
     @Override
@@ -166,17 +164,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void checkNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= 33) {
-            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-                    != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(
-                    new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
-                    NOTIF_PERM_CODE);
-            }
-        }
-    }
-
     // ======== Day / Week toggle ========
 
     private void setupViewToggle() {
@@ -211,6 +198,12 @@ public class MainActivity extends Activity {
         });
         nextDayBtn.setOnClickListener(v -> {
             calendar.add(Calendar.DAY_OF_MONTH, isWeekView ? 7 : 1);
+            updateDateDisplay();
+            loadData();
+        });
+        // Tap date text to jump back to today / this week
+        dateText.setOnClickListener(v -> {
+            calendar = Calendar.getInstance(); // reset to now
             updateDateDisplay();
             loadData();
         });
@@ -267,6 +260,7 @@ public class MainActivity extends Activity {
         // Pie chart uses grouped data (same name = one slice)
         List<ActivityEntry> grouped = groupEntries(rawEntries);
         pieChart.setEntries(grouped);
+        colorBar.setEntries(grouped);
 
         int totalSec = 0;
         for (ActivityEntry e : rawEntries) totalSec += e.getDurationSeconds();
@@ -282,7 +276,27 @@ public class MainActivity extends Activity {
 
         // History shows individual entries (not grouped) — each session editable
         historyContainer.removeAllViews();
-        if (rawEntries.isEmpty()) {
+
+        // Show live activity at the top if overlay is running and we're viewing today
+        boolean showLive = false;
+        if (OverlayService.isServiceRunning && OverlayService.liveIsRunning
+                && !OverlayService.liveActivityName.isEmpty()) {
+            String today = dateFormat.format(new Date());
+            String viewDate = dateFormat.format(calendar.getTime());
+            if (!isWeekView && viewDate.equals(today)) {
+                showLive = true;
+            } else if (isWeekView) {
+                String[] range = getWeekRange();
+                if (today.compareTo(range[0]) >= 0 && today.compareTo(range[1]) <= 0) {
+                    showLive = true;
+                }
+            }
+        }
+        if (showLive) {
+            addLiveHistoryItem();
+        }
+
+        if (rawEntries.isEmpty() && !showLive) {
             TextView empty = new TextView(this);
             empty.setText("No activities recorded");
             empty.setTextColor(0xFF888899);
@@ -301,7 +315,7 @@ public class MainActivity extends Activity {
     private List<ActivityEntry> groupEntries(List<ActivityEntry> raw) {
         Map<String, ActivityEntry> map = new LinkedHashMap<>();
         for (ActivityEntry e : raw) {
-            String key = e.getName().toLowerCase(Locale.US);
+            String key = ActivityEntry.normalizeName(e.getName());
             if (map.containsKey(key)) {
                 ActivityEntry existing = map.get(key);
                 existing.setDurationSeconds(
@@ -356,7 +370,8 @@ public class MainActivity extends Activity {
         nameEdit.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_DONE) {
                 String newName = nameEdit.getText().toString().trim();
-                if (!newName.isEmpty() && !newName.equals(entry.getName())) {
+                if (!newName.isEmpty() && !ActivityEntry.normalizeName(newName).equals(
+                        ActivityEntry.normalizeName(entry.getName()))) {
                     int color = dbHelper.getColorForName(newName);
                     dbHelper.updateEntryNameAndColor(entry.getId(), newName, color);
                     loadData();
@@ -372,6 +387,9 @@ public class MainActivity extends Activity {
             }
             return false;
         });
+
+        // Tap duration to edit it
+        durationText.setOnClickListener(v -> showDurationEditor(entry));
 
         // Color picker (updates all entries with same name)
         colorBtn.setOnClickListener(v -> showEntryColorPicker(entry));
@@ -390,6 +408,180 @@ public class MainActivity extends Activity {
         });
 
         historyContainer.addView(item);
+    }
+
+    // ======== Live activity entry (currently recording) ========
+
+    private void addLiveHistoryItem() {
+        float d = getResources().getDisplayMetrics().density;
+
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.HORIZONTAL);
+        item.setGravity(Gravity.CENTER_VERTICAL);
+        item.setPadding((int)(12*d), (int)(12*d), (int)(12*d), (int)(12*d));
+        item.setBackgroundColor(0xFF33334A); // slightly different bg to stand out
+
+        // Color dot
+        View colorDot = new View(this);
+        LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(
+            (int)(20*d), (int)(20*d));
+        dotParams.setMarginEnd((int)(12*d));
+        colorDot.setLayoutParams(dotParams);
+        GradientDrawable dotBg = new GradientDrawable();
+        dotBg.setShape(GradientDrawable.OVAL);
+        dotBg.setColor(OverlayService.liveActivityColor);
+        colorDot.setBackground(dotBg);
+        item.addView(colorDot);
+
+        // Text column
+        LinearLayout textCol = new LinearLayout(this);
+        textCol.setOrientation(LinearLayout.VERTICAL);
+        textCol.setLayoutParams(new LinearLayout.LayoutParams(
+            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        // Activity name
+        TextView nameText = new TextView(this);
+        nameText.setText(OverlayService.liveActivityName);
+        nameText.setTextColor(0xFFCDD6F4);
+        nameText.setTextSize(15f);
+        nameText.setTypeface(null, android.graphics.Typeface.BOLD);
+        textCol.addView(nameText);
+
+        // Time: "15:30 – now"
+        String startStr = timeFormat.format(new Date(OverlayService.liveStartTime));
+        long elapsed = (System.currentTimeMillis() - OverlayService.liveStartTime) / 1000;
+        int eh = (int)(elapsed / 3600);
+        int em = (int)((elapsed % 3600) / 60);
+        String durStr = eh > 0 ?
+            String.format(Locale.US, "%dh %02dm", eh, em) :
+            String.format(Locale.US, "%dm", em);
+
+        TextView durationText = new TextView(this);
+        durationText.setText(startStr + " – now · " + durStr);
+        durationText.setTextColor(0xFF43A047); // green to indicate live
+        durationText.setTextSize(13f);
+        textCol.addView(durationText);
+
+        item.addView(textCol);
+
+        // "LIVE" label
+        TextView liveLabel = new TextView(this);
+        liveLabel.setText("● REC");
+        liveLabel.setTextColor(0xFFE53935); // red
+        liveLabel.setTextSize(12f);
+        liveLabel.setTypeface(null, android.graphics.Typeface.BOLD);
+        item.addView(liveLabel);
+
+        // Bottom margin
+        LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT);
+        itemParams.setMargins(0, 0, 0, (int)(4*d));
+        item.setLayoutParams(itemParams);
+
+        historyContainer.addView(item);
+    }
+
+    // ======== Duration editor ========
+
+    private void showDurationEditor(ActivityEntry entry) {
+        float d = getResources().getDisplayMetrics().density;
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding((int)(20*d), (int)(16*d), (int)(20*d), (int)(8*d));
+
+        // Show current duration
+        int curH = entry.getDurationSeconds() / 3600;
+        int curM = (entry.getDurationSeconds() % 3600) / 60;
+        int curS = entry.getDurationSeconds() % 60;
+        TextView currentLabel = new TextView(this);
+        currentLabel.setText("Current: " + entry.getFormattedDuration());
+        currentLabel.setTextColor(0xFFCDD6F4);
+        currentLabel.setTextSize(14f);
+        layout.addView(currentLabel);
+
+        addSpacer(layout, 12);
+
+        // Hours input
+        LinearLayout hoursRow = new LinearLayout(this);
+        hoursRow.setOrientation(LinearLayout.HORIZONTAL);
+        hoursRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        EditText hoursInput = new EditText(this);
+        hoursInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        hoursInput.setText(String.valueOf(curH));
+        hoursInput.setTextColor(0xFFCDD6F4);
+        hoursInput.setTextSize(16f);
+        hoursInput.setMinWidth((int)(60*d));
+        hoursInput.selectAll();
+        TextView hoursLabel = new TextView(this);
+        hoursLabel.setText(" hours");
+        hoursLabel.setTextColor(0xFF9399B2);
+        hoursLabel.setTextSize(14f);
+        hoursRow.addView(hoursInput);
+        hoursRow.addView(hoursLabel);
+        layout.addView(hoursRow);
+
+        // Minutes input
+        LinearLayout minsRow = new LinearLayout(this);
+        minsRow.setOrientation(LinearLayout.HORIZONTAL);
+        minsRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        EditText minsInput = new EditText(this);
+        minsInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        minsInput.setText(String.valueOf(curM));
+        minsInput.setTextColor(0xFFCDD6F4);
+        minsInput.setTextSize(16f);
+        minsInput.setMinWidth((int)(60*d));
+        TextView minsLabel = new TextView(this);
+        minsLabel.setText(" minutes");
+        minsLabel.setTextColor(0xFF9399B2);
+        minsLabel.setTextSize(14f);
+        minsRow.addView(minsInput);
+        minsRow.addView(minsLabel);
+        layout.addView(minsRow);
+
+        // Seconds input
+        LinearLayout secsRow = new LinearLayout(this);
+        secsRow.setOrientation(LinearLayout.HORIZONTAL);
+        secsRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        EditText secsInput = new EditText(this);
+        secsInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        secsInput.setText(String.valueOf(curS));
+        secsInput.setTextColor(0xFFCDD6F4);
+        secsInput.setTextSize(16f);
+        secsInput.setMinWidth((int)(60*d));
+        TextView secsLabel = new TextView(this);
+        secsLabel.setText(" seconds");
+        secsLabel.setTextColor(0xFF9399B2);
+        secsLabel.setTextSize(14f);
+        secsRow.addView(secsInput);
+        secsRow.addView(secsLabel);
+        layout.addView(secsRow);
+
+        new AlertDialog.Builder(this)
+            .setTitle("Edit Duration")
+            .setView(layout)
+            .setPositiveButton("Save", (dialog, which) -> {
+                try {
+                    int h = Integer.parseInt(hoursInput.getText().toString().trim());
+                    int m = Integer.parseInt(minsInput.getText().toString().trim());
+                    int s = Integer.parseInt(secsInput.getText().toString().trim());
+                    int totalSec = h * 3600 + m * 60 + s;
+                    if (totalSec > 0) {
+                        dbHelper.updateEntryDuration(entry.getId(), totalSec);
+                        loadData();
+                    } else {
+                        Toast.makeText(this, "Duration must be > 0", Toast.LENGTH_SHORT).show();
+                    }
+                } catch (NumberFormatException e) {
+                    Toast.makeText(this, "Invalid number", Toast.LENGTH_SHORT).show();
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
     }
 
     // ======== Entry color picker ========
@@ -461,9 +653,15 @@ public class MainActivity extends Activity {
                 obj.put("date", e.getDate());
                 arr.put(obj);
             }
+            // Quick-select shortcuts (backward-compatible: older imports just ignore this)
+            List<String> shortcuts = new OverlayPreferences(this).getQuickActivities();
+            JSONArray shortcutsArr = new JSONArray();
+            for (String s : shortcuts) shortcutsArr.put(s);
+
             JSONObject root = new JSONObject();
             root.put("version", 1);
             root.put("entries", arr);
+            root.put("quick_activities", shortcutsArr);
 
             OutputStream os = getContentResolver().openOutputStream(uri);
             if (os != null) {
@@ -501,9 +699,21 @@ public class MainActivity extends Activity {
                 entries.add(e);
             }
 
+            // Restore quick-select shortcuts if present (backward-compatible)
+            JSONArray shortcutsArr = root.optJSONArray("quick_activities");
+            if (shortcutsArr != null && shortcutsArr.length() > 0) {
+                List<String> shortcuts = new ArrayList<>();
+                for (int i = 0; i < shortcutsArr.length(); i++) {
+                    shortcuts.add(shortcutsArr.getString(i));
+                }
+                new OverlayPreferences(this).setQuickActivities(shortcuts);
+            }
+
             int count = dbHelper.importEntries(entries);
+            String shortcutMsg = (shortcutsArr != null && shortcutsArr.length() > 0)
+                ? ", " + shortcutsArr.length() + " shortcuts" : "";
             Toast.makeText(this,
-                "Imported " + count + " new entries" +
+                "Imported " + count + " new entries" + shortcutMsg +
                 (count < entries.size() ? " (" + (entries.size() - count) + " duplicates skipped)" : ""),
                 Toast.LENGTH_SHORT).show();
             loadData();

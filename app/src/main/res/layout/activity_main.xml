@@ -108,6 +108,13 @@
             android:layout_gravity="center"
             android:layout_marginBottom="8dp" />
 
+        <com.timetracker.overlay.ColorBarView
+            android:id="@+id/colorBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginBottom="8dp" />
+
         <TextView
             android:id="@+id/totalTimeText"
             android:layout_width="wrap_content"
