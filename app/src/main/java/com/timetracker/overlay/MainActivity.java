@@ -829,6 +829,15 @@ public class MainActivity extends Activity {
         pulseCb.setOnCheckedChangeListener((btn, checked) -> prefs.setOverlayPulseEnabled(checked));
         layout.addView(pulseCb);
 
+        // Text stroke toggle
+        CheckBox strokeCb = new CheckBox(this);
+        strokeCb.setText("Text stroke/outline (TV subtitle style)");
+        strokeCb.setTextColor(0xFFCDD6F4);
+        strokeCb.setTextSize(14f);
+        strokeCb.setChecked(prefs.isTextStrokeEnabled());
+        strokeCb.setOnCheckedChangeListener((btn, checked) -> prefs.setTextStrokeEnabled(checked));
+        layout.addView(strokeCb);
+
         new AlertDialog.Builder(this)
             .setTitle("Overlay Settings")
             .setView(layout)

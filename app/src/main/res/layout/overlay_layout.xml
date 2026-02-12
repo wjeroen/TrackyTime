@@ -16,7 +16,7 @@
         android:gravity="center_vertical">
 
         <!-- Activity name (tap to edit) -->
-        <EditText
+        <com.timetracker.overlay.StrokeEditText
             android:id="@+id/activityInput"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -32,7 +32,7 @@
             android:fontFamily="sans-serif" />
 
         <!-- Separator (shown when timer is visible) -->
-        <TextView
+        <com.timetracker.overlay.StrokeTextView
             android:id="@+id/separator"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -41,7 +41,7 @@
             android:visibility="gone" />
 
         <!-- Timer (tap to pause/resume) -->
-        <TextView
+        <com.timetracker.overlay.StrokeTextView
             android:id="@+id/timerText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -52,7 +52,7 @@
             android:visibility="gone" />
 
         <!-- Add quick-select shortcut (shown only in edit mode) -->
-        <TextView
+        <com.timetracker.overlay.StrokeTextView
             android:id="@+id/addBtn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -65,7 +65,7 @@
             android:visibility="gone" />
 
         <!-- Open full app (shown only in edit mode) -->
-        <TextView
+        <com.timetracker.overlay.StrokeTextView
             android:id="@+id/openAppBtn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -78,7 +78,7 @@
             android:visibility="gone" />
 
         <!-- Collapse/minimize overlay (shown only in expanded mode) -->
-        <TextView
+        <com.timetracker.overlay.StrokeTextView
             android:id="@+id/closeBtn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

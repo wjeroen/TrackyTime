@@ -37,6 +37,10 @@ public class OverlayPreferences {
     public boolean isOverlayPulseEnabled() { return sp.getBoolean("overlay_pulse", true); }
     public void setOverlayPulseEnabled(boolean on) { sp.edit().putBoolean("overlay_pulse", on).apply(); }
 
+    // Text stroke/outline (TV subtitle style with auto-contrast)
+    public boolean isTextStrokeEnabled() { return sp.getBoolean("text_stroke", false); }
+    public void setTextStrokeEnabled(boolean on) { sp.edit().putBoolean("text_stroke", on).apply(); }
+
     // 0=small, 1=medium, 2=large, 3=extra large
     public int getSize() { return sp.getInt("size", 0); }
     public void setSize(int s) { sp.edit().putInt("size", s).apply(); }
@@ -78,6 +82,7 @@ public class OverlayPreferences {
         sb.append("accentColor:0x").append(Integer.toHexString(getAccentColor())).append(",");
         sb.append("borderWidth:").append(getBorderWidth()).append(",");
         sb.append("overlayPulse:").append(isOverlayPulseEnabled()).append(",");
+        sb.append("textStroke:").append(isTextStrokeEnabled()).append(",");
         sb.append("size:").append(getSize());
         return sb.toString();
     }
@@ -112,6 +117,9 @@ public class OverlayPreferences {
                         break;
                     case "overlayPulse":
                         setOverlayPulseEnabled(Boolean.parseBoolean(value));
+                        break;
+                    case "textStroke":
+                        setTextStrokeEnabled(Boolean.parseBoolean(value));
                         break;
                     case "size":
                         setSize(Integer.parseInt(value));

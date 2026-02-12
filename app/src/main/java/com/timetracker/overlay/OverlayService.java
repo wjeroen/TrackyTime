@@ -48,8 +48,8 @@ public class OverlayService extends Service {
     private WindowManager.LayoutParams params;
 
     private TimelineBarView timelineBar;
-    private TextView timerText, separator, openAppBtn, closeBtn, addBtn;
-    private EditText editText;
+    private StrokeTextView timerText, separator, openAppBtn, closeBtn, addBtn;
+    private StrokeEditText editText;
     private LinearLayout quickSelectContainer;
     private GradientDrawable overlayBgFill;        // background fill (inset when border > 0)
     private GradientDrawable overlayBorderDrawable; // stroke-only border layer (null when border = 0)
@@ -228,22 +228,35 @@ public class OverlayService extends Service {
         openAppBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         closeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
 
+        // Text stroke (TV subtitle style with auto-contrast)
+        boolean strokeEnabled = prefs.isTextStrokeEnabled();
+        timerText.setStrokeEnabled(strokeEnabled);
+        editText.setStrokeEnabled(strokeEnabled);
+        separator.setStrokeEnabled(strokeEnabled);
+        addBtn.setStrokeEnabled(strokeEnabled);
+        openAppBtn.setStrokeEnabled(strokeEnabled);
+        closeBtn.setStrokeEnabled(strokeEnabled);
+
         // Timeline bar corner radius (not affected by opacity)
         timelineBar.setCornerRadius(2 * density);
 
-        // Live-update quick-select row colors + sizes
+        // Live-update quick-select row colors + sizes + stroke
+        boolean strokeEnabled = prefs.isTextStrokeEnabled();
         for (int i = 0; i < quickSelectContainer.getChildCount(); i++) {
             LinearLayout row = (LinearLayout) quickSelectContainer.getChildAt(i);
-            TextView playBtn = (TextView) row.getChildAt(0);
-            EditText nameField = (EditText) row.getChildAt(1);
-            TextView removeBtn = (TextView) row.getChildAt(2);
+            StrokeTextView playBtn = (StrokeTextView) row.getChildAt(0);
+            StrokeEditText nameField = (StrokeEditText) row.getChildAt(1);
+            StrokeTextView removeBtn = (StrokeTextView) row.getChildAt(2);
             playBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
             playBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+            playBtn.setStrokeEnabled(strokeEnabled);
             nameField.setTextColor(textColor);
             nameField.setHintTextColor((textColor & 0x00FFFFFF) | 0x55000000);
             nameField.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+            nameField.setStrokeEnabled(strokeEnabled);
             removeBtn.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
             removeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+            removeBtn.setStrokeEnabled(strokeEnabled);
         }
     }
 
@@ -703,6 +716,7 @@ public class OverlayService extends Service {
         float density = getResources().getDisplayMetrics().density;
         float textSize = prefs.getTextSize();
         int textColor = prefs.getTextColor();
+        boolean strokeEnabled = prefs.isTextStrokeEnabled();
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -710,15 +724,16 @@ public class OverlayService extends Service {
         row.setPadding(0, (int) (3 * density), 0, 0);
 
         // Play button ▶
-        TextView playBtn = new TextView(this);
+        StrokeTextView playBtn = new StrokeTextView(this);
         playBtn.setText("▶");
         playBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         playBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
         playBtn.setPadding(0, 0, (int) (6 * density), 0);
         playBtn.setIncludeFontPadding(false);
+        playBtn.setStrokeEnabled(strokeEnabled);
 
         // Activity name
-        EditText nameField = new EditText(this);
+        StrokeEditText nameField = new StrokeEditText(this);
         nameField.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         nameField.setTextColor(textColor);
         nameField.setHintTextColor((textColor & 0x00FFFFFF) | 0x55000000);
@@ -731,17 +746,19 @@ public class OverlayService extends Service {
         nameField.setMinWidth((int) (60 * density));
         nameField.setMaxWidth((int) (140 * density));
         if (!name.isEmpty()) nameField.setText(name);
+        nameField.setStrokeEnabled(strokeEnabled);
         LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(
             0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         nameField.setLayoutParams(nameParams);
 
         // Remove button ✕
-        TextView removeBtn = new TextView(this);
+        StrokeTextView removeBtn = new StrokeTextView(this);
         removeBtn.setText("✕");
         removeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         removeBtn.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
         removeBtn.setPadding((int) (6 * density), 0, 0, 0);
         removeBtn.setIncludeFontPadding(false);
+        removeBtn.setStrokeEnabled(strokeEnabled);
 
         row.addView(playBtn);
         row.addView(nameField);
