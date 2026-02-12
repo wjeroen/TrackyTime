@@ -37,7 +37,7 @@ public class OverlayPreferences {
     public boolean isOverlayPulseEnabled() { return sp.getBoolean("overlay_pulse", true); }
     public void setOverlayPulseEnabled(boolean on) { sp.edit().putBoolean("overlay_pulse", on).apply(); }
 
-    // 0=small, 1=medium, 2=large
+    // 0=small, 1=medium, 2=large, 3=extra large
     public int getSize() { return sp.getInt("size", 0); }
     public void setSize(int s) { sp.edit().putInt("size", s).apply(); }
 
@@ -46,6 +46,7 @@ public class OverlayPreferences {
         switch (getSize()) {
             case 0: return 14f;
             case 2: return 20f;
+            case 3: return 30f; // extra large for computer use
             default: return 16f;
         }
     }
@@ -63,5 +64,63 @@ public class OverlayPreferences {
     }
     public void setQuickActivities(List<String> activities) {
         sp.edit().putString("quick_activities", String.join("\n", activities)).apply();
+    }
+
+    /**
+     * Export all preferences as a JSON-compatible string.
+     * Format: "bgColor:0xFFFFFFFF,textColor:0xFF000000,opacity:153,..."
+     */
+    public String exportToString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("bgColor:0x").append(Integer.toHexString(getBgColor())).append(",");
+        sb.append("textColor:0x").append(Integer.toHexString(getTextColor())).append(",");
+        sb.append("opacity:").append(getOpacity()).append(",");
+        sb.append("accentColor:0x").append(Integer.toHexString(getAccentColor())).append(",");
+        sb.append("borderWidth:").append(getBorderWidth()).append(",");
+        sb.append("overlayPulse:").append(isOverlayPulseEnabled()).append(",");
+        sb.append("size:").append(getSize());
+        return sb.toString();
+    }
+
+    /**
+     * Import preferences from an exported string. Backward-compatible: ignores unrecognized keys.
+     */
+    public void importFromString(String data) {
+        if (data == null || data.isEmpty()) return;
+        String[] pairs = data.split(",");
+        for (String pair : pairs) {
+            String[] kv = pair.split(":", 2);
+            if (kv.length != 2) continue;
+            String key = kv[0].trim();
+            String value = kv[1].trim();
+            try {
+                switch (key) {
+                    case "bgColor":
+                        setBgColor((int) Long.parseLong(value.replace("0x", ""), 16));
+                        break;
+                    case "textColor":
+                        setTextColor((int) Long.parseLong(value.replace("0x", ""), 16));
+                        break;
+                    case "opacity":
+                        setOpacity(Integer.parseInt(value));
+                        break;
+                    case "accentColor":
+                        setAccentColor((int) Long.parseLong(value.replace("0x", ""), 16));
+                        break;
+                    case "borderWidth":
+                        setBorderWidth(Integer.parseInt(value));
+                        break;
+                    case "overlayPulse":
+                        setOverlayPulseEnabled(Boolean.parseBoolean(value));
+                        break;
+                    case "size":
+                        setSize(Integer.parseInt(value));
+                        break;
+                    // Ignore unrecognized keys (forward compatibility)
+                }
+            } catch (Exception e) {
+                // Skip malformed values
+            }
+        }
     }
 }
