@@ -92,7 +92,7 @@ public class TimelineBarView extends View {
         float timelineBottom = paddingDp + timelineHeight;
         float halfTimelineH = timelineHeight / 2f;
 
-        tickPaint.setStrokeWidth(2f); // 2px (thin marks)
+        tickPaint.setStrokeWidth(1f * density); // 1dp (scales with screen density)
 
         // Walk through every 30-min interval up to totalDuration
         for (int sec = 1800; sec < totalDuration; sec += 1800) {
