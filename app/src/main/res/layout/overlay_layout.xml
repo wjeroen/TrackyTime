@@ -52,42 +52,39 @@
             android:visibility="gone" />
 
         <!-- Add quick-select shortcut (shown only in edit mode) -->
-        <com.timetracker.overlay.StrokeTextView
+        <ImageButton
             android:id="@+id/addBtn"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="+"
-            android:textSize="14sp"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:paddingLeft="6dp"
-            android:paddingRight="0dp"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginLeft="6dp"
+            android:src="@drawable/ic_add"
+            android:background="@android:color/transparent"
+            android:scaleType="fitCenter"
+            android:contentDescription="Add shortcut"
             android:visibility="gone" />
 
         <!-- Open full app (shown only in edit mode) -->
-        <com.timetracker.overlay.StrokeTextView
+        <ImageButton
             android:id="@+id/openAppBtn"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="➚"
-            android:textSize="14sp"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:paddingLeft="8dp"
-            android:paddingRight="0dp"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginLeft="8dp"
+            android:src="@drawable/ic_open_in_new"
+            android:background="@android:color/transparent"
+            android:scaleType="fitCenter"
+            android:contentDescription="Open app"
             android:visibility="gone" />
 
         <!-- Collapse/minimize overlay (shown only in expanded mode) -->
-        <com.timetracker.overlay.StrokeTextView
+        <ImageButton
             android:id="@+id/closeBtn"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="−"
-            android:textSize="14sp"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:paddingLeft="6dp"
-            android:paddingRight="0dp"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginLeft="6dp"
+            android:src="@drawable/ic_remove"
+            android:background="@android:color/transparent"
+            android:scaleType="fitCenter"
+            android:contentDescription="Collapse"
             android:visibility="gone" />
     </LinearLayout>
 

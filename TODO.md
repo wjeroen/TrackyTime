@@ -3,7 +3,7 @@
 ## Current Sprint
 
 ### High Priority
-- [ ] Verify GitHub Actions build succeeds after latest push
+- [ ] Verify GitHub Actions build succeeds after icon update and color bar sorting change
 
 ### Features to Implement
 - [ ] Add separate opacity slider for the timeline bar
@@ -51,6 +51,8 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Replace overlay text buttons with Android vector drawable icons (add, open, remove, close) (2026-02-16)
+- [x] Update color bar sorting to group similar colors by hue, then by duration (2026-02-16)
 - [x] Add crash recovery heartbeat — saves running activity to SharedPreferences every 5s, recovers on next startup (2026-02-12)
 - [x] Fix StrokeEditText stroke not rendering — use Layout.draw() to bypass Editor hardware-acceleration cache (2026-02-12)
 - [x] Configure GitHub Secrets for consistent debug keystore signing (2026-02-12)

@@ -5,11 +5,11 @@
 ### Overlay (floating pill)
 - **Compact pill shape**: activity name on the left, timer on the right, 10dp rounded corners
 - **Border**: configurable color (uses accent/border color setting) and width (0–6dp, default 2dp black). Uses LayerDrawable: bottom layer = bg fill (inset by border width), top layer = stroke-only drawable (transparent fill + stroke). This avoids both the filled-rectangle-behind-bg bug and the stroke/fill overlap bug. Padding offsets content so the border doesn't overlap it.
-- **Tap activity text** → expand overlay (keyboard pops up, +/➚/− buttons appear, quick-select rows show). Type a new name and press Done — the previous activity is saved, timer restarts, and overlay collapses.
+- **Tap activity text** → expand overlay (keyboard pops up, +/➚/− icon buttons appear, quick-select rows show). Type a new name and press Done — the previous activity is saved, timer restarts, and overlay collapses.
 - **Tap timer** → pause/resume (timer dims when paused)
 - **Drag anywhere** → reposition the pill on screen (clamped to screen bounds)
 - **Tap outside overlay** → releases keyboard focus (overlay stays expanded, phone becomes usable for typing elsewhere)
-- **+ add shortcut** → adds a quick-select row below the timeline. Type an activity name, then tap ▶ to instantly switch to it (overlay stays expanded, focus released). Tap ✕ on a row to remove it. Shortcuts persist across sessions.
+- **+ add shortcut** → adds a quick-select row below the timeline. Type an activity name, then tap ▶ to instantly switch to it (overlay stays expanded, focus released). Tap X icon on a row to remove it. Shortcuts persist across sessions.
 - **➚ open app** → opens the full TrackyTime app (releases focus, overlay stays expanded)
 - **− collapse** → collapses the expanded overlay back to the compact pill
 - **Timeline bar** → 6dp colored bar at the bottom showing the day's activity history as proportional segments. Each activity session is a colored rectangle. The currently-running activity grows live. The live segment pulses immediately, speeding up 2x every 30 minutes as a gentle nudge. Not affected by the opacity slider. White tick marks (2px wide) at every hour (full height) and half-hour (bottom half). Both fully opaque. Half-hour marks are hidden once total tracked time exceeds 5 hours.
@@ -24,7 +24,7 @@
 
 ### App
 - Daily pie chart with color-coded slices (entries grouped by name)
-- **Color bar** below pie chart: horizontal stacked bar grouping all activity time by color. Max width ~1.4x the pie chart (centered). Activities with the same color are lumped into one segment. Percentage labels appear on segments wide enough to fit them. Sorted by duration descending.
+- **Color bar** below pie chart: horizontal stacked bar grouping all activity time by color. Max width ~1.4x the pie chart (centered). Activities with the same color are lumped into one segment. Percentage labels appear on segments wide enough to fit them. Sorted by hue (similar colors grouped together), then by duration descending within each hue group.
 - **Week view**: toggle between Day/Week; week view aggregates Mon-Sun
 - History list shows **individual entries** with time range (e.g. "10:00 – 11:00 · 1h 00m"), color dot, color picker, delete
 - **Inline rename**: tap an entry's name → it becomes editable. Press Done → saves new name and auto-assigns a matching color.
@@ -65,10 +65,11 @@
 | `app/build.gradle` | Android build config — SDK versions, package name, build types |
 | `app/proguard-rules.pro` | ProGuard rules for release builds (currently empty) |
 | `app/src/main/AndroidManifest.xml` | Permissions + component declarations |
-| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, expand/collapse/focus model, quick-select shortcuts, timeline bar, progressive pulse, breathing overlay (stroke-only border layer + bg darken/brighten), live-update settings |
+| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, expand/collapse/focus model, quick-select shortcuts with icon buttons, timeline bar, progressive pulse, breathing overlay (stroke-only border layer + bg darken/brighten), live-update settings |
 | `app/src/main/java/.../TimelineBarView.java` | Custom View: draws day timeline as proportional colored segments on a Canvas |
 | `app/src/main/java/.../MainActivity.java` | History view (individual entries, inline rename), pie chart, color bar, day/week toggle, date nav, color picker, export/import (with shortcuts), settings (border color + width) |
-| `app/src/main/java/.../ColorBarView.java` | Custom canvas-drawn horizontal stacked bar chart — groups activity time by color |
+| `app/src/main/java/.../ColorBarView.java` | Custom canvas-drawn horizontal stacked bar chart — groups activity time by color, sorted by hue then duration |
+| `app/src/main/res/drawable/` | Vector drawable icons (add, open, remove, close) used in overlay buttons |
 | `app/src/main/java/.../DatabaseHelper.java` | SQLite storage + `getColorForName()` / `updateColorByName()` / `updateEntryNameAndColor()` / date range queries / export/import — all name matching is case/space-insensitive via `LOWER(TRIM())` |
 | `app/src/main/java/.../ActivityEntry.java` | Data model + `normalizeName()` helper (trim, collapse spaces, lowercase) |
 | `app/src/main/java/.../PieChartView.java` | Custom canvas-drawn pie chart |
