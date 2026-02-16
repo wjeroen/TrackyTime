@@ -250,6 +250,21 @@ public class OverlayService extends Service {
 
         // Unified text size for text elements
         float textSize = prefs.getTextSize();
+
+        // Main button icon sizes: baseline 24dp at large (20sp) = 1.2x multiplier
+        // Perfect for large, scales down for small/medium, scales up for extra large
+        int iconSize = (int) (textSize * 1.2f * density);
+        LinearLayout.LayoutParams addBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+        addBtnParams.setMargins((int) (6 * density), 0, 0, 0);
+        addBtn.setLayoutParams(addBtnParams);
+
+        LinearLayout.LayoutParams openAppBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+        openAppBtnParams.setMargins((int) (8 * density), 0, 0, 0);
+        openAppBtn.setLayoutParams(openAppBtnParams);
+
+        LinearLayout.LayoutParams closeBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+        closeBtnParams.setMargins((int) (6 * density), 0, 0, 0);
+        closeBtn.setLayoutParams(closeBtnParams);
         timerText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         editText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         separator.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
@@ -264,6 +279,9 @@ public class OverlayService extends Service {
         timelineBar.setCornerRadius(2 * density);
 
         // Live-update quick-select row colors + sizes + stroke
+        // X button icon sizes: baseline 20dp at small (14sp) = 1.43x multiplier
+        // Perfect for small, scales up for medium/large/extra large
+        int quickSelectIconSize = (int) (textSize * 1.43f * density);
         for (int i = 0; i < quickSelectContainer.getChildCount(); i++) {
             LinearLayout row = (LinearLayout) quickSelectContainer.getChildAt(i);
             StrokeTextView playBtn = (StrokeTextView) row.getChildAt(0);
@@ -279,6 +297,11 @@ public class OverlayService extends Service {
             nameField.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
             nameField.setStrokeEnabled(strokeEnabled);
             removeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x66000000));
+            // Update icon size
+            LinearLayout.LayoutParams removeBtnParams = new LinearLayout.LayoutParams(
+                quickSelectIconSize, quickSelectIconSize);
+            removeBtnParams.setMargins((int) (6 * density), 0, 0, 0);
+            removeBtn.setLayoutParams(removeBtnParams);
         }
     }
 
@@ -804,9 +827,11 @@ public class OverlayService extends Service {
         removeBtn.setImageResource(R.drawable.ic_close);
         removeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x66000000));
         removeBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        removeBtn.setPadding((int) (6 * density), 0, 0, 0);
-        int iconSize = (int) (20 * density);
+        // X button icon size: baseline 20dp at small (14sp) = 1.43x multiplier
+        // Perfect for small, scales up for medium/large/extra large
+        int iconSize = (int) (textSize * 1.43f * density);
         LinearLayout.LayoutParams removeBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+        removeBtnParams.setMargins((int) (6 * density), 0, 0, 0);
         removeBtn.setLayoutParams(removeBtnParams);
 
         row.addView(playBtn);

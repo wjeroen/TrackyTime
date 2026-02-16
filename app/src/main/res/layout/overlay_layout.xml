@@ -54,8 +54,8 @@
         <!-- Add quick-select shortcut (shown only in edit mode) -->
         <ImageButton
             android:id="@+id/addBtn"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_marginLeft="6dp"
             android:src="@drawable/ic_add"
             android:background="@android:color/transparent"
@@ -66,8 +66,8 @@
         <!-- Open full app (shown only in edit mode) -->
         <ImageButton
             android:id="@+id/openAppBtn"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_marginLeft="8dp"
             android:src="@drawable/ic_open_in_new"
             android:background="@android:color/transparent"
@@ -78,8 +78,8 @@
         <!-- Collapse/minimize overlay (shown only in expanded mode) -->
         <ImageButton
             android:id="@+id/closeBtn"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_marginLeft="6dp"
             android:src="@drawable/ic_remove"
             android:background="@android:color/transparent"
