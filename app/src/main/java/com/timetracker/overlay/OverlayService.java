@@ -246,7 +246,7 @@ public class OverlayService extends Service {
         // Icon button tints
         addBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x99000000));
         openAppBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x99000000));
-        closeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x66000000));
+        closeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x99000000));
 
         // Unified text size for text elements
         float textSize = prefs.getTextSize();
@@ -279,9 +279,8 @@ public class OverlayService extends Service {
         timelineBar.setCornerRadius(2 * density);
 
         // Live-update quick-select row colors + sizes + stroke
-        // X button icon sizes: baseline 20dp at small (14sp) = 1.43x multiplier
         // Perfect for small, scales up for medium/large/extra large
-        int quickSelectIconSize = (int) (textSize * 1.43f * density);
+        int quickSelectIconSize = (int) (textSize * 1.2f * density);
         for (int i = 0; i < quickSelectContainer.getChildCount(); i++) {
             LinearLayout row = (LinearLayout) quickSelectContainer.getChildAt(i);
             StrokeTextView playBtn = (StrokeTextView) row.getChildAt(0);
@@ -296,7 +295,7 @@ public class OverlayService extends Service {
             nameField.invalidate();
             nameField.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
             nameField.setStrokeEnabled(strokeEnabled);
-            removeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x66000000));
+            removeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x99000000));
             // Update icon size
             LinearLayout.LayoutParams removeBtnParams = new LinearLayout.LayoutParams(
                 quickSelectIconSize, quickSelectIconSize);
@@ -825,11 +824,9 @@ public class OverlayService extends Service {
         // Remove button X icon
         ImageView removeBtn = new ImageView(this);
         removeBtn.setImageResource(R.drawable.ic_close);
-        removeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x66000000));
+        removeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x99000000));
         removeBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        // X button icon size: baseline 20dp at small (14sp) = 1.43x multiplier
-        // Perfect for small, scales up for medium/large/extra large
-        int iconSize = (int) (textSize * 1.43f * density);
+        int iconSize = (int) (textSize * 1.2f * density);
         LinearLayout.LayoutParams removeBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
         removeBtnParams.setMargins((int) (6 * density), 0, 0, 0);
         removeBtn.setLayoutParams(removeBtnParams);
