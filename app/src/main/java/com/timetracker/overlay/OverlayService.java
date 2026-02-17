@@ -7,6 +7,7 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
@@ -24,6 +25,8 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.text.InputType;
 import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.text.SimpleDateFormat;
@@ -48,7 +51,8 @@ public class OverlayService extends Service {
     private WindowManager.LayoutParams params;
 
     private TimelineBarView timelineBar;
-    private StrokeTextView timerText, separator, openAppBtn, closeBtn, addBtn;
+    private StrokeTextView timerText, separator;
+    private ImageButton openAppBtn, closeBtn, addBtn;
     private StrokeEditText editText;
     private LinearLayout quickSelectContainer;
     private GradientDrawable overlayBgFill;        // background fill (inset when border > 0)
@@ -238,37 +242,51 @@ public class OverlayService extends Service {
         editText.setHintTextColor((textColor & 0x00FFFFFF) | 0x55000000);
         // Force EditText to redraw after color change (needed for stroke updates)
         editText.invalidate();
-        addBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
-        openAppBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
-        closeBtn.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
 
-        // Unified text size for everything, open-app icon slightly larger to match ✕ visually
+        // Icon button tints
+        addBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x99000000));
+        openAppBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x99000000));
+        closeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x66000000));
+
+        // Unified text size for text elements
         float textSize = prefs.getTextSize();
+
+        // Main button icon sizes: baseline 24dp at large (20sp) = 1.2x multiplier
+        // Perfect for large, scales down for small/medium, scales up for extra large
+        int iconSize = (int) (textSize * 1.2f * density);
+        LinearLayout.LayoutParams addBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+        addBtnParams.setMargins((int) (6 * density), 0, 0, 0);
+        addBtn.setLayoutParams(addBtnParams);
+
+        LinearLayout.LayoutParams openAppBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+        openAppBtnParams.setMargins((int) (8 * density), 0, 0, 0);
+        openAppBtn.setLayoutParams(openAppBtnParams);
+
+        LinearLayout.LayoutParams closeBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+        closeBtnParams.setMargins((int) (6 * density), 0, 0, 0);
+        closeBtn.setLayoutParams(closeBtnParams);
         timerText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         editText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         separator.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
-        addBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
-        openAppBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
-        closeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
 
         // Text stroke (TV subtitle style with auto-contrast)
         boolean strokeEnabled = prefs.isTextStrokeEnabled();
         timerText.setStrokeEnabled(strokeEnabled);
         editText.setStrokeEnabled(strokeEnabled);
         separator.setStrokeEnabled(strokeEnabled);
-        addBtn.setStrokeEnabled(strokeEnabled);
-        openAppBtn.setStrokeEnabled(strokeEnabled);
-        closeBtn.setStrokeEnabled(strokeEnabled);
 
         // Timeline bar corner radius (not affected by opacity)
         timelineBar.setCornerRadius(2 * density);
 
         // Live-update quick-select row colors + sizes + stroke
+        // X button icon sizes: baseline 20dp at small (14sp) = 1.43x multiplier
+        // Perfect for small, scales up for medium/large/extra large
+        int quickSelectIconSize = (int) (textSize * 1.43f * density);
         for (int i = 0; i < quickSelectContainer.getChildCount(); i++) {
             LinearLayout row = (LinearLayout) quickSelectContainer.getChildAt(i);
             StrokeTextView playBtn = (StrokeTextView) row.getChildAt(0);
             StrokeEditText nameField = (StrokeEditText) row.getChildAt(1);
-            StrokeTextView removeBtn = (StrokeTextView) row.getChildAt(2);
+            ImageView removeBtn = (ImageView) row.getChildAt(2);
             playBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
             playBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
             playBtn.setStrokeEnabled(strokeEnabled);
@@ -278,9 +296,12 @@ public class OverlayService extends Service {
             nameField.invalidate();
             nameField.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
             nameField.setStrokeEnabled(strokeEnabled);
-            removeBtn.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
-            removeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
-            removeBtn.setStrokeEnabled(strokeEnabled);
+            removeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x66000000));
+            // Update icon size
+            LinearLayout.LayoutParams removeBtnParams = new LinearLayout.LayoutParams(
+                quickSelectIconSize, quickSelectIconSize);
+            removeBtnParams.setMargins((int) (6 * density), 0, 0, 0);
+            removeBtn.setLayoutParams(removeBtnParams);
         }
     }
 
@@ -801,14 +822,17 @@ public class OverlayService extends Service {
             0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         nameField.setLayoutParams(nameParams);
 
-        // Remove button ✕
-        StrokeTextView removeBtn = new StrokeTextView(this);
-        removeBtn.setText("✕");
-        removeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
-        removeBtn.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
-        removeBtn.setPadding((int) (6 * density), 0, 0, 0);
-        removeBtn.setIncludeFontPadding(false);
-        removeBtn.setStrokeEnabled(strokeEnabled);
+        // Remove button X icon
+        ImageView removeBtn = new ImageView(this);
+        removeBtn.setImageResource(R.drawable.ic_close);
+        removeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x66000000));
+        removeBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        // X button icon size: baseline 20dp at small (14sp) = 1.43x multiplier
+        // Perfect for small, scales up for medium/large/extra large
+        int iconSize = (int) (textSize * 1.43f * density);
+        LinearLayout.LayoutParams removeBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+        removeBtnParams.setMargins((int) (6 * density), 0, 0, 0);
+        removeBtn.setLayoutParams(removeBtnParams);
 
         row.addView(playBtn);
         row.addView(nameField);

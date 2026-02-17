@@ -88,9 +88,24 @@ public class ColorBarView extends View {
         }
         if (totalSeconds == 0) return;
 
-        // Sort by duration descending for a clean look
+        // Sort by color similarity (hue), then by duration as fallback
         List<Map.Entry<Integer, Integer>> sorted = new ArrayList<>(colorDurations.entrySet());
-        sorted.sort((a, b) -> b.getValue() - a.getValue());
+        sorted.sort((a, b) -> {
+            // Convert colors to HSV to get hue
+            float[] hsvA = new float[3];
+            float[] hsvB = new float[3];
+            Color.colorToHSV(a.getKey(), hsvA);
+            Color.colorToHSV(b.getKey(), hsvB);
+
+            // Primary sort: by hue (groups similar colors together)
+            float hueDiff = hsvA[0] - hsvB[0];
+            if (Math.abs(hueDiff) > 1.0f) {
+                return Float.compare(hsvA[0], hsvB[0]);
+            }
+
+            // Secondary sort: by duration (larger segments first within same hue)
+            return b.getValue() - a.getValue();
+        });
 
         // Draw rounded background
         paint.setColor(0xFF333344);
