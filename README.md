@@ -6,7 +6,7 @@
 - **Compact pill shape**: activity name on the left, timer on the right, 10dp rounded corners
 - **Border**: configurable color (uses accent/border color setting) and width (0–6dp, default 2dp black). Uses LayerDrawable: bottom layer = bg fill (inset by border width), top layer = stroke-only drawable (transparent fill + stroke). This avoids both the filled-rectangle-behind-bg bug and the stroke/fill overlap bug. Padding offsets content so the border doesn't overlap it.
 - **Tap activity text** → expand overlay (keyboard pops up, +/➚/− icon buttons appear, quick-select rows show). Icon buttons scale with overlay text size for consistent tap targets. Type a new name and press Done — the previous activity is saved, timer restarts, and overlay collapses.
-- **Tap timer** → pause/resume (timer dims when paused)
+- **Tap timer** → pause/resume (timer dims to icon opacity 0x99 when paused)
 - **Drag anywhere** → reposition the pill on screen (clamped to screen bounds)
 - **Tap outside overlay** → releases keyboard focus (overlay stays expanded, phone becomes usable for typing elsewhere)
 - **+ add shortcut** → adds a quick-select row below the timeline. Type an activity name, then tap ▶ to instantly switch to it (overlay stays expanded, focus released). Tap X icon on a row to remove it. Shortcuts persist across sessions.
@@ -24,7 +24,7 @@
 
 ### App
 - Daily pie chart with color-coded slices (entries grouped by name)
-- **Color bar** below pie chart: horizontal stacked bar grouping all activity time by color. Max width ~1.4x the pie chart (centered). Activities with the same color are lumped into one segment. Percentage labels appear on segments wide enough to fit them. Sorted by hue (similar colors grouped together), then by duration descending within each hue group.
+- **Color bar** below pie chart: horizontal stacked bar grouping all activity time by color. Full screen width (within the 16dp page margins). Activities with the same color are lumped into one segment. Percentage labels appear on segments wide enough to fit them. Sorted by hue (similar colors grouped together), then by duration descending within each hue group.
 - **Week view**: toggle between Day/Week; week view aggregates Mon-Sun
 - History list shows **individual entries** with time range (e.g. "10:00 – 11:00 · 1h 00m"), color dot, color picker, delete
 - **Inline rename**: tap an entry's name → it becomes editable. Press Done → saves new name and auto-assigns a matching color.
@@ -75,6 +75,7 @@
 | `app/src/main/java/.../PieChartView.java` | Custom canvas-drawn pie chart |
 | `app/src/main/java/.../StrokeTextView.java` | Custom TextView with TV subtitle-style text stroke/outline — auto-contrast via ITU BT.601 brightness (black stroke for light text, white for dark) |
 | `app/src/main/java/.../StrokeEditText.java` | Custom EditText with same stroke/outline — uses Layout.draw() directly to bypass Editor's hardware-acceleration cache |
+| `app/src/main/java/.../StrokeImageView.java` | Custom ImageView with same stroke outline — draws icon at 8 offset positions in contrasting color, then normally on top (same auto-contrast as StrokeTextView) |
 | `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance (bg/text/border colors, border width, opacity, size, overlay pulse toggle, text stroke toggle, quick-select activities) + crash recovery checkpoint (separate `crash_recovery` file) |
 | `.github/workflows/android.yml` | GitHub Actions workflow — builds APK on every push |
 
@@ -105,6 +106,7 @@ TrackyTime/
 │       │   ├── OverlayService.java
 │       │   ├── PieChartView.java
 │       │   ├── StrokeEditText.java
+│       │   ├── StrokeImageView.java
 │       │   ├── StrokeTextView.java
 │       │   └── TimelineBarView.java
 │       └── res/

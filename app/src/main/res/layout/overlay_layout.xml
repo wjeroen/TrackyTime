@@ -52,7 +52,7 @@
             android:visibility="gone" />
 
         <!-- Add quick-select shortcut (shown only in edit mode) -->
-        <ImageButton
+        <com.timetracker.overlay.StrokeImageView
             android:id="@+id/addBtn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -64,7 +64,7 @@
             android:visibility="gone" />
 
         <!-- Open full app (shown only in edit mode) -->
-        <ImageButton
+        <com.timetracker.overlay.StrokeImageView
             android:id="@+id/openAppBtn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -76,7 +76,7 @@
             android:visibility="gone" />
 
         <!-- Collapse/minimize overlay (shown only in expanded mode) -->
-        <ImageButton
+        <com.timetracker.overlay.StrokeImageView
             android:id="@+id/closeBtn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

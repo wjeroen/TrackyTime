@@ -51,6 +51,8 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Paused timer and hint text opacity match icon opacity (0x99); icon stroke follows stroke setting (2026-02-19)
+- [x] Color bar now fills full screen width (within layout margins) — removed fixed max-width cap (2026-02-19)
 - [x] Fix icon scaling: main buttons use 1.2x (perfect at large), X buttons use 1.43x (perfect at small) (2026-02-16)
 - [x] Redesign icons with consistent 2dp stroke width and simplified arrow for pop-up (2026-02-16)
 - [x] Replace overlay text buttons with Android vector drawable icons (add, open, remove, close) (2026-02-16)
