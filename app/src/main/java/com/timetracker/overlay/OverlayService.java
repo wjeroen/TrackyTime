@@ -25,7 +25,6 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.text.InputType;
 import android.widget.EditText;
-import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -52,7 +51,7 @@ public class OverlayService extends Service {
 
     private TimelineBarView timelineBar;
     private StrokeTextView timerText, separator;
-    private ImageButton openAppBtn, closeBtn, addBtn;
+    private StrokeImageView openAppBtn, closeBtn, addBtn;
     private StrokeEditText editText;
     private LinearLayout quickSelectContainer;
     private GradientDrawable overlayBgFill;        // background fill (inset when border > 0)
@@ -239,7 +238,7 @@ public class OverlayService extends Service {
         timerText.setTextColor(textColor);
         separator.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
         editText.setTextColor(textColor);
-        editText.setHintTextColor((textColor & 0x00FFFFFF) | 0x55000000);
+        editText.setHintTextColor((textColor & 0x00FFFFFF) | 0x99000000);
         // Force EditText to redraw after color change (needed for stroke updates)
         editText.invalidate();
 
@@ -274,6 +273,9 @@ public class OverlayService extends Service {
         timerText.setStrokeEnabled(strokeEnabled);
         editText.setStrokeEnabled(strokeEnabled);
         separator.setStrokeEnabled(strokeEnabled);
+        addBtn.setStrokeEnabled(strokeEnabled);
+        openAppBtn.setStrokeEnabled(strokeEnabled);
+        closeBtn.setStrokeEnabled(strokeEnabled);
 
         // Timeline bar corner radius (not affected by opacity)
         timelineBar.setCornerRadius(2 * density);
@@ -285,17 +287,18 @@ public class OverlayService extends Service {
             LinearLayout row = (LinearLayout) quickSelectContainer.getChildAt(i);
             StrokeTextView playBtn = (StrokeTextView) row.getChildAt(0);
             StrokeEditText nameField = (StrokeEditText) row.getChildAt(1);
-            ImageView removeBtn = (ImageView) row.getChildAt(2);
+            StrokeImageView removeBtn = (StrokeImageView) row.getChildAt(2);
             playBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
             playBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
             playBtn.setStrokeEnabled(strokeEnabled);
             nameField.setTextColor(textColor);
-            nameField.setHintTextColor((textColor & 0x00FFFFFF) | 0x55000000);
+            nameField.setHintTextColor((textColor & 0x00FFFFFF) | 0x99000000);
             // Force EditText to redraw after color change (needed for stroke updates)
             nameField.invalidate();
             nameField.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
             nameField.setStrokeEnabled(strokeEnabled);
             removeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x99000000));
+            removeBtn.setStrokeEnabled(strokeEnabled);
             // Update icon size
             LinearLayout.LayoutParams removeBtnParams = new LinearLayout.LayoutParams(
                 quickSelectIconSize, quickSelectIconSize);
@@ -526,7 +529,7 @@ public class OverlayService extends Service {
     }
 
     private void showTimerPaused() {
-        timerText.setAlpha(0.5f);
+        timerText.setAlpha(0x99 / 255f);
         stopProgressPulse();
         currentPulseDuration = 0; // force pulse recalculation on resume
         timelineBar.setPulseAlpha(1.0f); // fully opaque when paused
@@ -806,7 +809,7 @@ public class OverlayService extends Service {
         StrokeEditText nameField = new StrokeEditText(this);
         nameField.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         nameField.setTextColor(textColor);
-        nameField.setHintTextColor((textColor & 0x00FFFFFF) | 0x55000000);
+        nameField.setHintTextColor((textColor & 0x00FFFFFF) | 0x99000000);
         nameField.setBackground(null);
         nameField.setSingleLine(true);
         nameField.setImeOptions(EditorInfo.IME_ACTION_DONE);
@@ -822,9 +825,10 @@ public class OverlayService extends Service {
         nameField.setLayoutParams(nameParams);
 
         // Remove button X icon
-        ImageView removeBtn = new ImageView(this);
+        StrokeImageView removeBtn = new StrokeImageView(this);
         removeBtn.setImageResource(R.drawable.ic_close);
         removeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x99000000));
+        removeBtn.setStrokeEnabled(strokeEnabled);
         removeBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
         int iconSize = (int) (textSize * 1.2f * density);
         LinearLayout.LayoutParams removeBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
