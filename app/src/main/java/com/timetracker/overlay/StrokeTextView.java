@@ -12,7 +12,7 @@ import android.widget.TextView;
  */
 public class StrokeTextView extends TextView {
     private boolean strokeEnabled = true;
-    private float strokeWidth = 4f;
+    private float strokeWidthSetting = 4f;
 
     public StrokeTextView(Context context) {
         super(context);
@@ -32,12 +32,12 @@ public class StrokeTextView extends TextView {
     }
 
     /**
-     * Set stroke width setting (1-10). Internally uses quadratic scaling:
-     * actual = width² / 4, so 4px setting = 4 raw pixels (matches old hardcoded default).
-     * This gives a much wider visible range on high-density screens.
+     * Set stroke width setting (1-10). Actual pixel width is computed in onDraw()
+     * using quadratic scaling (width² / 4) and proportional to text size so the
+     * stroke scales with overlay size (anchored at 16sp Medium = original default).
      */
     public void setStrokeWidth(float width) {
-        this.strokeWidth = (width * width) / 4f;
+        this.strokeWidthSetting = width;
         invalidate();
     }
 
@@ -67,6 +67,13 @@ public class StrokeTextView extends TextView {
         Paint paint = getPaint();
         Paint.Style originalStyle = paint.getStyle();
         float originalStrokeWidth = paint.getStrokeWidth();
+
+        // Scale stroke with text size so it's proportional at all overlay sizes.
+        // Anchored at 16sp (Medium): setting 4 → 4px at 16sp, scales up for larger text.
+        float basePx = (strokeWidthSetting * strokeWidthSetting) / 4f;
+        float scaledDensity = getResources().getDisplayMetrics().scaledDensity;
+        float referencePx = 16f * scaledDensity;
+        float strokeWidth = basePx * (getTextSize() / referencePx);
 
         // Draw stroke: change VIEW's color so super.onDraw() uses it
         setTextColor(strokeColor);

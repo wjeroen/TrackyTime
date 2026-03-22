@@ -33,7 +33,7 @@
 - **Tap date to return to today**: tapping the date/week text in the header jumps back to the present day or current week.
 - Date navigation (prev/next day or week)
 - Export/Import/Settings buttons at the top (above history) for quick access
-- Settings: background color, text color, border color (accent), border width (0–6dp), background opacity, text size, breathing overlay toggle, text stroke toggle + stroke width slider (1–10, quadratic scaling so higher values are much more visible; 4 = same as original default), UI elements opacity (buttons, separator, hints, paused clock)
+- Settings: background color, text color, border color (accent), border width (0–6dp), background opacity, text size, breathing overlay toggle, text stroke toggle + stroke width slider (1–10, quadratic scaling + proportional to text size so stroke scales with overlay size; anchored at 16sp Medium where setting 4 = original default), UI elements opacity (buttons, separator, hints, paused clock)
 - **Export**: save all data as JSON to any location (Google Drive, email, etc.). Also includes quick-select shortcut names.
 - **Import**: restore data from a JSON backup (skips duplicates). Restores quick-select shortcuts if present. Backward-compatible with older exports that don't have shortcuts.
 

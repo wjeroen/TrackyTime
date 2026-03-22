@@ -12,6 +12,8 @@
 ### Bug Fixes
 - [x] Fix text stroke width barely visible — use quadratic scaling (width²/4) so higher values are much more noticeable (2026-03-22)
 - [x] Fix color picker: fixed width layout, brightness row aligned with grid, OK/Cancel buttons instead of dismiss-on-click, live selection highlighting, default to 600 brightness (black/white select actual color) (2026-03-22)
+- [x] Fix color picker dialog white space — force WRAP_CONTENT on dialog window (2026-03-22)
+- [x] Fix text stroke not scaling with overlay size — stroke now proportional to text size (anchored at 16sp Medium), matching icon stroke behavior (2026-03-22)
 
 ### Performance & Optimization
 _(none right now)_

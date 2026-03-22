@@ -676,12 +676,18 @@ public class MainActivity extends Activity {
         populateBrightnessRow(brightnessRow, initialGrid, selected, d,
             swatchSize, swatchMargin, grid);
 
-        // Build dialog with OK button
-        new AlertDialog.Builder(this)
+        // Build dialog with OK button — force WRAP_CONTENT so no white space
+        AlertDialog dialog = new AlertDialog.Builder(this)
             .setView(root)
             .setPositiveButton("OK", (dlg, which) -> callback.onColor(selected[0]))
             .setNegativeButton("Cancel", null)
-            .show();
+            .create();
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(
+                android.view.WindowManager.LayoutParams.WRAP_CONTENT,
+                android.view.WindowManager.LayoutParams.WRAP_CONTENT);
+        }
     }
 
     /** Refresh both brightness row and grid selection indicators. */
