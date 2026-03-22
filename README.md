@@ -40,7 +40,7 @@
 ### Consistent colors
 - Activities with the **same name always get the same color** — in pie chart, history, and across all days
 - **Name matching is case- and space-insensitive**: "Coding Time", "coding time", and "CODING  TIME" are all treated as the same activity (via `normalizeName()` — trim, collapse spaces, lowercase)
-- New names get a stable color auto-assigned from a 44-color palette (based on normalized name hash)
+- New names get a stable color auto-assigned from a 76-color palette (19 Material Design hues × 4 brightness levels, based on normalized name hash)
 - Changing an entry's color updates **all** entries with that name (case/space-insensitive)
 
 ### Grouping
