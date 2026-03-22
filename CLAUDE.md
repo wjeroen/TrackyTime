@@ -1,5 +1,7 @@
 # Claude Code Instructions
 
+> **DO NOT attempt to build the Gradle project (e.g. `./gradlew build`, `./gradlew assembleDebug`, etc.).** The build environment has persistent network issues that prevent Gradle from downloading dependencies/plugins. Builds will always fail with network errors — this is NOT a code problem. Skip build verification steps entirely.
+
 ## TL;DR
 The user is a coding noob. ELI5 (Explain Like I'm 5) frequently when discussing technical concepts, code changes, and tradeoffs. Always make sure to update the README.md and TODO.md when making changes. Always consider at least 3 possible causes when something isn't working.
 
