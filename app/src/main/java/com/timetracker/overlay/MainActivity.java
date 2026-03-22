@@ -2,6 +2,7 @@ package com.timetracker.overlay;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -676,16 +677,39 @@ public class MainActivity extends Activity {
         populateBrightnessRow(brightnessRow, initialGrid, selected, d,
             swatchSize, swatchMargin, grid);
 
-        // Build dialog — replace stock background to eliminate extra white space
-        AlertDialog dialog = new AlertDialog.Builder(this)
-            .setView(root)
-            .setPositiveButton("OK", (dlg, which) -> callback.onColor(selected[0]))
-            .setNegativeButton("Cancel", null)
-            .create();
+        // --- OK / Cancel buttons ---
+        LinearLayout buttonRow = new LinearLayout(this);
+        buttonRow.setOrientation(LinearLayout.HORIZONTAL);
+        buttonRow.setGravity(Gravity.END);
+        LinearLayout.LayoutParams btnRowLp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        btnRowLp.setMargins(0, (int)(8 * d), 0, 0);
+        buttonRow.setLayoutParams(btnRowLp);
+
+        Button cancelBtn = new Button(this, null, android.R.attr.buttonBarButtonStyle);
+        cancelBtn.setText("CANCEL");
+        cancelBtn.setTextColor(0xFFBBBBBB);
+
+        Button okBtn = new Button(this, null, android.R.attr.buttonBarButtonStyle);
+        okBtn.setText("OK");
+        okBtn.setTextColor(0xFF8AB4F8);
+
+        buttonRow.addView(cancelBtn);
+        buttonRow.addView(okBtn);
+        root.addView(buttonRow);
+
+        // Plain Dialog — no AlertDialog minimum-width / internal-padding nonsense
+        Dialog dialog = new Dialog(this);
+        dialog.setContentView(root);
+
+        cancelBtn.setOnClickListener(v -> dialog.dismiss());
+        okBtn.setOnClickListener(v -> {
+            callback.onColor(selected[0]);
+            dialog.dismiss();
+        });
+
         dialog.show();
         if (dialog.getWindow() != null) {
-            // Stock AlertDialog background has large insets that force a minimum width.
-            // Replace with a simple rounded rectangle so WRAP_CONTENT actually works.
             GradientDrawable dialogBg = new GradientDrawable();
             dialogBg.setColor(0xFF303030);
             dialogBg.setCornerRadius(16 * d);
