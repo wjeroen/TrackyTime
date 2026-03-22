@@ -39,8 +39,9 @@ public class StrokeEditText extends EditText {
 
     /**
      * Set stroke width setting (1-10). Actual pixel width is computed in onDraw()
-     * using quadratic scaling (width² / 4) and proportional to text size so the
-     * stroke scales with overlay size (anchored at 16sp Medium = original default).
+     * using linear scaling proportional to text size so the stroke scales with
+     * overlay size — matching how icon stroke scales with icon size.
+     * Anchored at 16sp Medium where setting 4 = 4px (original default).
      */
     public void setStrokeWidth(float width) {
         this.strokeWidthSetting = width;
@@ -103,12 +104,12 @@ public class StrokeEditText extends EditText {
             Paint.Style origStyle = paint.getStyle();
             float origStrokeWidth = paint.getStrokeWidth();
 
-            // Scale stroke with text size so it's proportional at all overlay sizes.
-            // Anchored at 16sp (Medium): setting 4 → 4px at 16sp, scales up for larger text.
-            float basePx = (strokeWidthSetting * strokeWidthSetting) / 4f;
+            // Scale stroke linearly with setting AND proportionally with text size,
+            // matching how icon stroke scales (linear in setting, proportional to icon size).
+            // At 16sp Medium, setting N → N pixels. At larger text, stroke grows proportionally.
             float scaledDensity = getResources().getDisplayMetrics().scaledDensity;
             float referencePx = 16f * scaledDensity;
-            float strokeWidth = basePx * (getTextSize() / referencePx);
+            float strokeWidth = strokeWidthSetting * (getTextSize() / referencePx);
 
             paint.setColor(strokeColor);
             paint.setStyle(Paint.Style.STROKE);

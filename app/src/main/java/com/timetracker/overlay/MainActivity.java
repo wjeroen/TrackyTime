@@ -676,7 +676,7 @@ public class MainActivity extends Activity {
         populateBrightnessRow(brightnessRow, initialGrid, selected, d,
             swatchSize, swatchMargin, grid);
 
-        // Build dialog with OK button — force WRAP_CONTENT so no white space
+        // Build dialog — replace stock background to eliminate extra white space
         AlertDialog dialog = new AlertDialog.Builder(this)
             .setView(root)
             .setPositiveButton("OK", (dlg, which) -> callback.onColor(selected[0]))
@@ -684,6 +684,12 @@ public class MainActivity extends Activity {
             .create();
         dialog.show();
         if (dialog.getWindow() != null) {
+            // Stock AlertDialog background has large insets that force a minimum width.
+            // Replace with a simple rounded rectangle so WRAP_CONTENT actually works.
+            GradientDrawable dialogBg = new GradientDrawable();
+            dialogBg.setColor(0xFF303030);
+            dialogBg.setCornerRadius(16 * d);
+            dialog.getWindow().setBackgroundDrawable(dialogBg);
             dialog.getWindow().setLayout(
                 android.view.WindowManager.LayoutParams.WRAP_CONTENT,
                 android.view.WindowManager.LayoutParams.WRAP_CONTENT);
