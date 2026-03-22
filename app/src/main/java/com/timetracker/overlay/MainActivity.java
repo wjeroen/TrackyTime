@@ -599,28 +599,32 @@ public class MainActivity extends Activity {
     private interface ColorCallback { void onColor(int color); }
 
     private void showColorPickerDialog(int currentColor, ColorCallback callback) {
-        AlertDialog dialog = new AlertDialog.Builder(this).create();
         float d = getResources().getDisplayMetrics().density;
         int pad = (int)(12 * d);
+        int swatchSize = (int)(52 * d);
+        int swatchMargin = (int)(5 * d);
+        // Fixed width: 4 swatches + margins
+        int gridWidth = 4 * swatchSize + 8 * swatchMargin;
+
+        // Track selected color (mutable via array)
+        final int[] selected = { currentColor };
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(pad, pad, pad, pad);
 
-        // --- Brightness row (top) ---
+        // --- Brightness row (top, 4 columns matching grid) ---
         LinearLayout brightnessRow = new LinearLayout(this);
         brightnessRow.setOrientation(LinearLayout.HORIZONTAL);
-        brightnessRow.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams brLp = new LinearLayout.LayoutParams(
+            gridWidth, LinearLayout.LayoutParams.WRAP_CONTENT);
+        brightnessRow.setLayoutParams(brLp);
         root.addView(brightnessRow);
 
-        // Find which grid color the current color belongs to
-        int initialGrid = findGridColorFor(currentColor);
-        populateBrightnessRow(brightnessRow, initialGrid, currentColor, d, callback, dialog);
-
-        // --- Divider ---
+        // --- Divider (matches grid width) ---
         View divider = new View(this);
         LinearLayout.LayoutParams divLp = new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, (int)(1 * d));
+            gridWidth, (int)(1 * d));
         divLp.setMargins(0, (int)(10 * d), 0, (int)(8 * d));
         divider.setLayoutParams(divLp);
         divider.setBackgroundColor(0x44FFFFFF);
@@ -630,56 +634,110 @@ public class MainActivity extends Activity {
         GridLayout grid = new GridLayout(this);
         grid.setColumnCount(4);
 
+        // Find which grid color the current color belongs to
+        int initialGrid = findGridColorFor(currentColor);
+
         for (int color : GRID_COLORS) {
             View sw = new View(this);
             GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-            lp.width = (int)(52 * d);
-            lp.height = (int)(52 * d);
-            lp.setMargins((int)(5*d), (int)(5*d), (int)(5*d), (int)(5*d));
+            lp.width = swatchSize;
+            lp.height = swatchSize;
+            lp.setMargins(swatchMargin, swatchMargin, swatchMargin, swatchMargin);
             sw.setLayoutParams(lp);
 
             GradientDrawable bg = new GradientDrawable();
             bg.setShape(GradientDrawable.RECTANGLE);
             bg.setCornerRadius(6 * d);
             bg.setColor(color);
-            if (color == currentColor) bg.setStroke((int)(3*d), 0xFFFFFFFF);
+            // Show selection on the grid color whose brightness family contains the selected color
+            if (color == initialGrid) bg.setStroke((int)(3*d), 0xFFFFFFFF);
             sw.setBackground(bg);
 
             final int c = color;
             sw.setOnClickListener(v -> {
-                populateBrightnessRow(brightnessRow, c, -1, d, callback, dialog);
+                int[] variants = brightnessVariants(c);
+                // Black/white exception: select the actual clicked color, not 600-level
+                if (c == 0xFF000000) {
+                    selected[0] = 0xFF000000; // select black (index 3)
+                } else if (c == 0xFFFFFFFF) {
+                    selected[0] = 0xFFFFFFFF; // select white (index 0)
+                } else {
+                    selected[0] = variants[2]; // 600-level default
+                }
+                refreshColorPickerSelection(grid, brightnessRow, c, selected, d,
+                    swatchSize, swatchMargin);
             });
             grid.addView(sw);
         }
 
         root.addView(grid);
-        dialog.setView(root);
-        dialog.show();
+
+        // Populate initial brightness row
+        populateBrightnessRow(brightnessRow, initialGrid, selected, d,
+            swatchSize, swatchMargin, grid);
+
+        // Build dialog with OK button
+        new AlertDialog.Builder(this)
+            .setView(root)
+            .setPositiveButton("OK", (dlg, which) -> callback.onColor(selected[0]))
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    /** Refresh both brightness row and grid selection indicators. */
+    private void refreshColorPickerSelection(GridLayout grid, LinearLayout brightnessRow,
+                                              int activeGridColor, int[] selected,
+                                              float d, int swatchSize, int swatchMargin) {
+        // Update grid swatches — highlight the active grid color family
+        for (int i = 0; i < grid.getChildCount(); i++) {
+            View child = grid.getChildAt(i);
+            int color = GRID_COLORS[i];
+            GradientDrawable bg = new GradientDrawable();
+            bg.setShape(GradientDrawable.RECTANGLE);
+            bg.setCornerRadius(6 * d);
+            bg.setColor(color);
+            if (color == activeGridColor) bg.setStroke((int)(3*d), 0xFFFFFFFF);
+            child.setBackground(bg);
+        }
+
+        populateBrightnessRow(brightnessRow, activeGridColor, selected, d,
+            swatchSize, swatchMargin, grid);
     }
 
     private void populateBrightnessRow(LinearLayout row, int gridColor,
-                                        int currentColor, float d,
-                                        ColorCallback callback, AlertDialog dialog) {
+                                        int[] selected, float d,
+                                        int swatchSize, int swatchMargin,
+                                        GridLayout grid) {
         row.removeAllViews();
         int[] variants = brightnessVariants(gridColor);
         for (int color : variants) {
             View sw = new View(this);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                (int)(52 * d), (int)(52 * d));
-            lp.setMargins((int)(5*d), (int)(5*d), (int)(5*d), (int)(5*d));
+                swatchSize, swatchSize);
+            lp.setMargins(swatchMargin, swatchMargin, swatchMargin, swatchMargin);
             sw.setLayoutParams(lp);
 
             GradientDrawable bg = new GradientDrawable();
             bg.setShape(GradientDrawable.RECTANGLE);
             bg.setCornerRadius(6 * d);
             bg.setColor(color);
-            if (color == currentColor) bg.setStroke((int)(3*d), 0xFFFFFFFF);
+            if (color == selected[0]) bg.setStroke((int)(3*d), 0xFFFFFFFF);
             sw.setBackground(bg);
 
             final int c = color;
             sw.setOnClickListener(v -> {
-                callback.onColor(c);
-                dialog.dismiss();
+                selected[0] = c;
+                // Refresh brightness row selection
+                for (int i = 0; i < row.getChildCount(); i++) {
+                    View child = row.getChildAt(i);
+                    int varColor = variants[i];
+                    GradientDrawable vbg = new GradientDrawable();
+                    vbg.setShape(GradientDrawable.RECTANGLE);
+                    vbg.setCornerRadius(6 * d);
+                    vbg.setColor(varColor);
+                    if (varColor == c) vbg.setStroke((int)(3*d), 0xFFFFFFFF);
+                    child.setBackground(vbg);
+                }
             });
             row.addView(sw);
         }

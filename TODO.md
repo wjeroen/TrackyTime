@@ -10,7 +10,8 @@
 - [x] Unified color picker: 4x5 grid + brightness row (100/300/600/900) for both entries and settings (2026-03-22)
 
 ### Bug Fixes
-_(none right now)_
+- [x] Fix text stroke width barely visible — use quadratic scaling (width²/4) so higher values are much more noticeable (2026-03-22)
+- [x] Fix color picker: fixed width layout, brightness row aligned with grid, OK/Cancel buttons instead of dismiss-on-click, live selection highlighting, default to 600 brightness (black/white select actual color) (2026-03-22)
 
 ### Performance & Optimization
 _(none right now)_
@@ -29,7 +30,7 @@ _(none right now)_
 - [ ] Test that opacity slider affects background + border (text stays fully visible)
 - [ ] Test consistent colors: create "Coding" twice on different days, verify same color
 - [ ] Test name normalization: "Coding", "coding", "CODING", "Coding  Time" and "coding time" should all group together and share colors
-- [ ] Test color picker: unified 4x5 grid + brightness row (76 total colors), changing color updates all entries with same name
+- [ ] Test color picker: unified 4x5 grid + brightness row (76 total colors), OK/Cancel buttons, live selection highlight, default 600 brightness (black/white exception), changing color updates all entries with same name
 - [ ] Test open-app button (➚) appears in expanded mode, opens full app (keeps overlay expanded)
 - [ ] Test collapse button (−) appears in expanded mode, collapses overlay
 - [ ] Test quick-select: + adds row, ▶ switches activity, ✕ removes row, persists across sessions

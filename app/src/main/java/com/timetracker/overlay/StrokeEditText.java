@@ -37,8 +37,12 @@ public class StrokeEditText extends EditText {
         invalidate();
     }
 
+    /**
+     * Set stroke width setting (1-10). Internally uses quadratic scaling:
+     * actual = width² / 4, so 4px setting = 4 raw pixels (matches old hardcoded default).
+     */
     public void setStrokeWidth(float width) {
-        this.strokeWidth = width;
+        this.strokeWidth = (width * width) / 4f;
         invalidate();
     }
 

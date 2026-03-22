@@ -31,8 +31,13 @@ public class StrokeTextView extends TextView {
         invalidate();
     }
 
+    /**
+     * Set stroke width setting (1-10). Internally uses quadratic scaling:
+     * actual = width² / 4, so 4px setting = 4 raw pixels (matches old hardcoded default).
+     * This gives a much wider visible range on high-density screens.
+     */
     public void setStrokeWidth(float width) {
-        this.strokeWidth = width;
+        this.strokeWidth = (width * width) / 4f;
         invalidate();
     }
 
