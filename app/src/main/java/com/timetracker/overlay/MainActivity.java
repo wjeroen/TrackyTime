@@ -42,32 +42,42 @@ public class MainActivity extends Activity {
     private static final int EXPORT_FILE_CODE = 200;
     private static final int IMPORT_FILE_CODE = 201;
 
-    private static final int[] ENTRY_COLORS = {
-        // Row 1: Vivid / saturated
-        0xFFE53935, 0xFFD81B60, 0xFF8E24AA, 0xFF5E35B1,
-        0xFF3949AB, 0xFF1E88E5, 0xFF039BE5, 0xFF00ACC1,
-        0xFF00897B, 0xFF43A047, 0xFF7CB342, 0xFFC0CA33,
-        // Row 2: Warm + earthy
-        0xFFFDD835, 0xFFFFB300, 0xFFFB8C00, 0xFFF4511E,
-        0xFF6D4C41, 0xFF757575, 0xFF546E7A, 0xFFEC407A,
-        // Row 3: Pastel / lighter
-        0xFFEF9A9A, 0xFFF48FB1, 0xFFCE93D8, 0xFFB39DDB,
-        0xFF9FA8DA, 0xFF90CAF9, 0xFF81D4FA, 0xFF80DEEA,
-        0xFF80CBC4, 0xFFA5D6A7, 0xFFC5E1A5, 0xFFE6EE9C,
-        // Row 4: Deep / dark
-        0xFFB71C1C, 0xFF880E4F, 0xFF4A148C, 0xFF1A237E,
-        0xFF0D47A1, 0xFF006064, 0xFF1B5E20, 0xFF33691E,
-        0xFFE65100, 0xFF3E2723, 0xFF263238, 0xFF212121
+    // 4x5 grid colors (mostly 600-level + black/white)
+    private static final int[] GRID_COLORS = {
+        0xFF6D4C41, 0xFF546E7A, 0xFF000000, 0xFFFFFFFF,
+        0xFFE53935, 0xFFF4511E, 0xFFFB8C00, 0xFFFFB300,
+        0xFFFDD835, 0xFFC0CA33, 0xFF7CB342, 0xFF43A047,
+        0xFF00897B, 0xFF00ACC1, 0xFF039BE5, 0xFF1E88E5,
+        0xFF3949AB, 0xFF5E35B1, 0xFF8E24AA, 0xFFD81B60
     };
 
-    private static final int[] SETTINGS_COLORS = {
-        0xFF1E1E2E, 0xFF2A2A3C, 0xFF313244, 0xFF45475A,
-        0xFFCDD6F4, 0xFFBAC2DE, 0xFFA6ADC8, 0xFF9399B2,
-        0xFF89B4FA, 0xFF74C7EC, 0xFF94E2D5, 0xFFA6E3A1,
-        0xFFF9E2AF, 0xFFFAB387, 0xFFF38BA8, 0xFFCBA6F7,
-        0xFFE53935, 0xFFFF6F00, 0xFF1B5E20, 0xFF0D47A1,
-        0xFFFFFFFF, 0xFF000000, 0xFF424242, 0xFF757575
-    };
+    // Brightness variants: 100, 300, 600, 900 for each grid color
+    private static int[] brightnessVariants(int gridColor) {
+        switch (gridColor) {
+            // Grey (also used for black and white)
+            case 0xFF000000: case 0xFFFFFFFF:
+                return new int[]{0xFFFFFFFF, 0xFFE0E0E0, 0xFF757575, 0xFF000000};
+            case 0xFFE53935: return new int[]{0xFFFFCDD2, 0xFFE57373, 0xFFE53935, 0xFFB71C1C};
+            case 0xFFF4511E: return new int[]{0xFFFFCCBC, 0xFFFF8A65, 0xFFF4511E, 0xFFBF360C};
+            case 0xFFFB8C00: return new int[]{0xFFFFE0B2, 0xFFFFB74D, 0xFFFB8C00, 0xFFE65100};
+            case 0xFFFFB300: return new int[]{0xFFFFECB3, 0xFFFFD54F, 0xFFFFB300, 0xFFFF6F00};
+            case 0xFFFDD835: return new int[]{0xFFFFF9C4, 0xFFFFF176, 0xFFFDD835, 0xFFF57F17};
+            case 0xFFC0CA33: return new int[]{0xFFF0F4C3, 0xFFDCE775, 0xFFC0CA33, 0xFF827717};
+            case 0xFF7CB342: return new int[]{0xFFDCEDC8, 0xFFAED581, 0xFF7CB342, 0xFF33691E};
+            case 0xFF43A047: return new int[]{0xFFC8E6C9, 0xFF81C784, 0xFF43A047, 0xFF1B5E20};
+            case 0xFF00897B: return new int[]{0xFFB2DFDB, 0xFF4DB6AC, 0xFF00897B, 0xFF004D40};
+            case 0xFF00ACC1: return new int[]{0xFFB2EBF2, 0xFF4DD0E1, 0xFF00ACC1, 0xFF006064};
+            case 0xFF039BE5: return new int[]{0xFFB3E5FC, 0xFF4FC3F7, 0xFF039BE5, 0xFF01579B};
+            case 0xFF1E88E5: return new int[]{0xFFBBDEFB, 0xFF64B5F6, 0xFF1E88E5, 0xFF0D47A1};
+            case 0xFF3949AB: return new int[]{0xFFC5CAE9, 0xFF7986CB, 0xFF3949AB, 0xFF1A237E};
+            case 0xFF5E35B1: return new int[]{0xFFD1C4E9, 0xFF9575CD, 0xFF5E35B1, 0xFF311B92};
+            case 0xFF8E24AA: return new int[]{0xFFE1BEE7, 0xFFBA68C8, 0xFF8E24AA, 0xFF4A148C};
+            case 0xFFD81B60: return new int[]{0xFFF8BBD0, 0xFFF06292, 0xFFD81B60, 0xFF880E4F};
+            case 0xFF6D4C41: return new int[]{0xFFD7CCC8, 0xFFA1887F, 0xFF6D4C41, 0xFF3E2723};
+            case 0xFF546E7A: return new int[]{0xFFCFD8DC, 0xFF90A4AE, 0xFF546E7A, 0xFF263238};
+            default:         return new int[]{gridColor, gridColor, gridColor, gridColor};
+        }
+    }
 
     private Button toggleBtn, prevDayBtn, nextDayBtn, settingsBtn;
     private Button dayViewBtn, weekViewBtn, exportBtn, importBtn;
@@ -584,43 +594,113 @@ public class MainActivity extends Activity {
             .show();
     }
 
-    // ======== Entry color picker ========
+    // ======== Shared color picker with brightness row ========
 
-    private void showEntryColorPicker(ActivityEntry entry) {
+    private interface ColorCallback { void onColor(int color); }
+
+    private void showColorPickerDialog(int currentColor, ColorCallback callback) {
         AlertDialog dialog = new AlertDialog.Builder(this).create();
-
-        GridLayout grid = new GridLayout(this);
-        grid.setColumnCount(6);
         float d = getResources().getDisplayMetrics().density;
         int pad = (int)(12 * d);
-        grid.setPadding(pad, pad, pad, pad);
 
-        for (int color : ENTRY_COLORS) {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(pad, pad, pad, pad);
+
+        // --- Brightness row (top) ---
+        LinearLayout brightnessRow = new LinearLayout(this);
+        brightnessRow.setOrientation(LinearLayout.HORIZONTAL);
+        brightnessRow.setGravity(Gravity.CENTER);
+        root.addView(brightnessRow);
+
+        // Find which grid color the current color belongs to
+        int initialGrid = findGridColorFor(currentColor);
+        populateBrightnessRow(brightnessRow, initialGrid, currentColor, d, callback, dialog);
+
+        // --- Divider ---
+        View divider = new View(this);
+        LinearLayout.LayoutParams divLp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, (int)(1 * d));
+        divLp.setMargins(0, (int)(10 * d), 0, (int)(8 * d));
+        divider.setLayoutParams(divLp);
+        divider.setBackgroundColor(0x44FFFFFF);
+        root.addView(divider);
+
+        // --- 4x5 grid ---
+        GridLayout grid = new GridLayout(this);
+        grid.setColumnCount(4);
+
+        for (int color : GRID_COLORS) {
             View sw = new View(this);
             GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-            lp.width = (int)(40 * d);
-            lp.height = (int)(40 * d);
-            lp.setMargins((int)(4*d), (int)(4*d), (int)(4*d), (int)(4*d));
+            lp.width = (int)(52 * d);
+            lp.height = (int)(52 * d);
+            lp.setMargins((int)(5*d), (int)(5*d), (int)(5*d), (int)(5*d));
             sw.setLayoutParams(lp);
 
             GradientDrawable bg = new GradientDrawable();
             bg.setShape(GradientDrawable.RECTANGLE);
             bg.setCornerRadius(6 * d);
             bg.setColor(color);
-            if (color == entry.getColor()) bg.setStroke((int)(3*d), 0xFFFFFFFF);
+            if (color == currentColor) bg.setStroke((int)(3*d), 0xFFFFFFFF);
             sw.setBackground(bg);
 
             final int c = color;
             sw.setOnClickListener(v -> {
-                dbHelper.updateColorByName(entry.getName(), c);
-                loadData();
-                dialog.dismiss();
+                populateBrightnessRow(brightnessRow, c, -1, d, callback, dialog);
             });
             grid.addView(sw);
         }
 
-        dialog.setView(grid);
+        root.addView(grid);
+        dialog.setView(root);
         dialog.show();
+    }
+
+    private void populateBrightnessRow(LinearLayout row, int gridColor,
+                                        int currentColor, float d,
+                                        ColorCallback callback, AlertDialog dialog) {
+        row.removeAllViews();
+        int[] variants = brightnessVariants(gridColor);
+        for (int color : variants) {
+            View sw = new View(this);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                (int)(52 * d), (int)(52 * d));
+            lp.setMargins((int)(5*d), (int)(5*d), (int)(5*d), (int)(5*d));
+            sw.setLayoutParams(lp);
+
+            GradientDrawable bg = new GradientDrawable();
+            bg.setShape(GradientDrawable.RECTANGLE);
+            bg.setCornerRadius(6 * d);
+            bg.setColor(color);
+            if (color == currentColor) bg.setStroke((int)(3*d), 0xFFFFFFFF);
+            sw.setBackground(bg);
+
+            final int c = color;
+            sw.setOnClickListener(v -> {
+                callback.onColor(c);
+                dialog.dismiss();
+            });
+            row.addView(sw);
+        }
+    }
+
+    private int findGridColorFor(int color) {
+        for (int gridColor : GRID_COLORS) {
+            int[] variants = brightnessVariants(gridColor);
+            for (int v : variants) {
+                if (v == color) return gridColor;
+            }
+        }
+        // Default to first grid color if not found
+        return GRID_COLORS[0];
+    }
+
+    private void showEntryColorPicker(ActivityEntry entry) {
+        showColorPickerDialog(entry.getColor(), color -> {
+            dbHelper.updateColorByName(entry.getName(), color);
+            loadData();
+        });
     }
 
     // ======== Export / Import ========
@@ -735,10 +815,6 @@ public class MainActivity extends Activity {
     }
 
     // ======== Settings dialog ========
-
-    private interface ColorCallback {
-        void onColor(int color);
-    }
 
     private void showSettingsDialog() {
         float d = getResources().getDisplayMetrics().density;
@@ -948,39 +1024,7 @@ public class MainActivity extends Activity {
     }
 
     private void showSettingsColorPicker(int current, ColorCallback callback) {
-        AlertDialog dialog = new AlertDialog.Builder(this).create();
-        float d = getResources().getDisplayMetrics().density;
-
-        GridLayout grid = new GridLayout(this);
-        grid.setColumnCount(4);
-        int pad = (int)(12 * d);
-        grid.setPadding(pad, pad, pad, pad);
-
-        for (int color : SETTINGS_COLORS) {
-            View sw = new View(this);
-            GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-            lp.width = (int)(52 * d);
-            lp.height = (int)(52 * d);
-            lp.setMargins((int)(5*d), (int)(5*d), (int)(5*d), (int)(5*d));
-            sw.setLayoutParams(lp);
-
-            GradientDrawable bg = new GradientDrawable();
-            bg.setShape(GradientDrawable.RECTANGLE);
-            bg.setCornerRadius(6 * d);
-            bg.setColor(color);
-            if (color == current) bg.setStroke((int)(3*d), 0xFFFFFFFF);
-            sw.setBackground(bg);
-
-            final int c = color;
-            sw.setOnClickListener(v -> {
-                callback.onColor(c);
-                dialog.dismiss();
-            });
-            grid.addView(sw);
-        }
-
-        dialog.setView(grid);
-        dialog.show();
+        showColorPickerDialog(current, callback);
     }
 
     private void addSpacer(LinearLayout parent, int dp) {
