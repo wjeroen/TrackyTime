@@ -12,6 +12,7 @@ import android.widget.TextView;
  */
 public class StrokeTextView extends TextView {
     private boolean strokeEnabled = true;
+    private float strokeWidth = 4f;
 
     public StrokeTextView(Context context) {
         super(context);
@@ -27,6 +28,11 @@ public class StrokeTextView extends TextView {
 
     public void setStrokeEnabled(boolean enabled) {
         this.strokeEnabled = enabled;
+        invalidate();
+    }
+
+    public void setStrokeWidth(float width) {
+        this.strokeWidth = width;
         invalidate();
     }
 
@@ -60,7 +66,7 @@ public class StrokeTextView extends TextView {
         // Draw stroke: change VIEW's color so super.onDraw() uses it
         setTextColor(strokeColor);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(4f); // 4px stroke
+        paint.setStrokeWidth(strokeWidth);
         super.onDraw(canvas);
 
         // Draw fill: restore VIEW's original color

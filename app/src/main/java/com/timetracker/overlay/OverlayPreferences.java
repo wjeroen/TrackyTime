@@ -43,6 +43,14 @@ public class OverlayPreferences {
     public boolean isTextStrokeEnabled() { return sp.getBoolean("text_stroke", false); }
     public void setTextStrokeEnabled(boolean on) { sp.edit().putBoolean("text_stroke", on).apply(); }
 
+    // Stroke width in pixels (1-10, default 4) — applies to text stroke AND icon stroke
+    public int getStrokeWidth() { return sp.getInt("stroke_width", 4); }
+    public void setStrokeWidth(int w) { sp.edit().putInt("stroke_width", w).apply(); }
+
+    // UI elements opacity (50-255, default 0x99=153) — buttons, separator, hint text, paused timer
+    public int getUiElementsOpacity() { return sp.getInt("ui_elements_opacity", 0x99); }
+    public void setUiElementsOpacity(int o) { sp.edit().putInt("ui_elements_opacity", o).apply(); }
+
     // 0=small, 1=medium, 2=large, 3=extra large
     public int getSize() { return sp.getInt("size", 0); }
     public void setSize(int s) { sp.edit().putInt("size", s).apply(); }
@@ -112,6 +120,8 @@ public class OverlayPreferences {
         sb.append("borderWidth:").append(getBorderWidth()).append(",");
         sb.append("overlayPulse:").append(isOverlayPulseEnabled()).append(",");
         sb.append("textStroke:").append(isTextStrokeEnabled()).append(",");
+        sb.append("strokeWidth:").append(getStrokeWidth()).append(",");
+        sb.append("uiElementsOpacity:").append(getUiElementsOpacity()).append(",");
         sb.append("size:").append(getSize());
         return sb.toString();
     }
@@ -149,6 +159,12 @@ public class OverlayPreferences {
                         break;
                     case "textStroke":
                         setTextStrokeEnabled(Boolean.parseBoolean(value));
+                        break;
+                    case "strokeWidth":
+                        setStrokeWidth(Integer.parseInt(value));
+                        break;
+                    case "uiElementsOpacity":
+                        setUiElementsOpacity(Integer.parseInt(value));
                         break;
                     case "size":
                         setSize(Integer.parseInt(value));

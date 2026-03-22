@@ -835,8 +835,68 @@ public class MainActivity extends Activity {
         strokeCb.setTextColor(0xFFCDD6F4);
         strokeCb.setTextSize(14f);
         strokeCb.setChecked(prefs.isTextStrokeEnabled());
-        strokeCb.setOnCheckedChangeListener((btn, checked) -> prefs.setTextStrokeEnabled(checked));
         layout.addView(strokeCb);
+
+        // Stroke width slider (only visible when stroke is enabled)
+        addSpacer(layout, 8);
+        TextView strokeLabel = new TextView(this);
+        int sw = prefs.getStrokeWidth();
+        strokeLabel.setText("Stroke Width: " + sw + "px");
+        strokeLabel.setTextColor(0xFFCDD6F4);
+        strokeLabel.setTextSize(14f);
+        strokeLabel.setVisibility(prefs.isTextStrokeEnabled() ? View.VISIBLE : View.GONE);
+        layout.addView(strokeLabel);
+
+        SeekBar strokeBar = new SeekBar(this);
+        strokeBar.setMax(9); // 1-10 (offset by 1)
+        strokeBar.setProgress(prefs.getStrokeWidth() - 1);
+        strokeBar.setVisibility(prefs.isTextStrokeEnabled() ? View.VISIBLE : View.GONE);
+        strokeBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int val, boolean u) {
+                strokeLabel.setText("Stroke Width: " + (val + 1) + "px");
+            }
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {
+                prefs.setStrokeWidth(sb.getProgress() + 1);
+            }
+        });
+        layout.addView(strokeBar);
+
+        // Toggle stroke checkbox shows/hides stroke width slider
+        strokeCb.setOnCheckedChangeListener((btn, checked) -> {
+            prefs.setTextStrokeEnabled(checked);
+            strokeLabel.setVisibility(checked ? View.VISIBLE : View.GONE);
+            strokeBar.setVisibility(checked ? View.VISIBLE : View.GONE);
+        });
+
+        // UI elements opacity (buttons, separator, hint text, paused clock)
+        addSpacer(layout, 14);
+        TextView uiOpLabel = new TextView(this);
+        uiOpLabel.setText("UI Elements Opacity: " + (prefs.getUiElementsOpacity() * 100 / 255) + "%");
+        uiOpLabel.setTextColor(0xFFCDD6F4);
+        uiOpLabel.setTextSize(15f);
+        layout.addView(uiOpLabel);
+
+        TextView uiOpHint = new TextView(this);
+        uiOpHint.setText("Buttons, separator, hints, paused clock");
+        uiOpHint.setTextColor(0xFF9399B2);
+        uiOpHint.setTextSize(12f);
+        layout.addView(uiOpHint);
+
+        SeekBar uiOpBar = new SeekBar(this);
+        uiOpBar.setMax(255);
+        uiOpBar.setMin(25);
+        uiOpBar.setProgress(prefs.getUiElementsOpacity());
+        uiOpBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int val, boolean u) {
+                uiOpLabel.setText("UI Elements Opacity: " + (val * 100 / 255) + "%");
+            }
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {
+                prefs.setUiElementsOpacity(sb.getProgress());
+            }
+        });
+        layout.addView(uiOpBar);
 
         new AlertDialog.Builder(this)
             .setTitle("Overlay Settings")

@@ -18,6 +18,7 @@ import android.widget.EditText;
  */
 public class StrokeEditText extends EditText {
     private boolean strokeEnabled = true;
+    private float strokeWidth = 4f;
 
     public StrokeEditText(Context context) {
         super(context);
@@ -33,6 +34,11 @@ public class StrokeEditText extends EditText {
 
     public void setStrokeEnabled(boolean enabled) {
         this.strokeEnabled = enabled;
+        invalidate();
+    }
+
+    public void setStrokeWidth(float width) {
+        this.strokeWidth = width;
         invalidate();
     }
 
@@ -94,7 +100,7 @@ public class StrokeEditText extends EditText {
 
             paint.setColor(strokeColor);
             paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(4f);
+            paint.setStrokeWidth(strokeWidth);
             layout.draw(canvas);
 
             // Restore paint state

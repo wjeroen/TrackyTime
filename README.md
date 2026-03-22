@@ -33,7 +33,7 @@
 - **Tap date to return to today**: tapping the date/week text in the header jumps back to the present day or current week.
 - Date navigation (prev/next day or week)
 - Export/Import/Settings buttons at the top (above history) for quick access
-- Settings: background color, text color, border color (accent), border width (0–6dp), background opacity, text size, breathing overlay toggle
+- Settings: background color, text color, border color (accent), border width (0–6dp), background opacity, text size, breathing overlay toggle, text stroke toggle + stroke width slider (1–10px, appears when stroke enabled), UI elements opacity (buttons, separator, hints, paused clock)
 - **Export**: save all data as JSON to any location (Google Drive, email, etc.). Also includes quick-select shortcut names.
 - **Import**: restore data from a JSON backup (skips duplicates). Restores quick-select shortcuts if present. Backward-compatible with older exports that don't have shortcuts.
 
@@ -50,10 +50,11 @@
 - Import deduplication is also case/space-insensitive
 
 ### Opacity
-- The opacity slider sets the **opacity** of the overlay background and border (default ~60%)
+- The **background opacity** slider sets the opacity of the overlay background and border (default ~60%)
 - With breathing enabled: border pulses from fully transparent up to this opacity; background shifts inversely (darkest when border is gone, normal when border is visible)
 - Without breathing: everything stays at the set opacity
-- Text, timer, and timeline bar are always fully visible (100% alpha)
+- Text (activity name) and timeline bar are always fully visible (100% alpha)
+- The **UI elements opacity** slider controls the transparency of secondary UI elements: close/add/open-app buttons, separator dot, hint text, play buttons in quick-select rows, and the timer when paused (default ~60%, range 10–100%)
 
 ## Quick Reference File Structure
 
@@ -76,7 +77,7 @@
 | `app/src/main/java/.../StrokeTextView.java` | Custom TextView with TV subtitle-style text stroke/outline — auto-contrast via ITU BT.601 brightness (black stroke for light text, white for dark) |
 | `app/src/main/java/.../StrokeEditText.java` | Custom EditText with same stroke/outline — uses Layout.draw() directly to bypass Editor's hardware-acceleration cache |
 | `app/src/main/java/.../StrokeImageView.java` | Custom ImageView with same stroke outline — draws icon at 8 offset positions in contrasting color, then normally on top (same auto-contrast as StrokeTextView) |
-| `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance (bg/text/border colors, border width, opacity, size, overlay pulse toggle, text stroke toggle, quick-select activities) + crash recovery checkpoint (separate `crash_recovery` file) |
+| `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance (bg/text/border colors, border width, opacity, size, overlay pulse toggle, text stroke toggle + stroke width, UI elements opacity, quick-select activities) + crash recovery checkpoint (separate `crash_recovery` file) |
 | `.github/workflows/android.yml` | GitHub Actions workflow — builds APK on every push |
 
 > **Note:** Java files live under `app/src/main/java/com/timetracker/overlay/`. The `...` above abbreviates that path.

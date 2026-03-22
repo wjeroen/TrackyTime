@@ -234,18 +234,19 @@ public class OverlayService extends Service {
 
         // Text: always fully opaque
         int textColor = prefs.getTextColor();
+        int uiOpacity = prefs.getUiElementsOpacity();
 
         timerText.setTextColor(textColor);
-        separator.setTextColor((textColor & 0x00FFFFFF) | 0x66000000);
+        separator.setTextColor((textColor & 0x00FFFFFF) | (uiOpacity << 24));
         editText.setTextColor(textColor);
-        editText.setHintTextColor((textColor & 0x00FFFFFF) | 0x99000000);
+        editText.setHintTextColor((textColor & 0x00FFFFFF) | (uiOpacity << 24));
         // Force EditText to redraw after color change (needed for stroke updates)
         editText.invalidate();
 
-        // Icon button tints
-        addBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x99000000));
-        openAppBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x99000000));
-        closeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x99000000));
+        // Icon button tints (use UI elements opacity)
+        addBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | (uiOpacity << 24)));
+        openAppBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | (uiOpacity << 24)));
+        closeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | (uiOpacity << 24)));
 
         // Unified text size for text elements
         float textSize = prefs.getTextSize();
@@ -270,12 +271,20 @@ public class OverlayService extends Service {
 
         // Text stroke (TV subtitle style with auto-contrast)
         boolean strokeEnabled = prefs.isTextStrokeEnabled();
+        int strokeWidth = prefs.getStrokeWidth();
+        float strokeWidthScale = strokeWidth / 4f; // 4px = default = 1.0x scale for icons
         timerText.setStrokeEnabled(strokeEnabled);
+        timerText.setStrokeWidth(strokeWidth);
         editText.setStrokeEnabled(strokeEnabled);
+        editText.setStrokeWidth(strokeWidth);
         separator.setStrokeEnabled(strokeEnabled);
+        separator.setStrokeWidth(strokeWidth);
         addBtn.setStrokeEnabled(strokeEnabled);
+        addBtn.setStrokeWidthScale(strokeWidthScale);
         openAppBtn.setStrokeEnabled(strokeEnabled);
+        openAppBtn.setStrokeWidthScale(strokeWidthScale);
         closeBtn.setStrokeEnabled(strokeEnabled);
+        closeBtn.setStrokeWidthScale(strokeWidthScale);
 
         // Timeline bar corner radius (not affected by opacity)
         timelineBar.setCornerRadius(2 * density);
@@ -288,17 +297,20 @@ public class OverlayService extends Service {
             StrokeTextView playBtn = (StrokeTextView) row.getChildAt(0);
             StrokeEditText nameField = (StrokeEditText) row.getChildAt(1);
             StrokeImageView removeBtn = (StrokeImageView) row.getChildAt(2);
-            playBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
+            playBtn.setTextColor((textColor & 0x00FFFFFF) | (uiOpacity << 24));
             playBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
             playBtn.setStrokeEnabled(strokeEnabled);
+            playBtn.setStrokeWidth(strokeWidth);
             nameField.setTextColor(textColor);
-            nameField.setHintTextColor((textColor & 0x00FFFFFF) | 0x99000000);
+            nameField.setHintTextColor((textColor & 0x00FFFFFF) | (uiOpacity << 24));
             // Force EditText to redraw after color change (needed for stroke updates)
             nameField.invalidate();
             nameField.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
             nameField.setStrokeEnabled(strokeEnabled);
-            removeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x99000000));
+            nameField.setStrokeWidth(strokeWidth);
+            removeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | (uiOpacity << 24)));
             removeBtn.setStrokeEnabled(strokeEnabled);
+            removeBtn.setStrokeWidthScale(strokeWidthScale);
             // Update icon size
             LinearLayout.LayoutParams removeBtnParams = new LinearLayout.LayoutParams(
                 quickSelectIconSize, quickSelectIconSize);
@@ -529,7 +541,8 @@ public class OverlayService extends Service {
     }
 
     private void showTimerPaused() {
-        timerText.setAlpha(0x99 / 255f);
+        int uiOpacity = new OverlayPreferences(this).getUiElementsOpacity();
+        timerText.setAlpha(uiOpacity / 255f);
         stopProgressPulse();
         currentPulseDuration = 0; // force pulse recalculation on resume
         timelineBar.setPulseAlpha(1.0f); // fully opaque when paused
@@ -790,6 +803,9 @@ public class OverlayService extends Service {
         float textSize = prefs.getTextSize();
         int textColor = prefs.getTextColor();
         boolean strokeEnabled = prefs.isTextStrokeEnabled();
+        int strokeWidthPref = prefs.getStrokeWidth();
+        float strokeScalePref = strokeWidthPref / 4f;
+        int uiOpacity = prefs.getUiElementsOpacity();
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -800,16 +816,17 @@ public class OverlayService extends Service {
         StrokeTextView playBtn = new StrokeTextView(this);
         playBtn.setText("▶");
         playBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
-        playBtn.setTextColor((textColor & 0x00FFFFFF) | 0x99000000);
+        playBtn.setTextColor((textColor & 0x00FFFFFF) | (uiOpacity << 24));
         playBtn.setPadding(0, 0, (int) (6 * density), 0);
         playBtn.setIncludeFontPadding(false);
         playBtn.setStrokeEnabled(strokeEnabled);
+        playBtn.setStrokeWidth(strokeWidthPref);
 
         // Activity name
         StrokeEditText nameField = new StrokeEditText(this);
         nameField.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         nameField.setTextColor(textColor);
-        nameField.setHintTextColor((textColor & 0x00FFFFFF) | 0x99000000);
+        nameField.setHintTextColor((textColor & 0x00FFFFFF) | (uiOpacity << 24));
         nameField.setBackground(null);
         nameField.setSingleLine(true);
         nameField.setImeOptions(EditorInfo.IME_ACTION_DONE);
@@ -820,6 +837,7 @@ public class OverlayService extends Service {
         nameField.setMaxWidth((int) (140 * density));
         if (!name.isEmpty()) nameField.setText(name);
         nameField.setStrokeEnabled(strokeEnabled);
+        nameField.setStrokeWidth(strokeWidthPref);
         LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(
             0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         nameField.setLayoutParams(nameParams);
@@ -827,8 +845,9 @@ public class OverlayService extends Service {
         // Remove button X icon
         StrokeImageView removeBtn = new StrokeImageView(this);
         removeBtn.setImageResource(R.drawable.ic_close);
-        removeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | 0x99000000));
+        removeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | (uiOpacity << 24)));
         removeBtn.setStrokeEnabled(strokeEnabled);
+        removeBtn.setStrokeWidthScale(strokeScalePref);
         removeBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
         int iconSize = (int) (textSize * 1.2f * density);
         LinearLayout.LayoutParams removeBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
