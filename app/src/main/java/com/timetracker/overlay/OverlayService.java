@@ -620,25 +620,16 @@ public class OverlayService extends Service {
         if (factor > 1f) factor = 1f;
         float dimFactor = 1f - factor; // 1.0 at peak dim, 0.0 at rest
 
-        // --- Transparency: opacity oscillation ---
-        float transAmount = cachedBreathingTransparency / 50f; // -1.0 to +1.0
-
-        // Border opacity oscillation
+        // --- Border: always breathes from transparent → border opacity ---
         if (cachedBorderWidth > 0 && overlayBorderDrawable != null) {
-            int baseAlpha = cachedBorderOpacity;
-            int alphaChange = (int) (baseAlpha * Math.abs(transAmount) * dimFactor);
-            int borderAlpha;
-            if (transAmount >= 0) {
-                borderAlpha = Math.max(0, baseAlpha - alphaChange);
-            } else {
-                borderAlpha = Math.min(255, baseAlpha + alphaChange);
-            }
+            int borderAlpha = (int) (cachedBorderOpacity * factor); // 0 at dim, full at rest
             int borderWidthPx = (int) (cachedBorderWidth * cachedDensity);
             overlayBorderDrawable.setStroke(borderWidthPx,
                 (borderAlpha << 24) | (cachedAccentColor & 0x00FFFFFF));
         }
 
-        // Background opacity oscillation (subtler: 30% of the border effect)
+        // --- Transparency slider: controls background opacity oscillation only ---
+        float transAmount = cachedBreathingTransparency / 50f; // -1.0 to +1.0
         int bgAlphaChange = (int) (cachedBgOpacity * Math.abs(transAmount) * dimFactor * 0.3f);
         int newAlpha;
         if (transAmount >= 0) {
