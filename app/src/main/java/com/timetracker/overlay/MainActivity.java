@@ -600,6 +600,15 @@ public class MainActivity extends Activity {
     private interface ColorCallback { void onColor(int color); }
 
     private void showColorPickerDialog(int currentColor, ColorCallback callback) {
+        showColorPickerDialog(currentColor, callback, null);
+    }
+
+    /**
+     * @param previewCallback if non-null, called on every tap for live preview.
+     *                        On cancel, called with originalColor to revert.
+     */
+    private void showColorPickerDialog(int currentColor, ColorCallback callback,
+                                        ColorCallback previewCallback) {
         float d = getResources().getDisplayMetrics().density;
         int pad = (int)(12 * d);
         int swatchSize = (int)(52 * d);
@@ -665,8 +674,9 @@ public class MainActivity extends Activity {
                 } else {
                     selected[0] = variants[2]; // 600-level default
                 }
+                if (previewCallback != null) previewCallback.onColor(selected[0]);
                 refreshColorPickerSelection(grid, brightnessRow, c, selected, d,
-                    swatchSize, swatchMargin);
+                    swatchSize, swatchMargin, previewCallback);
             });
             grid.addView(sw);
         }
@@ -675,7 +685,7 @@ public class MainActivity extends Activity {
 
         // Populate initial brightness row
         populateBrightnessRow(brightnessRow, initialGrid, selected, d,
-            swatchSize, swatchMargin, grid);
+            swatchSize, swatchMargin, grid, previewCallback);
 
         // --- OK / Cancel buttons ---
         LinearLayout buttonRow = new LinearLayout(this);
@@ -702,11 +712,24 @@ public class MainActivity extends Activity {
         Dialog dialog = new Dialog(this);
         dialog.setContentView(root);
 
-        cancelBtn.setOnClickListener(v -> dialog.dismiss());
+        // Track whether OK was pressed (to distinguish from dismiss-by-back-button)
+        final boolean[] confirmed = { false };
+
+        cancelBtn.setOnClickListener(v -> dialog.dismiss()); // dismiss triggers revert below
         okBtn.setOnClickListener(v -> {
+            confirmed[0] = true;
             callback.onColor(selected[0]);
             dialog.dismiss();
         });
+
+        // Revert on any dismiss that isn't OK (cancel button, back button, tap outside)
+        if (previewCallback != null) {
+            dialog.setOnDismissListener(d2 -> {
+                if (!confirmed[0]) {
+                    previewCallback.onColor(currentColor); // revert to original
+                }
+            });
+        }
 
         dialog.show();
         if (dialog.getWindow() != null) {
@@ -723,7 +746,8 @@ public class MainActivity extends Activity {
     /** Refresh both brightness row and grid selection indicators. */
     private void refreshColorPickerSelection(GridLayout grid, LinearLayout brightnessRow,
                                               int activeGridColor, int[] selected,
-                                              float d, int swatchSize, int swatchMargin) {
+                                              float d, int swatchSize, int swatchMargin,
+                                              ColorCallback previewCallback) {
         // Update grid swatches — highlight the active grid color family
         for (int i = 0; i < grid.getChildCount(); i++) {
             View child = grid.getChildAt(i);
@@ -737,13 +761,14 @@ public class MainActivity extends Activity {
         }
 
         populateBrightnessRow(brightnessRow, activeGridColor, selected, d,
-            swatchSize, swatchMargin, grid);
+            swatchSize, swatchMargin, grid, previewCallback);
     }
 
     private void populateBrightnessRow(LinearLayout row, int gridColor,
                                         int[] selected, float d,
                                         int swatchSize, int swatchMargin,
-                                        GridLayout grid) {
+                                        GridLayout grid,
+                                        ColorCallback previewCallback) {
         row.removeAllViews();
         int[] variants = brightnessVariants(gridColor);
         for (int color : variants) {
@@ -763,6 +788,7 @@ public class MainActivity extends Activity {
             final int c = color;
             sw.setOnClickListener(v -> {
                 selected[0] = c;
+                if (previewCallback != null) previewCallback.onColor(c);
                 // Refresh brightness row selection
                 for (int i = 0; i < row.getChildCount(); i++) {
                     View child = row.getChildAt(i);
@@ -917,9 +943,9 @@ public class MainActivity extends Activity {
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding((int)(20*d), (int)(12*d), (int)(20*d), (int)(8*d));
 
-        addColorRow(layout, "Background", prefs.getBgColor(), c -> prefs.setBgColor(c));
-        addColorRow(layout, "Text Color", prefs.getTextColor(), c -> prefs.setTextColor(c));
-        addColorRow(layout, "Border Color", prefs.getAccentColor(), c -> prefs.setAccentColor(c));
+        addColorRow(layout, "Background", () -> prefs.getBgColor(), c -> prefs.setBgColor(c));
+        addColorRow(layout, "Text Color", () -> prefs.getTextColor(), c -> prefs.setTextColor(c));
+        addColorRow(layout, "Border Color", () -> prefs.getAccentColor(), c -> prefs.setAccentColor(c));
 
         // Opacity
         addSpacer(layout, 14);
@@ -1165,7 +1191,8 @@ public class MainActivity extends Activity {
             .show();
     }
 
-    private void addColorRow(LinearLayout parent, String label, int current,
+    private void addColorRow(LinearLayout parent, String label,
+                             java.util.function.IntSupplier colorGetter,
                              ColorCallback callback) {
         float d = getResources().getDisplayMetrics().density;
 
@@ -1185,14 +1212,22 @@ public class MainActivity extends Activity {
         View swatch = new View(this);
         int sz = (int)(40 * d);
         swatch.setLayoutParams(new LinearLayout.LayoutParams(sz, sz));
-        setSwatchColor(swatch, current, d);
+        setSwatchColor(swatch, colorGetter.getAsInt(), d);
 
-        swatch.setOnClickListener(v ->
-            showSettingsColorPicker(current, color -> {
+        swatch.setOnClickListener(v -> {
+            int current = colorGetter.getAsInt(); // read CURRENT pref value
+            // Preview callback: writes to prefs immediately so overlay updates live.
+            // On cancel, reverts to the color read at open time.
+            ColorCallback preview = color -> {
                 callback.onColor(color);
                 setSwatchColor(swatch, color, d);
-            })
-        );
+            };
+            showColorPickerDialog(current, color -> {
+                // OK: already previewed, just ensure final save
+                callback.onColor(color);
+                setSwatchColor(swatch, color, d);
+            }, preview);
+        });
 
         row.addView(swatch);
         parent.addView(row);
@@ -1205,10 +1240,6 @@ public class MainActivity extends Activity {
         bg.setColor(color);
         bg.setStroke((int)(1 * density), 0x44FFFFFF);
         v.setBackground(bg);
-    }
-
-    private void showSettingsColorPicker(int current, ColorCallback callback) {
-        showColorPickerDialog(current, callback);
     }
 
     private void addSpacer(LinearLayout parent, int dp) {
