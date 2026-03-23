@@ -79,7 +79,8 @@ public class OverlayService extends Service {
 
     // Cached values for overlay pulse (avoid reading prefs every animation frame)
     private boolean cachedOverlayPulseEnabled = true;
-    private int cachedBgColor, cachedBgOpacity, cachedAccentColor, cachedBorderWidth;
+    private int cachedBgColor, cachedBgOpacity, cachedBorderOpacity, cachedAccentColor, cachedBorderWidth;
+    private int cachedBreathingTransparency, cachedBreathingBrightness;
     private float cachedDensity;
 
     // Throttle animation updates to 30fps (~33ms between frames)
@@ -206,7 +207,8 @@ public class OverlayService extends Service {
 
         if (borderWidth > 0) {
             int accentColor = prefs.getAccentColor();
-            int borderColor = (bgOpacity << 24) | (accentColor & 0x00FFFFFF);
+            int borderOpacity = prefs.getBorderOpacity();
+            int borderColor = (borderOpacity << 24) | (accentColor & 0x00FFFFFF);
 
             // Stroke-only layer: transparent fill, just the border line
             // Corner radius set so inner edge of stroke matches bg fill's radius
@@ -559,8 +561,11 @@ public class OverlayService extends Service {
         cachedOverlayPulseEnabled = prefs.isOverlayPulseEnabled();
         cachedBgColor = prefs.getBgColor();
         cachedBgOpacity = prefs.getOpacity();
+        cachedBorderOpacity = prefs.getBorderOpacity();
         cachedAccentColor = prefs.getAccentColor();
         cachedBorderWidth = prefs.getBorderWidth();
+        cachedBreathingTransparency = prefs.getBreathingTransparency();
+        cachedBreathingBrightness = prefs.getBreathingBrightness();
         cachedDensity = getResources().getDisplayMetrics().density;
     }
 
@@ -597,51 +602,73 @@ public class OverlayService extends Service {
         }
     }
 
-    /** Animate border stroke + shift background (darken or brighten) in sync. */
+    /**
+     * Animate border opacity + background color/opacity in sync with timeline pulse.
+     *
+     * Transparency slider (-50 to +50): controls opacity oscillation.
+     *   Positive = more transparent at dim point, negative = more opaque.
+     * Brightness slider (-50 to +50): controls color shift.
+     *   Negative = darken toward black, positive = brighten toward white.
+     */
     private void applyOverlayPulse(float pulseAlpha) {
         if (!cachedOverlayPulseEnabled) return;
         if (overlayBgFill == null) return;
 
-        // Normalized factor: 0.0 (pulse dim/transparent) to 1.0 (pulse bright/opaque)
+        // Normalized factor: 0.0 (dim point) to 1.0 (resting/bright)
         float factor = (pulseAlpha - 0.3f) / 0.7f;
         if (factor < 0f) factor = 0f;
         if (factor > 1f) factor = 1f;
+        float dimFactor = 1f - factor; // 1.0 at peak dim, 0.0 at rest
 
-        // 1. Border pulse: fully transparent → user's opacity (only when border exists)
+        // --- Transparency: opacity oscillation ---
+        float transAmount = cachedBreathingTransparency / 50f; // -1.0 to +1.0
+
+        // Border opacity oscillation
         if (cachedBorderWidth > 0 && overlayBorderDrawable != null) {
-            int borderAlpha = (int) (cachedBgOpacity * factor);
+            int baseAlpha = cachedBorderOpacity;
+            int alphaChange = (int) (baseAlpha * Math.abs(transAmount) * dimFactor);
+            int borderAlpha;
+            if (transAmount >= 0) {
+                borderAlpha = Math.max(0, baseAlpha - alphaChange);
+            } else {
+                borderAlpha = Math.min(255, baseAlpha + alphaChange);
+            }
             int borderWidthPx = (int) (cachedBorderWidth * cachedDensity);
             overlayBorderDrawable.setStroke(borderWidthPx,
                 (borderAlpha << 24) | (cachedAccentColor & 0x00FFFFFF));
         }
 
-        // 2. Background shift: inverted — darkest/brightest when border is gone
-        float bgFactor = 1f - factor;
-        float maxShift = 0.25f;
-        float shift = bgFactor * maxShift;
+        // Background opacity oscillation (subtler: 30% of the border effect)
+        int bgAlphaChange = (int) (cachedBgOpacity * Math.abs(transAmount) * dimFactor * 0.3f);
+        int newAlpha;
+        if (transAmount >= 0) {
+            newAlpha = Math.max(0, cachedBgOpacity - bgAlphaChange);
+        } else {
+            newAlpha = Math.min(255, cachedBgOpacity + bgAlphaChange);
+        }
+
+        // --- Brightness: color shift ---
+        float maxShift = Math.abs(cachedBreathingBrightness) / 100f; // 0.0 to 0.5
+        float shift = dimFactor * maxShift;
 
         int r = (cachedBgColor >> 16) & 0xFF;
         int g = (cachedBgColor >> 8) & 0xFF;
         int b = cachedBgColor & 0xFF;
 
-        // Perceived brightness (simple average, 0–255). Below ~75 → brighten instead
-        int brightness = (r + g + b) / 3;
         int dr, dg, db;
-        if (brightness < 75) {
+        if (cachedBreathingBrightness > 0) {
             // Brighten: blend toward white
             dr = r + (int) ((255 - r) * shift);
             dg = g + (int) ((255 - g) * shift);
             db = b + (int) ((255 - b) * shift);
-        } else {
+        } else if (cachedBreathingBrightness < 0) {
             // Darken: blend toward black
             dr = (int) (r * (1 - shift));
             dg = (int) (g * (1 - shift));
             db = (int) (b * (1 - shift));
+        } else {
+            dr = r; dg = g; db = b;
         }
-
-        // Alpha: from user's opacity toward more opaque (30% of remaining range), inverted with bg
-        int alphaBoost = (int) (bgFactor * (255 - cachedBgOpacity) * 0.3f);
-        int newAlpha = Math.min(255, cachedBgOpacity + alphaBoost);
 
         overlayBgFill.setColor((newAlpha << 24) | (dr << 16) | (dg << 8) | db);
     }

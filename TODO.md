@@ -8,6 +8,8 @@
 ### Features to Implement
 - [ ] Add separate opacity slider for the timeline bar
 - [x] Unified color picker: 4x5 grid + brightness row (100/300/600/900) for both entries and settings (2026-03-22)
+- [x] Separate border opacity slider — independent from background opacity (2026-03-23)
+- [x] Customizable breathing: transparency + brightness sliders (-50% to +50%, 0 = center), replaces auto-detect darken/brighten (2026-03-23)
 
 ### Bug Fixes
 - [x] Fix text stroke width barely visible — use quadratic scaling (width²/4) so higher values are much more noticeable (2026-03-22)
@@ -54,6 +56,9 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Separate border opacity + customizable breathing sliders (transparency/brightness, -50% to +50%) (2026-03-23)
+- [x] Fix color picker white space — replaced AlertDialog with plain Dialog (2026-03-23)
+- [x] Fix text stroke scaling — linear (not quadratic), proportional to text size (2026-03-23)
 - [x] Add stroke width slider (1-10px, appears when text stroke enabled) — applies to text and icon strokes (2026-03-22)
 - [x] Add UI elements opacity slider (buttons, separator, hints, paused clock) — replaces hardcoded 0x99 (2026-03-22)
 - [x] Paused timer and hint text opacity match icon opacity (0x99); icon stroke follows stroke setting (2026-02-19)

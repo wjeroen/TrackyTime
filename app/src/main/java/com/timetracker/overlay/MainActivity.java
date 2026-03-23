@@ -956,16 +956,45 @@ public class MainActivity extends Activity {
         SeekBar borderBar = new SeekBar(this);
         borderBar.setMax(6);
         borderBar.setProgress(prefs.getBorderWidth());
+        layout.addView(borderBar);
+
+        // Border Opacity
+        addSpacer(layout, 8);
+        TextView borderOpLabel = new TextView(this);
+        borderOpLabel.setText("Border Opacity: " + (prefs.getBorderOpacity() * 100 / 255) + "%");
+        borderOpLabel.setTextColor(0xFFCDD6F4);
+        borderOpLabel.setTextSize(14f);
+        borderOpLabel.setVisibility(prefs.getBorderWidth() > 0 ? View.VISIBLE : View.GONE);
+        layout.addView(borderOpLabel);
+
+        SeekBar borderOpBar = new SeekBar(this);
+        borderOpBar.setMax(255);
+        borderOpBar.setMin(10);
+        borderOpBar.setProgress(prefs.getBorderOpacity());
+        borderOpBar.setVisibility(prefs.getBorderWidth() > 0 ? View.VISIBLE : View.GONE);
+        borderOpBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int val, boolean u) {
+                borderOpLabel.setText("Border Opacity: " + (val * 100 / 255) + "%");
+            }
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {
+                prefs.setBorderOpacity(sb.getProgress());
+            }
+        });
+        layout.addView(borderOpBar);
+
+        // Show/hide border opacity when border width changes
         borderBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar sb, int val, boolean u) {
                 borderLabel.setText(val == 0 ? "Border: Off" : "Border: " + val + "dp");
+                borderOpLabel.setVisibility(val > 0 ? View.VISIBLE : View.GONE);
+                borderOpBar.setVisibility(val > 0 ? View.VISIBLE : View.GONE);
             }
             public void onStartTrackingTouch(SeekBar sb) {}
             public void onStopTrackingTouch(SeekBar sb) {
                 prefs.setBorderWidth(sb.getProgress());
             }
         });
-        layout.addView(borderBar);
 
         // Size
         addSpacer(layout, 14);
@@ -996,8 +1025,69 @@ public class MainActivity extends Activity {
         pulseCb.setTextColor(0xFFCDD6F4);
         pulseCb.setTextSize(14f);
         pulseCb.setChecked(prefs.isOverlayPulseEnabled());
-        pulseCb.setOnCheckedChangeListener((btn, checked) -> prefs.setOverlayPulseEnabled(checked));
         layout.addView(pulseCb);
+
+        // Breathing transparency slider (-50 to +50, 0 = center)
+        addSpacer(layout, 8);
+        int initTrans = prefs.getBreathingTransparency();
+        TextView transLabel = new TextView(this);
+        transLabel.setText("Transparency: " + (initTrans > 0 ? "+" : "") + initTrans + "%");
+        transLabel.setTextColor(0xFFCDD6F4);
+        transLabel.setTextSize(14f);
+        transLabel.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
+        layout.addView(transLabel);
+
+        SeekBar transBar = new SeekBar(this);
+        transBar.setMin(-50);
+        transBar.setMax(50);
+        transBar.setProgress(prefs.getBreathingTransparency());
+        transBar.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
+        transBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int val, boolean u) {
+                transLabel.setText("Transparency: " + (val > 0 ? "+" : "") + val + "%");
+            }
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {
+                prefs.setBreathingTransparency(sb.getProgress());
+            }
+        });
+        layout.addView(transBar);
+
+        // Breathing brightness slider (-50 to +50, 0 = center)
+        addSpacer(layout, 4);
+        int initBright = prefs.getBreathingBrightness();
+        TextView brightLabel = new TextView(this);
+        brightLabel.setText("Brightness: " + (initBright > 0 ? "+" : "") + initBright + "%");
+        brightLabel.setTextColor(0xFFCDD6F4);
+        brightLabel.setTextSize(14f);
+        brightLabel.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
+        layout.addView(brightLabel);
+
+        SeekBar brightBar = new SeekBar(this);
+        brightBar.setMin(-50);
+        brightBar.setMax(50);
+        brightBar.setProgress(prefs.getBreathingBrightness());
+        brightBar.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
+        brightBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int val, boolean u) {
+                brightLabel.setText("Brightness: " + (val > 0 ? "+" : "") + val + "%");
+            }
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {
+                prefs.setBreathingBrightness(sb.getProgress());
+            }
+        });
+        layout.addView(brightBar);
+
+        // Toggle breathing checkbox shows/hides sub-sliders
+        pulseCb.setOnCheckedChangeListener((btn, checked) -> {
+            prefs.setOverlayPulseEnabled(checked);
+            int vis = checked ? View.VISIBLE : View.GONE;
+            transLabel.setVisibility(vis);
+            transBar.setVisibility(vis);
+            brightLabel.setVisibility(vis);
+            brightBar.setVisibility(vis);
+        });
 
         // Text stroke toggle
         CheckBox strokeCb = new CheckBox(this);
