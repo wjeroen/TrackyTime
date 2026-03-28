@@ -35,13 +35,35 @@ public class OverlayPreferences {
     public int getBorderWidth() { return sp.getInt("border_width", 2); }
     public void setBorderWidth(int w) { sp.edit().putInt("border_width", w).apply(); }
 
+    // Border opacity (0-255, default 153 ≈ 60%) — independent from background opacity
+    public int getBorderOpacity() { return sp.getInt("border_opacity", 153); }
+    public void setBorderOpacity(int o) { sp.edit().putInt("border_opacity", o).apply(); }
+
     // Overlay pulse (bg + border breathe in sync with timeline bar)
     public boolean isOverlayPulseEnabled() { return sp.getBoolean("overlay_pulse", true); }
     public void setOverlayPulseEnabled(boolean on) { sp.edit().putBoolean("overlay_pulse", on).apply(); }
 
+    // Breathing transparency (-50 to +50, default +30)
+    // Positive = more transparent at dim point, negative = more opaque
+    public int getBreathingTransparency() { return sp.getInt("breathing_transparency", 30); }
+    public void setBreathingTransparency(int v) { sp.edit().putInt("breathing_transparency", v).apply(); }
+
+    // Breathing brightness (-50 to +50, default -25)
+    // Positive = brighten, negative = darken
+    public int getBreathingBrightness() { return sp.getInt("breathing_brightness", -25); }
+    public void setBreathingBrightness(int v) { sp.edit().putInt("breathing_brightness", v).apply(); }
+
     // Text stroke/outline (TV subtitle style with auto-contrast)
     public boolean isTextStrokeEnabled() { return sp.getBoolean("text_stroke", false); }
     public void setTextStrokeEnabled(boolean on) { sp.edit().putBoolean("text_stroke", on).apply(); }
+
+    // Stroke width in pixels (1-10, default 4) — applies to text stroke AND icon stroke
+    public int getStrokeWidth() { return sp.getInt("stroke_width", 4); }
+    public void setStrokeWidth(int w) { sp.edit().putInt("stroke_width", w).apply(); }
+
+    // UI elements opacity (50-255, default 0x99=153) — buttons, separator, hint text, paused timer
+    public int getUiElementsOpacity() { return sp.getInt("ui_elements_opacity", 0x99); }
+    public void setUiElementsOpacity(int o) { sp.edit().putInt("ui_elements_opacity", o).apply(); }
 
     // 0=small, 1=medium, 2=large, 3=extra large
     public int getSize() { return sp.getInt("size", 0); }
@@ -110,8 +132,13 @@ public class OverlayPreferences {
         sb.append("opacity:").append(getOpacity()).append(",");
         sb.append("accentColor:0x").append(Integer.toHexString(getAccentColor())).append(",");
         sb.append("borderWidth:").append(getBorderWidth()).append(",");
+        sb.append("borderOpacity:").append(getBorderOpacity()).append(",");
         sb.append("overlayPulse:").append(isOverlayPulseEnabled()).append(",");
+        sb.append("breathingTransparency:").append(getBreathingTransparency()).append(",");
+        sb.append("breathingBrightness:").append(getBreathingBrightness()).append(",");
         sb.append("textStroke:").append(isTextStrokeEnabled()).append(",");
+        sb.append("strokeWidth:").append(getStrokeWidth()).append(",");
+        sb.append("uiElementsOpacity:").append(getUiElementsOpacity()).append(",");
         sb.append("size:").append(getSize());
         return sb.toString();
     }
@@ -144,11 +171,26 @@ public class OverlayPreferences {
                     case "borderWidth":
                         setBorderWidth(Integer.parseInt(value));
                         break;
+                    case "borderOpacity":
+                        setBorderOpacity(Integer.parseInt(value));
+                        break;
                     case "overlayPulse":
                         setOverlayPulseEnabled(Boolean.parseBoolean(value));
                         break;
+                    case "breathingTransparency":
+                        setBreathingTransparency(Integer.parseInt(value));
+                        break;
+                    case "breathingBrightness":
+                        setBreathingBrightness(Integer.parseInt(value));
+                        break;
                     case "textStroke":
                         setTextStrokeEnabled(Boolean.parseBoolean(value));
+                        break;
+                    case "strokeWidth":
+                        setStrokeWidth(Integer.parseInt(value));
+                        break;
+                    case "uiElementsOpacity":
+                        setUiElementsOpacity(Integer.parseInt(value));
                         break;
                     case "size":
                         setSize(Integer.parseInt(value));

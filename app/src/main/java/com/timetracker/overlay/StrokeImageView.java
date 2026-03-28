@@ -25,6 +25,7 @@ import android.widget.ImageView;
  */
 public class StrokeImageView extends ImageView {
     private boolean strokeEnabled = false;
+    private float strokeWidthScale = 1f; // 1.0 = default (matches text stroke width 4px)
 
     public StrokeImageView(Context context) {
         super(context);
@@ -40,6 +41,12 @@ public class StrokeImageView extends ImageView {
 
     public void setStrokeEnabled(boolean enabled) {
         this.strokeEnabled = enabled;
+        invalidate();
+    }
+
+    /** Set stroke width as a scale factor relative to default (4px text = 1.0x). */
+    public void setStrokeWidthScale(float scale) {
+        this.strokeWidthScale = scale;
         invalidate();
     }
 
@@ -72,8 +79,8 @@ public class StrokeImageView extends ImageView {
         super.onDraw(bmpCanvas);
 
         // Offset scales with view width so stroke weight is proportional at all overlay sizes.
-        // ~3.5% of icon width: calibrated so it matches the text stroke weight at "large".
-        float offset = Math.max(1f, w * 0.035f);
+        // ~3.5% of icon width at default (4px text stroke). Scale with strokeWidthScale.
+        float offset = Math.max(1f, w * 0.035f * strokeWidthScale);
 
         int strokeColor = getStrokeColor();
         Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);

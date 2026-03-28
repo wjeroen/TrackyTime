@@ -2,6 +2,7 @@ package com.timetracker.overlay;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -42,32 +43,42 @@ public class MainActivity extends Activity {
     private static final int EXPORT_FILE_CODE = 200;
     private static final int IMPORT_FILE_CODE = 201;
 
-    private static final int[] ENTRY_COLORS = {
-        // Row 1: Vivid / saturated
-        0xFFE53935, 0xFFD81B60, 0xFF8E24AA, 0xFF5E35B1,
-        0xFF3949AB, 0xFF1E88E5, 0xFF039BE5, 0xFF00ACC1,
-        0xFF00897B, 0xFF43A047, 0xFF7CB342, 0xFFC0CA33,
-        // Row 2: Warm + earthy
-        0xFFFDD835, 0xFFFFB300, 0xFFFB8C00, 0xFFF4511E,
-        0xFF6D4C41, 0xFF757575, 0xFF546E7A, 0xFFEC407A,
-        // Row 3: Pastel / lighter
-        0xFFEF9A9A, 0xFFF48FB1, 0xFFCE93D8, 0xFFB39DDB,
-        0xFF9FA8DA, 0xFF90CAF9, 0xFF81D4FA, 0xFF80DEEA,
-        0xFF80CBC4, 0xFFA5D6A7, 0xFFC5E1A5, 0xFFE6EE9C,
-        // Row 4: Deep / dark
-        0xFFB71C1C, 0xFF880E4F, 0xFF4A148C, 0xFF1A237E,
-        0xFF0D47A1, 0xFF006064, 0xFF1B5E20, 0xFF33691E,
-        0xFFE65100, 0xFF3E2723, 0xFF263238, 0xFF212121
+    // 4x5 grid colors (mostly 600-level + black/white)
+    private static final int[] GRID_COLORS = {
+        0xFF6D4C41, 0xFF546E7A, 0xFF000000, 0xFFFFFFFF,
+        0xFFE53935, 0xFFF4511E, 0xFFFB8C00, 0xFFFFB300,
+        0xFFFDD835, 0xFFC0CA33, 0xFF7CB342, 0xFF43A047,
+        0xFF00897B, 0xFF00ACC1, 0xFF039BE5, 0xFF1E88E5,
+        0xFF3949AB, 0xFF5E35B1, 0xFF8E24AA, 0xFFD81B60
     };
 
-    private static final int[] SETTINGS_COLORS = {
-        0xFF1E1E2E, 0xFF2A2A3C, 0xFF313244, 0xFF45475A,
-        0xFFCDD6F4, 0xFFBAC2DE, 0xFFA6ADC8, 0xFF9399B2,
-        0xFF89B4FA, 0xFF74C7EC, 0xFF94E2D5, 0xFFA6E3A1,
-        0xFFF9E2AF, 0xFFFAB387, 0xFFF38BA8, 0xFFCBA6F7,
-        0xFFE53935, 0xFFFF6F00, 0xFF1B5E20, 0xFF0D47A1,
-        0xFFFFFFFF, 0xFF000000, 0xFF424242, 0xFF757575
-    };
+    // Brightness variants: 100, 300, 600, 900 for each grid color
+    private static int[] brightnessVariants(int gridColor) {
+        switch (gridColor) {
+            // Grey (also used for black and white)
+            case 0xFF000000: case 0xFFFFFFFF:
+                return new int[]{0xFFFFFFFF, 0xFFE0E0E0, 0xFF757575, 0xFF000000};
+            case 0xFFE53935: return new int[]{0xFFFFCDD2, 0xFFE57373, 0xFFE53935, 0xFFB71C1C};
+            case 0xFFF4511E: return new int[]{0xFFFFCCBC, 0xFFFF8A65, 0xFFF4511E, 0xFFBF360C};
+            case 0xFFFB8C00: return new int[]{0xFFFFE0B2, 0xFFFFB74D, 0xFFFB8C00, 0xFFE65100};
+            case 0xFFFFB300: return new int[]{0xFFFFECB3, 0xFFFFD54F, 0xFFFFB300, 0xFFFF6F00};
+            case 0xFFFDD835: return new int[]{0xFFFFF9C4, 0xFFFFF176, 0xFFFDD835, 0xFFF57F17};
+            case 0xFFC0CA33: return new int[]{0xFFF0F4C3, 0xFFDCE775, 0xFFC0CA33, 0xFF827717};
+            case 0xFF7CB342: return new int[]{0xFFDCEDC8, 0xFFAED581, 0xFF7CB342, 0xFF33691E};
+            case 0xFF43A047: return new int[]{0xFFC8E6C9, 0xFF81C784, 0xFF43A047, 0xFF1B5E20};
+            case 0xFF00897B: return new int[]{0xFFB2DFDB, 0xFF4DB6AC, 0xFF00897B, 0xFF004D40};
+            case 0xFF00ACC1: return new int[]{0xFFB2EBF2, 0xFF4DD0E1, 0xFF00ACC1, 0xFF006064};
+            case 0xFF039BE5: return new int[]{0xFFB3E5FC, 0xFF4FC3F7, 0xFF039BE5, 0xFF01579B};
+            case 0xFF1E88E5: return new int[]{0xFFBBDEFB, 0xFF64B5F6, 0xFF1E88E5, 0xFF0D47A1};
+            case 0xFF3949AB: return new int[]{0xFFC5CAE9, 0xFF7986CB, 0xFF3949AB, 0xFF1A237E};
+            case 0xFF5E35B1: return new int[]{0xFFD1C4E9, 0xFF9575CD, 0xFF5E35B1, 0xFF311B92};
+            case 0xFF8E24AA: return new int[]{0xFFE1BEE7, 0xFFBA68C8, 0xFF8E24AA, 0xFF4A148C};
+            case 0xFFD81B60: return new int[]{0xFFF8BBD0, 0xFFF06292, 0xFFD81B60, 0xFF880E4F};
+            case 0xFF6D4C41: return new int[]{0xFFD7CCC8, 0xFFA1887F, 0xFF6D4C41, 0xFF3E2723};
+            case 0xFF546E7A: return new int[]{0xFFCFD8DC, 0xFF90A4AE, 0xFF546E7A, 0xFF263238};
+            default:         return new int[]{gridColor, gridColor, gridColor, gridColor};
+        }
+    }
 
     private Button toggleBtn, prevDayBtn, nextDayBtn, settingsBtn;
     private Button dayViewBtn, weekViewBtn, exportBtn, importBtn;
@@ -584,43 +595,232 @@ public class MainActivity extends Activity {
             .show();
     }
 
-    // ======== Entry color picker ========
+    // ======== Shared color picker with brightness row ========
 
-    private void showEntryColorPicker(ActivityEntry entry) {
-        AlertDialog dialog = new AlertDialog.Builder(this).create();
+    private interface ColorCallback { void onColor(int color); }
 
-        GridLayout grid = new GridLayout(this);
-        grid.setColumnCount(6);
+    private void showColorPickerDialog(int currentColor, ColorCallback callback) {
+        showColorPickerDialog(currentColor, callback, null);
+    }
+
+    /**
+     * @param previewCallback if non-null, called on every tap for live preview.
+     *                        On cancel, called with originalColor to revert.
+     */
+    private void showColorPickerDialog(int currentColor, ColorCallback callback,
+                                        ColorCallback previewCallback) {
         float d = getResources().getDisplayMetrics().density;
         int pad = (int)(12 * d);
-        grid.setPadding(pad, pad, pad, pad);
+        int swatchSize = (int)(52 * d);
+        int swatchMargin = (int)(5 * d);
+        // Fixed width: 4 swatches + margins
+        int gridWidth = 4 * swatchSize + 8 * swatchMargin;
 
-        for (int color : ENTRY_COLORS) {
+        // Track selected color (mutable via array)
+        final int[] selected = { currentColor };
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(pad, pad, pad, pad);
+
+        // --- Brightness row (top, 4 columns matching grid) ---
+        LinearLayout brightnessRow = new LinearLayout(this);
+        brightnessRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams brLp = new LinearLayout.LayoutParams(
+            gridWidth, LinearLayout.LayoutParams.WRAP_CONTENT);
+        brightnessRow.setLayoutParams(brLp);
+        root.addView(brightnessRow);
+
+        // --- Divider (matches grid width) ---
+        View divider = new View(this);
+        LinearLayout.LayoutParams divLp = new LinearLayout.LayoutParams(
+            gridWidth, (int)(1 * d));
+        divLp.setMargins(0, (int)(10 * d), 0, (int)(8 * d));
+        divider.setLayoutParams(divLp);
+        divider.setBackgroundColor(0x44FFFFFF);
+        root.addView(divider);
+
+        // --- 4x5 grid ---
+        GridLayout grid = new GridLayout(this);
+        grid.setColumnCount(4);
+
+        // Find which grid color the current color belongs to
+        int initialGrid = findGridColorFor(currentColor);
+
+        for (int color : GRID_COLORS) {
             View sw = new View(this);
             GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-            lp.width = (int)(40 * d);
-            lp.height = (int)(40 * d);
-            lp.setMargins((int)(4*d), (int)(4*d), (int)(4*d), (int)(4*d));
+            lp.width = swatchSize;
+            lp.height = swatchSize;
+            lp.setMargins(swatchMargin, swatchMargin, swatchMargin, swatchMargin);
             sw.setLayoutParams(lp);
 
             GradientDrawable bg = new GradientDrawable();
             bg.setShape(GradientDrawable.RECTANGLE);
             bg.setCornerRadius(6 * d);
             bg.setColor(color);
-            if (color == entry.getColor()) bg.setStroke((int)(3*d), 0xFFFFFFFF);
+            // Show selection on the grid color whose brightness family contains the selected color
+            if (color == initialGrid) bg.setStroke((int)(3*d), 0xFFFFFFFF);
             sw.setBackground(bg);
 
             final int c = color;
             sw.setOnClickListener(v -> {
-                dbHelper.updateColorByName(entry.getName(), c);
-                loadData();
-                dialog.dismiss();
+                int[] variants = brightnessVariants(c);
+                // Black/white exception: select the actual clicked color, not 600-level
+                if (c == 0xFF000000) {
+                    selected[0] = 0xFF000000; // select black (index 3)
+                } else if (c == 0xFFFFFFFF) {
+                    selected[0] = 0xFFFFFFFF; // select white (index 0)
+                } else {
+                    selected[0] = variants[2]; // 600-level default
+                }
+                if (previewCallback != null) previewCallback.onColor(selected[0]);
+                refreshColorPickerSelection(grid, brightnessRow, c, selected, d,
+                    swatchSize, swatchMargin, previewCallback);
             });
             grid.addView(sw);
         }
 
-        dialog.setView(grid);
+        root.addView(grid);
+
+        // Populate initial brightness row
+        populateBrightnessRow(brightnessRow, initialGrid, selected, d,
+            swatchSize, swatchMargin, grid, previewCallback);
+
+        // --- OK / Cancel buttons ---
+        LinearLayout buttonRow = new LinearLayout(this);
+        buttonRow.setOrientation(LinearLayout.HORIZONTAL);
+        buttonRow.setGravity(Gravity.END);
+        LinearLayout.LayoutParams btnRowLp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        btnRowLp.setMargins(0, (int)(8 * d), 0, 0);
+        buttonRow.setLayoutParams(btnRowLp);
+
+        Button cancelBtn = new Button(this, null, android.R.attr.buttonBarButtonStyle);
+        cancelBtn.setText("CANCEL");
+        cancelBtn.setTextColor(0xFFBBBBBB);
+
+        Button okBtn = new Button(this, null, android.R.attr.buttonBarButtonStyle);
+        okBtn.setText("OK");
+        okBtn.setTextColor(0xFF8AB4F8);
+
+        buttonRow.addView(cancelBtn);
+        buttonRow.addView(okBtn);
+        root.addView(buttonRow);
+
+        // Plain Dialog — no AlertDialog minimum-width / internal-padding nonsense
+        Dialog dialog = new Dialog(this);
+        dialog.setContentView(root);
+
+        // Track whether OK was pressed (to distinguish from dismiss-by-back-button)
+        final boolean[] confirmed = { false };
+
+        cancelBtn.setOnClickListener(v -> dialog.dismiss()); // dismiss triggers revert below
+        okBtn.setOnClickListener(v -> {
+            confirmed[0] = true;
+            callback.onColor(selected[0]);
+            dialog.dismiss();
+        });
+
+        // Revert on any dismiss that isn't OK (cancel button, back button, tap outside)
+        if (previewCallback != null) {
+            dialog.setOnDismissListener(d2 -> {
+                if (!confirmed[0]) {
+                    previewCallback.onColor(currentColor); // revert to original
+                }
+            });
+        }
+
         dialog.show();
+        if (dialog.getWindow() != null) {
+            GradientDrawable dialogBg = new GradientDrawable();
+            dialogBg.setColor(0xFF303030);
+            dialogBg.setCornerRadius(16 * d);
+            dialog.getWindow().setBackgroundDrawable(dialogBg);
+            dialog.getWindow().setLayout(
+                android.view.WindowManager.LayoutParams.WRAP_CONTENT,
+                android.view.WindowManager.LayoutParams.WRAP_CONTENT);
+        }
+    }
+
+    /** Refresh both brightness row and grid selection indicators. */
+    private void refreshColorPickerSelection(GridLayout grid, LinearLayout brightnessRow,
+                                              int activeGridColor, int[] selected,
+                                              float d, int swatchSize, int swatchMargin,
+                                              ColorCallback previewCallback) {
+        // Update grid swatches — highlight the active grid color family
+        for (int i = 0; i < grid.getChildCount(); i++) {
+            View child = grid.getChildAt(i);
+            int color = GRID_COLORS[i];
+            GradientDrawable bg = new GradientDrawable();
+            bg.setShape(GradientDrawable.RECTANGLE);
+            bg.setCornerRadius(6 * d);
+            bg.setColor(color);
+            if (color == activeGridColor) bg.setStroke((int)(3*d), 0xFFFFFFFF);
+            child.setBackground(bg);
+        }
+
+        populateBrightnessRow(brightnessRow, activeGridColor, selected, d,
+            swatchSize, swatchMargin, grid, previewCallback);
+    }
+
+    private void populateBrightnessRow(LinearLayout row, int gridColor,
+                                        int[] selected, float d,
+                                        int swatchSize, int swatchMargin,
+                                        GridLayout grid,
+                                        ColorCallback previewCallback) {
+        row.removeAllViews();
+        int[] variants = brightnessVariants(gridColor);
+        for (int color : variants) {
+            View sw = new View(this);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                swatchSize, swatchSize);
+            lp.setMargins(swatchMargin, swatchMargin, swatchMargin, swatchMargin);
+            sw.setLayoutParams(lp);
+
+            GradientDrawable bg = new GradientDrawable();
+            bg.setShape(GradientDrawable.RECTANGLE);
+            bg.setCornerRadius(6 * d);
+            bg.setColor(color);
+            if (color == selected[0]) bg.setStroke((int)(3*d), 0xFFFFFFFF);
+            sw.setBackground(bg);
+
+            final int c = color;
+            sw.setOnClickListener(v -> {
+                selected[0] = c;
+                if (previewCallback != null) previewCallback.onColor(c);
+                // Refresh brightness row selection
+                for (int i = 0; i < row.getChildCount(); i++) {
+                    View child = row.getChildAt(i);
+                    int varColor = variants[i];
+                    GradientDrawable vbg = new GradientDrawable();
+                    vbg.setShape(GradientDrawable.RECTANGLE);
+                    vbg.setCornerRadius(6 * d);
+                    vbg.setColor(varColor);
+                    if (varColor == c) vbg.setStroke((int)(3*d), 0xFFFFFFFF);
+                    child.setBackground(vbg);
+                }
+            });
+            row.addView(sw);
+        }
+    }
+
+    private int findGridColorFor(int color) {
+        for (int gridColor : GRID_COLORS) {
+            int[] variants = brightnessVariants(gridColor);
+            for (int v : variants) {
+                if (v == color) return gridColor;
+            }
+        }
+        // Default to first grid color if not found
+        return GRID_COLORS[0];
+    }
+
+    private void showEntryColorPicker(ActivityEntry entry) {
+        showColorPickerDialog(entry.getColor(), color -> {
+            dbHelper.updateColorByName(entry.getName(), color);
+            loadData();
+        });
     }
 
     // ======== Export / Import ========
@@ -736,10 +936,6 @@ public class MainActivity extends Activity {
 
     // ======== Settings dialog ========
 
-    private interface ColorCallback {
-        void onColor(int color);
-    }
-
     private void showSettingsDialog() {
         float d = getResources().getDisplayMetrics().density;
 
@@ -747,9 +943,9 @@ public class MainActivity extends Activity {
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding((int)(20*d), (int)(12*d), (int)(20*d), (int)(8*d));
 
-        addColorRow(layout, "Background", prefs.getBgColor(), c -> prefs.setBgColor(c));
-        addColorRow(layout, "Text Color", prefs.getTextColor(), c -> prefs.setTextColor(c));
-        addColorRow(layout, "Border Color", prefs.getAccentColor(), c -> prefs.setAccentColor(c));
+        addColorRow(layout, "Background", () -> prefs.getBgColor(), c -> prefs.setBgColor(c));
+        addColorRow(layout, "Text Color", () -> prefs.getTextColor(), c -> prefs.setTextColor(c));
+        addColorRow(layout, "Border Color", () -> prefs.getAccentColor(), c -> prefs.setAccentColor(c));
 
         // Opacity
         addSpacer(layout, 14);
@@ -786,16 +982,45 @@ public class MainActivity extends Activity {
         SeekBar borderBar = new SeekBar(this);
         borderBar.setMax(6);
         borderBar.setProgress(prefs.getBorderWidth());
+        layout.addView(borderBar);
+
+        // Border Opacity
+        addSpacer(layout, 8);
+        TextView borderOpLabel = new TextView(this);
+        borderOpLabel.setText("Border Opacity: " + (prefs.getBorderOpacity() * 100 / 255) + "%");
+        borderOpLabel.setTextColor(0xFFCDD6F4);
+        borderOpLabel.setTextSize(14f);
+        borderOpLabel.setVisibility(prefs.getBorderWidth() > 0 ? View.VISIBLE : View.GONE);
+        layout.addView(borderOpLabel);
+
+        SeekBar borderOpBar = new SeekBar(this);
+        borderOpBar.setMax(255);
+        borderOpBar.setMin(10);
+        borderOpBar.setProgress(prefs.getBorderOpacity());
+        borderOpBar.setVisibility(prefs.getBorderWidth() > 0 ? View.VISIBLE : View.GONE);
+        borderOpBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int val, boolean u) {
+                borderOpLabel.setText("Border Opacity: " + (val * 100 / 255) + "%");
+            }
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {
+                prefs.setBorderOpacity(sb.getProgress());
+            }
+        });
+        layout.addView(borderOpBar);
+
+        // Show/hide border opacity when border width changes
         borderBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar sb, int val, boolean u) {
                 borderLabel.setText(val == 0 ? "Border: Off" : "Border: " + val + "dp");
+                borderOpLabel.setVisibility(val > 0 ? View.VISIBLE : View.GONE);
+                borderOpBar.setVisibility(val > 0 ? View.VISIBLE : View.GONE);
             }
             public void onStartTrackingTouch(SeekBar sb) {}
             public void onStopTrackingTouch(SeekBar sb) {
                 prefs.setBorderWidth(sb.getProgress());
             }
         });
-        layout.addView(borderBar);
 
         // Size
         addSpacer(layout, 14);
@@ -826,8 +1051,69 @@ public class MainActivity extends Activity {
         pulseCb.setTextColor(0xFFCDD6F4);
         pulseCb.setTextSize(14f);
         pulseCb.setChecked(prefs.isOverlayPulseEnabled());
-        pulseCb.setOnCheckedChangeListener((btn, checked) -> prefs.setOverlayPulseEnabled(checked));
         layout.addView(pulseCb);
+
+        // Breathing transparency slider (-50 to +50, 0 = center)
+        addSpacer(layout, 8);
+        int initTrans = prefs.getBreathingTransparency();
+        TextView transLabel = new TextView(this);
+        transLabel.setText("Transparency: " + (initTrans > 0 ? "+" : "") + initTrans + "%");
+        transLabel.setTextColor(0xFFCDD6F4);
+        transLabel.setTextSize(14f);
+        transLabel.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
+        layout.addView(transLabel);
+
+        SeekBar transBar = new SeekBar(this);
+        transBar.setMin(-50);
+        transBar.setMax(50);
+        transBar.setProgress(prefs.getBreathingTransparency());
+        transBar.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
+        transBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int val, boolean u) {
+                transLabel.setText("Transparency: " + (val > 0 ? "+" : "") + val + "%");
+            }
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {
+                prefs.setBreathingTransparency(sb.getProgress());
+            }
+        });
+        layout.addView(transBar);
+
+        // Breathing brightness slider (-50 to +50, 0 = center)
+        addSpacer(layout, 4);
+        int initBright = prefs.getBreathingBrightness();
+        TextView brightLabel = new TextView(this);
+        brightLabel.setText("Brightness: " + (initBright > 0 ? "+" : "") + initBright + "%");
+        brightLabel.setTextColor(0xFFCDD6F4);
+        brightLabel.setTextSize(14f);
+        brightLabel.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
+        layout.addView(brightLabel);
+
+        SeekBar brightBar = new SeekBar(this);
+        brightBar.setMin(-50);
+        brightBar.setMax(50);
+        brightBar.setProgress(prefs.getBreathingBrightness());
+        brightBar.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
+        brightBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int val, boolean u) {
+                brightLabel.setText("Brightness: " + (val > 0 ? "+" : "") + val + "%");
+            }
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {
+                prefs.setBreathingBrightness(sb.getProgress());
+            }
+        });
+        layout.addView(brightBar);
+
+        // Toggle breathing checkbox shows/hides sub-sliders
+        pulseCb.setOnCheckedChangeListener((btn, checked) -> {
+            prefs.setOverlayPulseEnabled(checked);
+            int vis = checked ? View.VISIBLE : View.GONE;
+            transLabel.setVisibility(vis);
+            transBar.setVisibility(vis);
+            brightLabel.setVisibility(vis);
+            brightBar.setVisibility(vis);
+        });
 
         // Text stroke toggle
         CheckBox strokeCb = new CheckBox(this);
@@ -835,8 +1121,68 @@ public class MainActivity extends Activity {
         strokeCb.setTextColor(0xFFCDD6F4);
         strokeCb.setTextSize(14f);
         strokeCb.setChecked(prefs.isTextStrokeEnabled());
-        strokeCb.setOnCheckedChangeListener((btn, checked) -> prefs.setTextStrokeEnabled(checked));
         layout.addView(strokeCb);
+
+        // Stroke width slider (only visible when stroke is enabled)
+        addSpacer(layout, 8);
+        TextView strokeLabel = new TextView(this);
+        int sw = prefs.getStrokeWidth();
+        strokeLabel.setText("Stroke Width: " + sw + "px");
+        strokeLabel.setTextColor(0xFFCDD6F4);
+        strokeLabel.setTextSize(14f);
+        strokeLabel.setVisibility(prefs.isTextStrokeEnabled() ? View.VISIBLE : View.GONE);
+        layout.addView(strokeLabel);
+
+        SeekBar strokeBar = new SeekBar(this);
+        strokeBar.setMax(9); // 1-10 (offset by 1)
+        strokeBar.setProgress(prefs.getStrokeWidth() - 1);
+        strokeBar.setVisibility(prefs.isTextStrokeEnabled() ? View.VISIBLE : View.GONE);
+        strokeBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int val, boolean u) {
+                strokeLabel.setText("Stroke Width: " + (val + 1) + "px");
+            }
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {
+                prefs.setStrokeWidth(sb.getProgress() + 1);
+            }
+        });
+        layout.addView(strokeBar);
+
+        // Toggle stroke checkbox shows/hides stroke width slider
+        strokeCb.setOnCheckedChangeListener((btn, checked) -> {
+            prefs.setTextStrokeEnabled(checked);
+            strokeLabel.setVisibility(checked ? View.VISIBLE : View.GONE);
+            strokeBar.setVisibility(checked ? View.VISIBLE : View.GONE);
+        });
+
+        // UI elements opacity (buttons, separator, hint text, paused clock)
+        addSpacer(layout, 14);
+        TextView uiOpLabel = new TextView(this);
+        uiOpLabel.setText("UI Elements Opacity: " + (prefs.getUiElementsOpacity() * 100 / 255) + "%");
+        uiOpLabel.setTextColor(0xFFCDD6F4);
+        uiOpLabel.setTextSize(15f);
+        layout.addView(uiOpLabel);
+
+        TextView uiOpHint = new TextView(this);
+        uiOpHint.setText("Buttons, separator, hints, paused clock");
+        uiOpHint.setTextColor(0xFF9399B2);
+        uiOpHint.setTextSize(12f);
+        layout.addView(uiOpHint);
+
+        SeekBar uiOpBar = new SeekBar(this);
+        uiOpBar.setMax(255);
+        uiOpBar.setMin(25);
+        uiOpBar.setProgress(prefs.getUiElementsOpacity());
+        uiOpBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int val, boolean u) {
+                uiOpLabel.setText("UI Elements Opacity: " + (val * 100 / 255) + "%");
+            }
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {
+                prefs.setUiElementsOpacity(sb.getProgress());
+            }
+        });
+        layout.addView(uiOpBar);
 
         new AlertDialog.Builder(this)
             .setTitle("Overlay Settings")
@@ -845,7 +1191,8 @@ public class MainActivity extends Activity {
             .show();
     }
 
-    private void addColorRow(LinearLayout parent, String label, int current,
+    private void addColorRow(LinearLayout parent, String label,
+                             java.util.function.IntSupplier colorGetter,
                              ColorCallback callback) {
         float d = getResources().getDisplayMetrics().density;
 
@@ -865,14 +1212,22 @@ public class MainActivity extends Activity {
         View swatch = new View(this);
         int sz = (int)(40 * d);
         swatch.setLayoutParams(new LinearLayout.LayoutParams(sz, sz));
-        setSwatchColor(swatch, current, d);
+        setSwatchColor(swatch, colorGetter.getAsInt(), d);
 
-        swatch.setOnClickListener(v ->
-            showSettingsColorPicker(current, color -> {
+        swatch.setOnClickListener(v -> {
+            int current = colorGetter.getAsInt(); // read CURRENT pref value
+            // Preview callback: writes to prefs immediately so overlay updates live.
+            // On cancel, reverts to the color read at open time.
+            ColorCallback preview = color -> {
                 callback.onColor(color);
                 setSwatchColor(swatch, color, d);
-            })
-        );
+            };
+            showColorPickerDialog(current, color -> {
+                // OK: already previewed, just ensure final save
+                callback.onColor(color);
+                setSwatchColor(swatch, color, d);
+            }, preview);
+        });
 
         row.addView(swatch);
         parent.addView(row);
@@ -885,42 +1240,6 @@ public class MainActivity extends Activity {
         bg.setColor(color);
         bg.setStroke((int)(1 * density), 0x44FFFFFF);
         v.setBackground(bg);
-    }
-
-    private void showSettingsColorPicker(int current, ColorCallback callback) {
-        AlertDialog dialog = new AlertDialog.Builder(this).create();
-        float d = getResources().getDisplayMetrics().density;
-
-        GridLayout grid = new GridLayout(this);
-        grid.setColumnCount(4);
-        int pad = (int)(12 * d);
-        grid.setPadding(pad, pad, pad, pad);
-
-        for (int color : SETTINGS_COLORS) {
-            View sw = new View(this);
-            GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-            lp.width = (int)(52 * d);
-            lp.height = (int)(52 * d);
-            lp.setMargins((int)(5*d), (int)(5*d), (int)(5*d), (int)(5*d));
-            sw.setLayoutParams(lp);
-
-            GradientDrawable bg = new GradientDrawable();
-            bg.setShape(GradientDrawable.RECTANGLE);
-            bg.setCornerRadius(6 * d);
-            bg.setColor(color);
-            if (color == current) bg.setStroke((int)(3*d), 0xFFFFFFFF);
-            sw.setBackground(bg);
-
-            final int c = color;
-            sw.setOnClickListener(v -> {
-                callback.onColor(c);
-                dialog.dismiss();
-            });
-            grid.addView(sw);
-        }
-
-        dialog.setView(grid);
-        dialog.show();
     }
 
     private void addSpacer(LinearLayout parent, int dp) {

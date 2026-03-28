@@ -4,7 +4,7 @@
 
 ### Overlay (floating pill)
 - **Compact pill shape**: activity name on the left, timer on the right, 10dp rounded corners
-- **Border**: configurable color (uses accent/border color setting) and width (0–6dp, default 2dp black). Uses LayerDrawable: bottom layer = bg fill (inset by border width), top layer = stroke-only drawable (transparent fill + stroke). This avoids both the filled-rectangle-behind-bg bug and the stroke/fill overlap bug. Padding offsets content so the border doesn't overlap it.
+- **Border**: configurable color (uses accent/border color setting), width (0–6dp, default 2dp black), and opacity (separate from background opacity, default ~60%). Uses LayerDrawable: bottom layer = bg fill (inset by border width), top layer = stroke-only drawable (transparent fill + stroke). This avoids both the filled-rectangle-behind-bg bug and the stroke/fill overlap bug. Padding offsets content so the border doesn't overlap it.
 - **Tap activity text** → expand overlay (keyboard pops up, +/➚/− icon buttons appear, quick-select rows show). Icon buttons scale with overlay text size for consistent tap targets. Type a new name and press Done — the previous activity is saved, timer restarts, and overlay collapses.
 - **Tap timer** → pause/resume (timer dims to icon opacity 0x99 when paused)
 - **Drag anywhere** → reposition the pill on screen (clamped to screen bounds)
@@ -13,7 +13,10 @@
 - **➚ open app** → opens the full TrackyTime app (releases focus, overlay stays expanded)
 - **− collapse** → collapses the expanded overlay back to the compact pill
 - **Timeline bar** → 6dp colored bar at the bottom showing the day's activity history as proportional segments. Each activity session is a colored rectangle. The currently-running activity grows live. The live segment pulses immediately, speeding up 2x every 30 minutes as a gentle nudge. Not affected by the opacity slider. White tick marks (2px wide) at every hour (full height) and half-hour (bottom half). Both fully opaque. Half-hour marks are hidden once total tracked time exceeds 5 hours.
-- **Breathing overlay** → optional (default on): the border and background pulse in opposing sync with the timeline bar. Border breathes from fully transparent up to the user's opacity setting. Background shifts inversely (darkest/brightest when border is gone, normal when border is fully visible) by up to 25%: light colors darken toward black, dark colors (brightness < 30%) brighten toward white. Works regardless of border width (even 0). Live-updates when toggled in settings. All pulse animations run at 30fps to reduce battery/compositor load.
+- **Breathing overlay** → optional (default on): the border and background pulse in sync with the timeline bar. When enabled, two sub-sliders appear:
+  - **Transparency** (-50% to +50%, default +30%): controls how much the **background** opacity oscillates during breathing. Positive = more transparent at dim point, negative = more opaque. Effect is subtle (30% scaling). The **border** always breathes independently (fades from transparent → its set opacity), unaffected by this slider.
+  - **Brightness** (-50% to +50%, default -25%): controls color shift direction and amount. Negative = darkens toward black, positive = brightens toward white. Slide to the opposite direction to reverse the effect — no auto-detect needed.
+  Values clamp silently at physical limits (can't go below 0% or above 100% opacity). Works regardless of border width (even 0). Live-updates when toggled/adjusted in settings. All pulse animations run at 30fps to reduce battery/compositor load.
 - **Minimum activity duration** → activities shorter than 10 seconds are automatically discarded (not saved). Prevents accidental micro-entries when switching activities quickly.
 - **Live-update**: changing any setting (colors, size, border, opacity) updates the overlay instantly — no restart needed. Includes quick-select row text/icon colors and sizes.
 
@@ -33,14 +36,14 @@
 - **Tap date to return to today**: tapping the date/week text in the header jumps back to the present day or current week.
 - Date navigation (prev/next day or week)
 - Export/Import/Settings buttons at the top (above history) for quick access
-- Settings: background color, text color, border color (accent), border width (0–6dp), background opacity, text size, breathing overlay toggle
+- Settings: background color, text color, border color (accent), border width (0–6dp) + border opacity, background opacity, text size, breathing overlay toggle + transparency/brightness sliders (-50% to +50%), text stroke toggle + stroke width slider (1–10, linear scaling, proportional to text size so stroke scales with overlay size like icon stroke does; anchored at 16sp Medium where setting 4 = original default), UI elements opacity (buttons, separator, hints, paused clock)
 - **Export**: save all data as JSON to any location (Google Drive, email, etc.). Also includes quick-select shortcut names.
 - **Import**: restore data from a JSON backup (skips duplicates). Restores quick-select shortcuts if present. Backward-compatible with older exports that don't have shortcuts.
 
 ### Consistent colors
 - Activities with the **same name always get the same color** — in pie chart, history, and across all days
 - **Name matching is case- and space-insensitive**: "Coding Time", "coding time", and "CODING  TIME" are all treated as the same activity (via `normalizeName()` — trim, collapse spaces, lowercase)
-- New names get a stable color auto-assigned from a 44-color palette (based on normalized name hash)
+- New names get a stable color auto-assigned from a 76-color palette (19 Material Design hues × 4 brightness levels, based on normalized name hash)
 - Changing an entry's color updates **all** entries with that name (case/space-insensitive)
 
 ### Grouping
@@ -50,10 +53,12 @@
 - Import deduplication is also case/space-insensitive
 
 ### Opacity
-- The opacity slider sets the **opacity** of the overlay background and border (default ~60%)
-- With breathing enabled: border pulses from fully transparent up to this opacity; background shifts inversely (darkest when border is gone, normal when border is visible)
+- The **background opacity** slider sets the opacity of the overlay background (default ~60%)
+- The **border opacity** slider (shown when border width > 0) sets the border's opacity independently from the background
+- With breathing enabled: transparency and brightness sliders control how much the opacity and color shift during the pulse cycle
 - Without breathing: everything stays at the set opacity
-- Text, timer, and timeline bar are always fully visible (100% alpha)
+- Text (activity name) and timeline bar are always fully visible (100% alpha)
+- The **UI elements opacity** slider controls the transparency of secondary UI elements: close/add/open-app buttons, separator dot, hint text, play buttons in quick-select rows, and the timer when paused (default ~60%, range 10–100%)
 
 ## Quick Reference File Structure
 
@@ -76,7 +81,7 @@
 | `app/src/main/java/.../StrokeTextView.java` | Custom TextView with TV subtitle-style text stroke/outline — auto-contrast via ITU BT.601 brightness (black stroke for light text, white for dark) |
 | `app/src/main/java/.../StrokeEditText.java` | Custom EditText with same stroke/outline — uses Layout.draw() directly to bypass Editor's hardware-acceleration cache |
 | `app/src/main/java/.../StrokeImageView.java` | Custom ImageView with same stroke outline — draws icon at 8 offset positions in contrasting color, then normally on top (same auto-contrast as StrokeTextView) |
-| `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance (bg/text/border colors, border width, opacity, size, overlay pulse toggle, text stroke toggle, quick-select activities) + crash recovery checkpoint (separate `crash_recovery` file) |
+| `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance (bg/text/border colors, border width, opacity, size, overlay pulse toggle, text stroke toggle + stroke width, UI elements opacity, quick-select activities) + crash recovery checkpoint (separate `crash_recovery` file) |
 | `.github/workflows/android.yml` | GitHub Actions workflow — builds APK on every push |
 
 > **Note:** Java files live under `app/src/main/java/com/timetracker/overlay/`. The `...` above abbreviates that path.

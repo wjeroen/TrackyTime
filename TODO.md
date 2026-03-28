@@ -7,10 +7,15 @@
 
 ### Features to Implement
 - [ ] Add separate opacity slider for the timeline bar
-- [ ] Expand background/border color picker (more color options like activity picker)
+- [x] Unified color picker: 4x5 grid + brightness row (100/300/600/900) for both entries and settings (2026-03-22)
+- [x] Separate border opacity slider — independent from background opacity (2026-03-23)
+- [x] Customizable breathing: transparency + brightness sliders (-50% to +50%, 0 = center), replaces auto-detect darken/brighten (2026-03-23)
 
 ### Bug Fixes
-_(none right now)_
+- [x] Fix text stroke width barely visible — use quadratic scaling (width²/4) so higher values are much more noticeable (2026-03-22)
+- [x] Fix color picker: fixed width layout, brightness row aligned with grid, OK/Cancel buttons instead of dismiss-on-click, live selection highlighting, default to 600 brightness (black/white select actual color) (2026-03-22)
+- [x] Fix color picker dialog white space — force WRAP_CONTENT on dialog window (2026-03-22)
+- [x] Fix text stroke not scaling with overlay size — stroke now proportional to text size (anchored at 16sp Medium), matching icon stroke behavior (2026-03-22)
 
 ### Performance & Optimization
 _(none right now)_
@@ -29,7 +34,7 @@ _(none right now)_
 - [ ] Test that opacity slider affects background + border (text stays fully visible)
 - [ ] Test consistent colors: create "Coding" twice on different days, verify same color
 - [ ] Test name normalization: "Coding", "coding", "CODING", "Coding  Time" and "coding time" should all group together and share colors
-- [ ] Test color picker: 44 colors (vivid, warm, pastel, deep), changing color updates all entries with same name
+- [ ] Test color picker: unified 4x5 grid + brightness row (76 total colors), OK/Cancel buttons, live selection highlight, default 600 brightness (black/white exception), changing color updates all entries with same name
 - [ ] Test open-app button (➚) appears in expanded mode, opens full app (keeps overlay expanded)
 - [ ] Test collapse button (−) appears in expanded mode, collapses overlay
 - [ ] Test quick-select: + adds row, ▶ switches activity, ✕ removes row, persists across sessions
@@ -51,6 +56,11 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Separate border opacity + customizable breathing sliders (transparency/brightness, -50% to +50%) (2026-03-23)
+- [x] Fix color picker white space — replaced AlertDialog with plain Dialog (2026-03-23)
+- [x] Fix text stroke scaling — linear (not quadratic), proportional to text size (2026-03-23)
+- [x] Add stroke width slider (1-10px, appears when text stroke enabled) — applies to text and icon strokes (2026-03-22)
+- [x] Add UI elements opacity slider (buttons, separator, hints, paused clock) — replaces hardcoded 0x99 (2026-03-22)
 - [x] Paused timer and hint text opacity match icon opacity (0x99); icon stroke follows stroke setting (2026-02-19)
 - [x] Color bar now fills full screen width (within layout margins) — removed fixed max-width cap (2026-02-19)
 - [x] Fix icon scaling: main buttons use 1.2x (perfect at large), X buttons use 1.43x (perfect at small) (2026-02-16)
