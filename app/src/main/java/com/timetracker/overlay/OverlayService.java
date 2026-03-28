@@ -80,7 +80,9 @@ public class OverlayService extends Service {
     // Cached values for overlay pulse (avoid reading prefs every animation frame)
     private boolean cachedOverlayPulseEnabled = true;
     private int cachedBgColor, cachedBgOpacity, cachedBorderOpacity, cachedAccentColor, cachedBorderWidth;
-    private int cachedBreathingTransparency, cachedBreathingBrightness;
+    private int cachedBreathingTransparency, cachedBreathingBrightness, cachedBreathingGrayscale;
+    private boolean cachedUseTaskColorBg;
+    private int cachedTaskColorBrightness;
     private float cachedDensity;
 
     // Throttle animation updates to 30fps (~33ms between frames)
@@ -95,6 +97,7 @@ public class OverlayService extends Service {
     // Live-update: listen for pref changes from the settings dialog
     private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
     private Runnable applyPrefsRunnable = () -> {
+        loadTodaySegments(); // reload segment colors from DB (picks up color changes from the app)
         applyPreferences();
         // Force pulse to pick up new values (toggle, opacity, colors)
         refreshPulseCache();
@@ -187,11 +190,38 @@ public class OverlayService extends Service {
 
     private static final int BASE_PADDING_DP = 5;
 
+    /** Adjust a color's brightness: positive shift brightens toward white, negative darkens toward black. */
+    private static int adjustColorBrightness(int color, int brightnessPercent) {
+        int r = (color >> 16) & 0xFF;
+        int g = (color >> 8) & 0xFF;
+        int b = color & 0xFF;
+        float shift = brightnessPercent / 100f; // -0.5 to +0.5
+        if (shift > 0) {
+            r = r + (int) ((255 - r) * shift);
+            g = g + (int) ((255 - g) * shift);
+            b = b + (int) ((255 - b) * shift);
+        } else {
+            float factor = 1f + shift; // 0.5 to 1.0
+            r = (int) (r * factor);
+            g = (int) (g * factor);
+            b = (int) (b * factor);
+        }
+        return 0xFF000000 | (Math.min(255, Math.max(0, r)) << 16)
+                          | (Math.min(255, Math.max(0, g)) << 8)
+                          | Math.min(255, Math.max(0, b));
+    }
+
     private void applyPreferences() {
         OverlayPreferences prefs = new OverlayPreferences(this);
         float density = getResources().getDisplayMetrics().density;
 
-        int bgColor = prefs.getBgColor();
+        int bgColor;
+        if (prefs.isUseTaskColorBg() && currentActivityColor != 0) {
+            // Use task's color adjusted by brightness
+            bgColor = adjustColorBrightness(currentActivityColor, prefs.getTaskColorBrightness()) & 0x00FFFFFF;
+        } else {
+            bgColor = prefs.getBgColor();
+        }
         int bgOpacity = prefs.getOpacity();
         int bgWithAlpha = (bgOpacity << 24) | (bgColor & 0x00FFFFFF);
 
@@ -559,13 +589,20 @@ public class OverlayService extends Service {
     private void refreshPulseCache() {
         OverlayPreferences prefs = new OverlayPreferences(this);
         cachedOverlayPulseEnabled = prefs.isOverlayPulseEnabled();
-        cachedBgColor = prefs.getBgColor();
+        cachedUseTaskColorBg = prefs.isUseTaskColorBg();
+        cachedTaskColorBrightness = prefs.getTaskColorBrightness();
+        if (cachedUseTaskColorBg && currentActivityColor != 0) {
+            cachedBgColor = adjustColorBrightness(currentActivityColor, cachedTaskColorBrightness) & 0x00FFFFFF;
+        } else {
+            cachedBgColor = prefs.getBgColor();
+        }
         cachedBgOpacity = prefs.getOpacity();
         cachedBorderOpacity = prefs.getBorderOpacity();
         cachedAccentColor = prefs.getAccentColor();
         cachedBorderWidth = prefs.getBorderWidth();
         cachedBreathingTransparency = prefs.getBreathingTransparency();
         cachedBreathingBrightness = prefs.getBreathingBrightness();
+        cachedBreathingGrayscale = prefs.getBreathingGrayscale();
         cachedDensity = getResources().getDisplayMetrics().density;
     }
 
@@ -659,6 +696,17 @@ public class OverlayService extends Service {
             db = (int) (b * (1 - shift));
         } else {
             dr = r; dg = g; db = b;
+        }
+
+        // --- Grayscale: desaturate toward gray at dim point ---
+        if (cachedBreathingGrayscale > 0) {
+            float gsAmount = cachedBreathingGrayscale / 100f; // 0.0 to 1.0
+            float gsBlend = dimFactor * gsAmount; // how much to desaturate right now
+            // ITU BT.601 luminance
+            int gray = (int) (0.299f * dr + 0.587f * dg + 0.114f * db);
+            dr = dr + (int) ((gray - dr) * gsBlend);
+            dg = dg + (int) ((gray - dg) * gsBlend);
+            db = db + (int) ((gray - db) * gsBlend);
         }
 
         overlayBgFill.setColor((newAlpha << 24) | (dr << 16) | (dg << 8) | db);
@@ -768,6 +816,13 @@ public class OverlayService extends Service {
         currentStartTime = System.currentTimeMillis();
         accumulatedMs = 0;
         virtualStartTimestamp = -1;
+
+        // Instantly update background if using task color mode
+        OverlayPreferences taskPrefs = new OverlayPreferences(this);
+        if (taskPrefs.isUseTaskColorBg()) {
+            applyPreferences();
+            refreshPulseCache();
+        }
 
         timerText.setVisibility(View.VISIBLE);
         separator.setVisibility(View.VISIBLE);

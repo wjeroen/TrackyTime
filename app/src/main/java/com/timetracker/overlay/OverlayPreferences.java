@@ -53,6 +53,20 @@ public class OverlayPreferences {
     public int getBreathingBrightness() { return sp.getInt("breathing_brightness", -25); }
     public void setBreathingBrightness(int v) { sp.edit().putInt("breathing_brightness", v).apply(); }
 
+    // Breathing grayscale (0 to 100, default 0)
+    // Controls how much the background desaturates toward grayscale during breathing dim point
+    public int getBreathingGrayscale() { return sp.getInt("breathing_grayscale", 0); }
+    public void setBreathingGrayscale(int v) { sp.edit().putInt("breathing_grayscale", v).apply(); }
+
+    // Use task color as background (false = custom color, true = task's color)
+    public boolean isUseTaskColorBg() { return sp.getBoolean("use_task_color_bg", false); }
+    public void setUseTaskColorBg(boolean on) { sp.edit().putBoolean("use_task_color_bg", on).apply(); }
+
+    // Task color background brightness adjustment (-50 to +50, default -30)
+    // Applied on top of task's color when use_task_color_bg is true
+    public int getTaskColorBrightness() { return sp.getInt("task_color_brightness", -30); }
+    public void setTaskColorBrightness(int v) { sp.edit().putInt("task_color_brightness", v).apply(); }
+
     // Text stroke/outline (TV subtitle style with auto-contrast)
     public boolean isTextStrokeEnabled() { return sp.getBoolean("text_stroke", false); }
     public void setTextStrokeEnabled(boolean on) { sp.edit().putBoolean("text_stroke", on).apply(); }
@@ -83,6 +97,9 @@ public class OverlayPreferences {
     public float getTimerTextSize() {
         return getTextSize();
     }
+
+    // Signal to overlay that a task color changed in the DB (timestamp, triggers pref listener)
+    public void notifyTaskColorChanged() { sp.edit().putLong("color_change_signal", System.currentTimeMillis()).apply(); }
 
     // Quick-select activity shortcuts (newline-delimited)
     public List<String> getQuickActivities() {
@@ -136,6 +153,9 @@ public class OverlayPreferences {
         sb.append("overlayPulse:").append(isOverlayPulseEnabled()).append(",");
         sb.append("breathingTransparency:").append(getBreathingTransparency()).append(",");
         sb.append("breathingBrightness:").append(getBreathingBrightness()).append(",");
+        sb.append("breathingGrayscale:").append(getBreathingGrayscale()).append(",");
+        sb.append("useTaskColorBg:").append(isUseTaskColorBg()).append(",");
+        sb.append("taskColorBrightness:").append(getTaskColorBrightness()).append(",");
         sb.append("textStroke:").append(isTextStrokeEnabled()).append(",");
         sb.append("strokeWidth:").append(getStrokeWidth()).append(",");
         sb.append("uiElementsOpacity:").append(getUiElementsOpacity()).append(",");
@@ -182,6 +202,15 @@ public class OverlayPreferences {
                         break;
                     case "breathingBrightness":
                         setBreathingBrightness(Integer.parseInt(value));
+                        break;
+                    case "breathingGrayscale":
+                        setBreathingGrayscale(Integer.parseInt(value));
+                        break;
+                    case "useTaskColorBg":
+                        setUseTaskColorBg(Boolean.parseBoolean(value));
+                        break;
+                    case "taskColorBrightness":
+                        setTaskColorBrightness(Integer.parseInt(value));
                         break;
                     case "textStroke":
                         setTextStrokeEnabled(Boolean.parseBoolean(value));

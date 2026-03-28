@@ -22,6 +22,7 @@ import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.CheckBox;
+import android.widget.ScrollView;
 import android.widget.Toast;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -820,6 +821,8 @@ public class MainActivity extends Activity {
         showColorPickerDialog(entry.getColor(), color -> {
             dbHelper.updateColorByName(entry.getName(), color);
             loadData();
+            // Signal overlay to reload segment colors immediately
+            prefs.notifyTaskColorChanged();
         });
     }
 
@@ -943,7 +946,90 @@ public class MainActivity extends Activity {
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding((int)(20*d), (int)(12*d), (int)(20*d), (int)(8*d));
 
-        addColorRow(layout, "Background", () -> prefs.getBgColor(), c -> prefs.setBgColor(c));
+        // Background color mode: Custom vs Task Color
+        TextView bgModeLabel = new TextView(this);
+        bgModeLabel.setText("Background Color");
+        bgModeLabel.setTextColor(0xFFCDD6F4);
+        bgModeLabel.setTextSize(15f);
+        layout.addView(bgModeLabel);
+
+        RadioGroup bgModeGroup = new RadioGroup(this);
+        bgModeGroup.setOrientation(RadioGroup.HORIZONTAL);
+        RadioButton customBgRb = new RadioButton(this);
+        customBgRb.setText("Custom");
+        customBgRb.setTextColor(0xFFCDD6F4);
+        customBgRb.setId(View.generateViewId());
+        RadioButton taskColorBgRb = new RadioButton(this);
+        taskColorBgRb.setText("Task Color");
+        taskColorBgRb.setTextColor(0xFFCDD6F4);
+        taskColorBgRb.setId(View.generateViewId());
+        bgModeGroup.addView(customBgRb);
+        bgModeGroup.addView(taskColorBgRb);
+        layout.addView(bgModeGroup);
+
+        // Custom color picker (shown only in custom mode)
+        LinearLayout customBgContainer = new LinearLayout(this);
+        customBgContainer.setOrientation(LinearLayout.VERTICAL);
+        addColorRow(customBgContainer, "Background", () -> prefs.getBgColor(), c -> prefs.setBgColor(c));
+        layout.addView(customBgContainer);
+
+        // Task color brightness slider (shown only in task color mode)
+        LinearLayout taskColorContainer = new LinearLayout(this);
+        taskColorContainer.setOrientation(LinearLayout.VERTICAL);
+        taskColorContainer.setPadding(0, (int)(4*d), 0, 0);
+        int initTaskBright = prefs.getTaskColorBrightness();
+        TextView taskBrightLabel = new TextView(this);
+        taskBrightLabel.setText("Brightness: " + (initTaskBright > 0 ? "+" : "") + initTaskBright + "%");
+        taskBrightLabel.setTextColor(0xFFCDD6F4);
+        taskBrightLabel.setTextSize(14f);
+        taskColorContainer.addView(taskBrightLabel);
+
+        SeekBar taskBrightBar = new SeekBar(this);
+        taskBrightBar.setMin(-50);
+        taskBrightBar.setMax(50);
+        taskBrightBar.setProgress(prefs.getTaskColorBrightness());
+        taskBrightBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int val, boolean u) {
+                taskBrightLabel.setText("Brightness: " + (val > 0 ? "+" : "") + val + "%");
+            }
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {
+                prefs.setTaskColorBrightness(sb.getProgress());
+            }
+        });
+        taskColorContainer.addView(taskBrightBar);
+
+        TextView taskBrightHint = new TextView(this);
+        taskBrightHint.setText("Background uses current task's color");
+        taskBrightHint.setTextColor(0xFF9399B2);
+        taskBrightHint.setTextSize(12f);
+        taskColorContainer.addView(taskBrightHint);
+        layout.addView(taskColorContainer);
+
+        // Set initial visibility based on current mode
+        boolean useTaskColor = prefs.isUseTaskColorBg();
+        if (useTaskColor) {
+            bgModeGroup.check(taskColorBgRb.getId());
+            customBgContainer.setVisibility(View.GONE);
+            taskColorContainer.setVisibility(View.VISIBLE);
+        } else {
+            bgModeGroup.check(customBgRb.getId());
+            customBgContainer.setVisibility(View.VISIBLE);
+            taskColorContainer.setVisibility(View.GONE);
+        }
+
+        bgModeGroup.setOnCheckedChangeListener((g, id) -> {
+            if (id == taskColorBgRb.getId()) {
+                prefs.setUseTaskColorBg(true);
+                customBgContainer.setVisibility(View.GONE);
+                taskColorContainer.setVisibility(View.VISIBLE);
+            } else {
+                prefs.setUseTaskColorBg(false);
+                customBgContainer.setVisibility(View.VISIBLE);
+                taskColorContainer.setVisibility(View.GONE);
+            }
+        });
+
         addColorRow(layout, "Text Color", () -> prefs.getTextColor(), c -> prefs.setTextColor(c));
         addColorRow(layout, "Border Color", () -> prefs.getAccentColor(), c -> prefs.setAccentColor(c));
 
@@ -1105,6 +1191,32 @@ public class MainActivity extends Activity {
         });
         layout.addView(brightBar);
 
+        // Breathing grayscale slider (0 to 100, default 0)
+        addSpacer(layout, 4);
+        int initGray = prefs.getBreathingGrayscale();
+        TextView grayLabel = new TextView(this);
+        grayLabel.setText("Grayscale: " + initGray + "%");
+        grayLabel.setTextColor(0xFFCDD6F4);
+        grayLabel.setTextSize(14f);
+        grayLabel.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
+        layout.addView(grayLabel);
+
+        SeekBar grayBar = new SeekBar(this);
+        grayBar.setMin(0);
+        grayBar.setMax(100);
+        grayBar.setProgress(prefs.getBreathingGrayscale());
+        grayBar.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
+        grayBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int val, boolean u) {
+                grayLabel.setText("Grayscale: " + val + "%");
+            }
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {
+                prefs.setBreathingGrayscale(sb.getProgress());
+            }
+        });
+        layout.addView(grayBar);
+
         // Toggle breathing checkbox shows/hides sub-sliders
         pulseCb.setOnCheckedChangeListener((btn, checked) -> {
             prefs.setOverlayPulseEnabled(checked);
@@ -1113,6 +1225,8 @@ public class MainActivity extends Activity {
             transBar.setVisibility(vis);
             brightLabel.setVisibility(vis);
             brightBar.setVisibility(vis);
+            grayLabel.setVisibility(vis);
+            grayBar.setVisibility(vis);
         });
 
         // Text stroke toggle
@@ -1184,9 +1298,12 @@ public class MainActivity extends Activity {
         });
         layout.addView(uiOpBar);
 
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.addView(layout);
+
         new AlertDialog.Builder(this)
             .setTitle("Overlay Settings")
-            .setView(layout)
+            .setView(scrollView)
             .setPositiveButton("OK", null)
             .show();
     }

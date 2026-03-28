@@ -13,12 +13,14 @@
 - **➚ open app** → opens the full TrackyTime app (releases focus, overlay stays expanded)
 - **− collapse** → collapses the expanded overlay back to the compact pill
 - **Timeline bar** → 6dp colored bar at the bottom showing the day's activity history as proportional segments. Each activity session is a colored rectangle. The currently-running activity grows live. The live segment pulses immediately, speeding up 2x every 30 minutes as a gentle nudge. Not affected by the opacity slider. White tick marks (2px wide) at every hour (full height) and half-hour (bottom half). Both fully opaque. Half-hour marks are hidden once total tracked time exceeds 5 hours.
-- **Breathing overlay** → optional (default on): the border and background pulse in sync with the timeline bar. When enabled, two sub-sliders appear:
+- **Background color mode** → choose between a **custom color** (the color picker) or **task color** (automatically uses the current task's assigned color). When task color mode is selected, a **brightness slider** (-50% to +50%, default -30%) adjusts the task color. The background color changes instantly whenever you switch tasks.
+- **Breathing overlay** → optional (default on): the border and background pulse in sync with the timeline bar. When enabled, three sub-sliders appear:
   - **Transparency** (-50% to +50%, default +30%): controls how much the **background** opacity oscillates during breathing. Positive = more transparent at dim point, negative = more opaque. Effect is subtle (30% scaling). The **border** always breathes independently (fades from transparent → its set opacity), unaffected by this slider.
   - **Brightness** (-50% to +50%, default -25%): controls color shift direction and amount. Negative = darkens toward black, positive = brightens toward white. Slide to the opposite direction to reverse the effect — no auto-detect needed.
+  - **Grayscale** (0% to 100%, default 0%): controls how much the background desaturates toward grayscale at the breathing dim point. At 100%, the background goes fully grayscale during the dim phase. Uses ITU BT.601 luminance for natural-looking desaturation.
   Values clamp silently at physical limits (can't go below 0% or above 100% opacity). Works regardless of border width (even 0). Live-updates when toggled/adjusted in settings. All pulse animations run at 30fps to reduce battery/compositor load.
 - **Minimum activity duration** → activities shorter than 10 seconds are automatically discarded (not saved). Prevents accidental micro-entries when switching activities quickly.
-- **Live-update**: changing any setting (colors, size, border, opacity) updates the overlay instantly — no restart needed. Includes quick-select row text/icon colors and sizes.
+- **Live-update**: changing any setting (colors, size, border, opacity) updates the overlay instantly — no restart needed. Includes quick-select row text/icon colors and sizes. Changing a task's color in the app immediately updates the timeline bar colors on the overlay.
 
 ### Timer
 - **Drift-proof**: uses `virtualStartTimestamp` pattern (elapsed = now − virtualStart) instead of incrementing a counter
@@ -36,7 +38,7 @@
 - **Tap date to return to today**: tapping the date/week text in the header jumps back to the present day or current week.
 - Date navigation (prev/next day or week)
 - Export/Import/Settings buttons at the top (above history) for quick access
-- Settings: background color, text color, border color (accent), border width (0–6dp) + border opacity, background opacity, text size, breathing overlay toggle + transparency/brightness sliders (-50% to +50%), text stroke toggle + stroke width slider (1–10, linear scaling, proportional to text size so stroke scales with overlay size like icon stroke does; anchored at 16sp Medium where setting 4 = original default), UI elements opacity (buttons, separator, hints, paused clock)
+- Settings: background color mode (custom/task color + brightness slider), text color, border color (accent), border width (0–6dp) + border opacity, background opacity, text size, breathing overlay toggle + transparency/brightness/grayscale sliders, text stroke toggle + stroke width slider (1–10, linear scaling, proportional to text size so stroke scales with overlay size like icon stroke does; anchored at 16sp Medium where setting 4 = original default), UI elements opacity (buttons, separator, hints, paused clock)
 - **Export**: save all data as JSON to any location (Google Drive, email, etc.). Also includes quick-select shortcut names.
 - **Import**: restore data from a JSON backup (skips duplicates). Restores quick-select shortcuts if present. Backward-compatible with older exports that don't have shortcuts.
 
@@ -81,7 +83,7 @@
 | `app/src/main/java/.../StrokeTextView.java` | Custom TextView with TV subtitle-style text stroke/outline — auto-contrast via ITU BT.601 brightness (black stroke for light text, white for dark) |
 | `app/src/main/java/.../StrokeEditText.java` | Custom EditText with same stroke/outline — uses Layout.draw() directly to bypass Editor's hardware-acceleration cache |
 | `app/src/main/java/.../StrokeImageView.java` | Custom ImageView with same stroke outline — draws icon at 8 offset positions in contrasting color, then normally on top (same auto-contrast as StrokeTextView) |
-| `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance (bg/text/border colors, border width, opacity, size, overlay pulse toggle, text stroke toggle + stroke width, UI elements opacity, quick-select activities) + crash recovery checkpoint (separate `crash_recovery` file) |
+| `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance (bg/text/border colors, border width, opacity, size, overlay pulse toggle + breathing transparency/brightness/grayscale, task color bg mode + brightness, text stroke toggle + stroke width, UI elements opacity, quick-select activities, color change signal) + crash recovery checkpoint (separate `crash_recovery` file) |
 | `.github/workflows/android.yml` | GitHub Actions workflow — builds APK on every push |
 
 > **Note:** Java files live under `app/src/main/java/com/timetracker/overlay/`. The `...` above abbreviates that path.
