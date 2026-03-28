@@ -62,7 +62,7 @@ public class OverlayPreferences {
     public boolean isUseTaskColorBg() { return sp.getBoolean("use_task_color_bg", false); }
     public void setUseTaskColorBg(boolean on) { sp.edit().putBoolean("use_task_color_bg", on).apply(); }
 
-    // Task color background brightness adjustment (-50 to +50, default -30)
+    // Task color background brightness adjustment (-100 to +100, default -30)
     // Applied on top of task's color when use_task_color_bg is true
     public int getTaskColorBrightness() { return sp.getInt("task_color_brightness", -30); }
     public void setTaskColorBrightness(int v) { sp.edit().putInt("task_color_brightness", v).apply(); }

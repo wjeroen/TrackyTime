@@ -985,8 +985,8 @@ public class MainActivity extends Activity {
         taskColorContainer.addView(taskBrightLabel);
 
         SeekBar taskBrightBar = new SeekBar(this);
-        taskBrightBar.setMin(-50);
-        taskBrightBar.setMax(50);
+        taskBrightBar.setMin(-100);
+        taskBrightBar.setMax(100);
         taskBrightBar.setProgress(prefs.getTaskColorBrightness());
         taskBrightBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar sb, int val, boolean u) {

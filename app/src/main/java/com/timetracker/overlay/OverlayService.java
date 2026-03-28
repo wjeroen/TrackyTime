@@ -195,13 +195,13 @@ public class OverlayService extends Service {
         int r = (color >> 16) & 0xFF;
         int g = (color >> 8) & 0xFF;
         int b = color & 0xFF;
-        float shift = brightnessPercent / 100f; // -0.5 to +0.5
+        float shift = brightnessPercent / 100f; // -1.0 to +1.0
         if (shift > 0) {
             r = r + (int) ((255 - r) * shift);
             g = g + (int) ((255 - g) * shift);
             b = b + (int) ((255 - b) * shift);
         } else {
-            float factor = 1f + shift; // 0.5 to 1.0
+            float factor = 1f + shift; // 0.0 to 1.0
             r = (int) (r * factor);
             g = (int) (g * factor);
             b = (int) (b * factor);
