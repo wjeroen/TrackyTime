@@ -19,7 +19,7 @@
   - **Brightness** (-50% to +50%, default -25%): controls color shift direction and amount. Negative = darkens toward black, positive = brightens toward white. Slide to the opposite direction to reverse the effect — no auto-detect needed.
   - **Grayscale** (0% to 100%, default 0%): controls how much the background desaturates toward grayscale at the breathing dim point. At 100%, the background goes fully grayscale during the dim phase. Uses ITU BT.601 luminance for natural-looking desaturation.
   Values clamp silently at physical limits (can't go below 0% or above 100% opacity). Works regardless of border width (even 0). Live-updates when toggled/adjusted in settings. All pulse animations run at 30fps to reduce battery/compositor load.
-- **Immersive clock** → optional (default off): when enabled, a small desaturated clock pill appears in the top-right corner whenever the phone enters immersive/fullscreen mode (e.g. gaming, video playback). The clock uses the same text size and stroke settings as the main overlay, but fully desaturated (grayscale) and borderless. Background uses the overlay's bg color (or task color if in that mode) desaturated with the same opacity. Updates every minute. Uses Android's WindowInsets API to detect when the status bar is hidden. The detection view is invisible and non-touchable.
+- **Immersive clock** → optional (default off): when enabled, a small clock pill (white text on black background) appears in the top-right corner whenever the phone enters immersive/fullscreen mode (e.g. gaming, video playback). Shows current time and battery level (e.g. "14:30 · 72%"). Uses the same text size, stroke settings, and background opacity as the main overlay, but always black/white and borderless. Updates every minute. Uses Android's WindowInsets API (`isVisible()` on API 30+) to detect when both status bar and navigation bar are hidden. Works independently of time tracking — if enabled, the overlay service auto-starts on boot so the clock is always available. Tapping the clock does nothing; touches outside it pass through to the app below.
 - **Minimum activity duration** → activities shorter than 10 seconds are automatically discarded (not saved). Prevents accidental micro-entries when switching activities quickly.
 - **Live-update**: changing any setting (colors, size, border, opacity) updates the overlay instantly — no restart needed. Includes quick-select row text/icon colors and sizes. Changing a task's color in the app immediately updates the timeline bar colors on the overlay.
 
@@ -84,6 +84,7 @@
 | `app/src/main/java/.../StrokeTextView.java` | Custom TextView with TV subtitle-style text stroke/outline — auto-contrast via ITU BT.601 brightness (black stroke for light text, white for dark) |
 | `app/src/main/java/.../StrokeEditText.java` | Custom EditText with same stroke/outline — uses Layout.draw() directly to bypass Editor's hardware-acceleration cache |
 | `app/src/main/java/.../StrokeImageView.java` | Custom ImageView with same stroke outline — draws icon at 8 offset positions in contrasting color, then normally on top (same auto-contrast as StrokeTextView) |
+| `app/src/main/java/.../BootReceiver.java` | Auto-starts OverlayService on boot when immersive clock is enabled |
 | `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance (bg/text/border colors, border width, opacity, size, overlay pulse toggle + breathing transparency/brightness/grayscale, task color bg mode + brightness, text stroke toggle + stroke width, UI elements opacity, quick-select activities, color change signal) + crash recovery checkpoint (separate `crash_recovery` file) |
 | `.github/workflows/android.yml` | GitHub Actions workflow — builds APK on every push |
 
@@ -107,6 +108,7 @@ TrackyTime/
 │       ├── AndroidManifest.xml  ← Permissions & components
 │       ├── java/com/timetracker/overlay/
 │       │   ├── ActivityEntry.java
+│       │   ├── BootReceiver.java
 │       │   ├── ColorBarView.java
 │       │   ├── DatabaseHelper.java
 │       │   ├── MainActivity.java
