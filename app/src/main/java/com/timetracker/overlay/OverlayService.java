@@ -11,6 +11,7 @@ import android.content.res.ColorStateList;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -20,6 +21,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
@@ -102,6 +104,8 @@ public class OverlayService extends Service {
         // Force pulse to pick up new values (toggle, opacity, colors)
         refreshPulseCache();
         currentPulseDuration = 0; // force restart on next tick
+        setupOrTeardownImmersiveClock();
+        applyClockPreferences();
     };
 
     private static final int NOTIF_ID = 1001;
@@ -114,6 +118,16 @@ public class OverlayService extends Service {
     private float initialTouchX, initialTouchY;
     private boolean isDragging = false;
     private static final int DRAG_THRESHOLD = 10;
+
+    // Immersive mode clock
+    private View immersiveDetectorView;
+    private StrokeTextView clockText;
+    private GradientDrawable clockBgDrawable;
+    private WindowManager.LayoutParams clockParams;
+    private Handler clockHandler;
+    private Runnable clockRunnable;
+    private boolean isImmersiveMode = false;
+    private boolean immersiveClockSetUp = false;
 
     @Override
     public void onCreate() {
@@ -184,6 +198,8 @@ public class OverlayService extends Service {
         loadTodaySegments();
 
         windowManager.addView(overlayView, params);
+
+        setupOrTeardownImmersiveClock();
     }
 
     // ---- Visual preferences (opacity applies to both background and border) ----
@@ -822,6 +838,7 @@ public class OverlayService extends Service {
         if (taskPrefs.isUseTaskColorBg()) {
             applyPreferences();
             refreshPulseCache();
+            applyClockPreferences();
         }
 
         timerText.setVisibility(View.VISIBLE);
@@ -1000,6 +1017,167 @@ public class OverlayService extends Service {
         }
     }
 
+    // ---- Immersive mode clock ----
+
+    private static int desaturateColor(int color) {
+        int r = (color >> 16) & 0xFF;
+        int g = (color >> 8) & 0xFF;
+        int b = color & 0xFF;
+        int gray = (int) (0.299f * r + 0.587f * g + 0.114f * b);
+        return (color & 0xFF000000) | (gray << 16) | (gray << 8) | gray;
+    }
+
+    private void setupOrTeardownImmersiveClock() {
+        OverlayPreferences prefs = new OverlayPreferences(this);
+        if (prefs.isImmersiveClockEnabled()) {
+            setupImmersiveClock();
+            applyClockPreferences();
+        } else {
+            teardownImmersiveClock();
+        }
+    }
+
+    private void setupImmersiveClock() {
+        if (immersiveClockSetUp) return;
+        immersiveClockSetUp = true;
+
+        float density = getResources().getDisplayMetrics().density;
+
+        // Invisible full-screen view to receive system inset changes
+        immersiveDetectorView = new View(this);
+        WindowManager.LayoutParams detectorParams = new WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        );
+        immersiveDetectorView.setOnApplyWindowInsetsListener((view, insets) -> {
+            boolean immersive;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                android.graphics.Insets statusInsets = insets.getInsets(WindowInsets.Type.statusBars());
+                immersive = statusInsets.top == 0;
+            } else {
+                immersive = insets.getSystemWindowInsetTop() == 0;
+            }
+            if (immersive != isImmersiveMode) {
+                isImmersiveMode = immersive;
+                updateClockVisibility(immersive);
+            }
+            return insets;
+        });
+        windowManager.addView(immersiveDetectorView, detectorParams);
+
+        // Clock overlay — small pill showing current time
+        clockText = new StrokeTextView(this);
+        int padH = (int) (8 * density);
+        int padV = (int) (4 * density);
+        clockText.setPadding(padH, padV, padH, padV);
+
+        clockBgDrawable = new GradientDrawable();
+        clockBgDrawable.setShape(GradientDrawable.RECTANGLE);
+        clockBgDrawable.setCornerRadius(10 * density);
+        clockText.setBackground(clockBgDrawable);
+
+        applyClockPreferences();
+        updateClockDisplay();
+
+        clockParams = new WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT
+        );
+        clockParams.gravity = Gravity.TOP | Gravity.END;
+        clockParams.x = (int) (16 * density);
+        clockParams.y = (int) (8 * density);
+
+        clockText.setVisibility(View.GONE);
+        windowManager.addView(clockText, clockParams);
+
+        // Clock update handler
+        clockHandler = new Handler(Looper.getMainLooper());
+        clockRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (isImmersiveMode && immersiveClockSetUp) {
+                    updateClockDisplay();
+                    long delay = 60000 - (System.currentTimeMillis() % 60000);
+                    clockHandler.postDelayed(this, delay);
+                }
+            }
+        };
+    }
+
+    private void teardownImmersiveClock() {
+        if (!immersiveClockSetUp) return;
+        immersiveClockSetUp = false;
+        isImmersiveMode = false;
+
+        if (clockHandler != null) {
+            clockHandler.removeCallbacks(clockRunnable);
+        }
+        if (immersiveDetectorView != null && immersiveDetectorView.isAttachedToWindow()) {
+            windowManager.removeView(immersiveDetectorView);
+        }
+        immersiveDetectorView = null;
+        if (clockText != null && clockText.isAttachedToWindow()) {
+            windowManager.removeView(clockText);
+        }
+        clockText = null;
+        clockBgDrawable = null;
+    }
+
+    private void updateClockVisibility(boolean show) {
+        if (clockText == null) return;
+        clockText.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (show) {
+            updateClockDisplay();
+            clockHandler.removeCallbacks(clockRunnable);
+            long delay = 60000 - (System.currentTimeMillis() % 60000);
+            clockHandler.postDelayed(clockRunnable, delay);
+        } else {
+            clockHandler.removeCallbacks(clockRunnable);
+        }
+    }
+
+    private void updateClockDisplay() {
+        if (clockText == null) return;
+        String pattern = android.text.format.DateFormat.is24HourFormat(this) ? "HH:mm" : "h:mm a";
+        clockText.setText(new SimpleDateFormat(pattern, Locale.US).format(new Date()));
+    }
+
+    private void applyClockPreferences() {
+        if (clockText == null || clockBgDrawable == null) return;
+        OverlayPreferences prefs = new OverlayPreferences(this);
+
+        float textSize = prefs.getTextSize();
+        clockText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+
+        int textColor = prefs.getTextColor();
+        clockText.setTextColor(desaturateColor(textColor));
+
+        boolean strokeEnabled = prefs.isTextStrokeEnabled();
+        int strokeWidth = prefs.getStrokeWidth();
+        clockText.setStrokeEnabled(strokeEnabled);
+        clockText.setStrokeWidth(strokeWidth);
+
+        int bgColor;
+        if (prefs.isUseTaskColorBg() && currentActivityColor != 0) {
+            bgColor = adjustColorBrightness(currentActivityColor, prefs.getTaskColorBrightness());
+        } else {
+            bgColor = prefs.getBgColor();
+        }
+        int grayBg = desaturateColor(bgColor);
+        int bgOpacity = prefs.getOpacity();
+        clockBgDrawable.setColor((bgOpacity << 24) | (grayBg & 0x00FFFFFF));
+    }
+
     // ---- Lifecycle ----
 
     @Override
@@ -1019,6 +1197,7 @@ public class OverlayService extends Service {
         timerHandler.removeCallbacks(applyPrefsRunnable);
         heartbeatHandler.removeCallbacks(heartbeatRunnable);
         stopProgressPulse();
+        teardownImmersiveClock();
         // Unregister pref listener
         getSharedPreferences("overlay_prefs", MODE_PRIVATE)
             .unregisterOnSharedPreferenceChangeListener(prefsListener);

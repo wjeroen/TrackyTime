@@ -1298,6 +1298,24 @@ public class MainActivity extends Activity {
         });
         layout.addView(uiOpBar);
 
+        // Immersive clock toggle
+        addSpacer(layout, 14);
+        CheckBox immersiveCb = new CheckBox(this);
+        immersiveCb.setText("Display a clock while playing videos or gaming");
+        immersiveCb.setTextColor(0xFFCDD6F4);
+        immersiveCb.setTextSize(14f);
+        immersiveCb.setChecked(prefs.isImmersiveClockEnabled());
+        immersiveCb.setOnCheckedChangeListener((btn, checked) -> {
+            prefs.setImmersiveClockEnabled(checked);
+        });
+        layout.addView(immersiveCb);
+
+        TextView immersiveHint = new TextView(this);
+        immersiveHint.setText("Shows a grayscale clock in fullscreen/immersive mode");
+        immersiveHint.setTextColor(0xFF9399B2);
+        immersiveHint.setTextSize(12f);
+        layout.addView(immersiveHint);
+
         ScrollView scrollView = new ScrollView(this);
         scrollView.addView(layout);
 

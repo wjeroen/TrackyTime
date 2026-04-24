@@ -79,6 +79,10 @@ public class OverlayPreferences {
     public int getUiElementsOpacity() { return sp.getInt("ui_elements_opacity", 0x99); }
     public void setUiElementsOpacity(int o) { sp.edit().putInt("ui_elements_opacity", o).apply(); }
 
+    // Immersive clock — display current time when phone is in immersive/fullscreen mode
+    public boolean isImmersiveClockEnabled() { return sp.getBoolean("immersive_clock", false); }
+    public void setImmersiveClockEnabled(boolean on) { sp.edit().putBoolean("immersive_clock", on).apply(); }
+
     // 0=small, 1=medium, 2=large, 3=extra large
     public int getSize() { return sp.getInt("size", 0); }
     public void setSize(int s) { sp.edit().putInt("size", s).apply(); }
@@ -159,6 +163,7 @@ public class OverlayPreferences {
         sb.append("textStroke:").append(isTextStrokeEnabled()).append(",");
         sb.append("strokeWidth:").append(getStrokeWidth()).append(",");
         sb.append("uiElementsOpacity:").append(getUiElementsOpacity()).append(",");
+        sb.append("immersiveClock:").append(isImmersiveClockEnabled()).append(",");
         sb.append("size:").append(getSize());
         return sb.toString();
     }
@@ -220,6 +225,9 @@ public class OverlayPreferences {
                         break;
                     case "uiElementsOpacity":
                         setUiElementsOpacity(Integer.parseInt(value));
+                        break;
+                    case "immersiveClock":
+                        setImmersiveClockEnabled(Boolean.parseBoolean(value));
                         break;
                     case "size":
                         setSize(Integer.parseInt(value));
