@@ -6,11 +6,13 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -1019,14 +1021,6 @@ public class OverlayService extends Service {
 
     // ---- Immersive mode clock ----
 
-    private static int desaturateColor(int color) {
-        int r = (color >> 16) & 0xFF;
-        int g = (color >> 8) & 0xFF;
-        int b = color & 0xFF;
-        int gray = (int) (0.299f * r + 0.587f * g + 0.114f * b);
-        return (color & 0xFF000000) | (gray << 16) | (gray << 8) | gray;
-    }
-
     private void setupOrTeardownImmersiveClock() {
         OverlayPreferences prefs = new OverlayPreferences(this);
         if (prefs.isImmersiveClockEnabled()) {
@@ -1152,7 +1146,18 @@ public class OverlayService extends Service {
     private void updateClockDisplay() {
         if (clockText == null) return;
         String pattern = android.text.format.DateFormat.is24HourFormat(this) ? "HH:mm" : "h:mm a";
-        clockText.setText(new SimpleDateFormat(pattern, Locale.US).format(new Date()));
+        String time = new SimpleDateFormat(pattern, Locale.US).format(new Date());
+        int battery = getBatteryLevel();
+        clockText.setText(time + "  " + battery + "%");
+    }
+
+    private int getBatteryLevel() {
+        IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        Intent batteryStatus = registerReceiver(null, filter);
+        if (batteryStatus == null) return -1;
+        int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+        int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, 100);
+        return (int) (level * 100f / scale);
     }
 
     private void applyClockPreferences() {
@@ -1161,24 +1166,15 @@ public class OverlayService extends Service {
 
         float textSize = prefs.getTextSize();
         clockText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
-
-        int textColor = prefs.getTextColor();
-        clockText.setTextColor(desaturateColor(textColor));
+        clockText.setTextColor(0xFFFFFFFF);
 
         boolean strokeEnabled = prefs.isTextStrokeEnabled();
         int strokeWidth = prefs.getStrokeWidth();
         clockText.setStrokeEnabled(strokeEnabled);
         clockText.setStrokeWidth(strokeWidth);
 
-        int bgColor;
-        if (prefs.isUseTaskColorBg() && currentActivityColor != 0) {
-            bgColor = adjustColorBrightness(currentActivityColor, prefs.getTaskColorBrightness());
-        } else {
-            bgColor = prefs.getBgColor();
-        }
-        int grayBg = desaturateColor(bgColor);
         int bgOpacity = prefs.getOpacity();
-        clockBgDrawable.setColor((bgOpacity << 24) | (grayBg & 0x00FFFFFF));
+        clockBgDrawable.setColor((bgOpacity << 24) | 0x00000000);
     }
 
     // ---- Lifecycle ----
