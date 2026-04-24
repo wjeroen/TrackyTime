@@ -19,9 +19,19 @@
   - **Brightness** (-50% to +50%, default -25%): controls color shift direction and amount. Negative = darkens toward black, positive = brightens toward white. Slide to the opposite direction to reverse the effect — no auto-detect needed.
   - **Grayscale** (0% to 100%, default 0%): controls how much the background desaturates toward grayscale at the breathing dim point. At 100%, the background goes fully grayscale during the dim phase. Uses ITU BT.601 luminance for natural-looking desaturation.
   Values clamp silently at physical limits (can't go below 0% or above 100% opacity). Works regardless of border width (even 0). Live-updates when toggled/adjusted in settings. All pulse animations run at 30fps to reduce battery/compositor load.
-- **Immersive clock** → optional (default off): when enabled, a small clock pill (white text on black background) appears in the top-right corner whenever the phone enters immersive/fullscreen mode (e.g. gaming, video playback). Shows current time and battery level (e.g. "14:30 · 72%"). Uses the same text size, stroke settings, and background opacity as the main overlay, but always black/white and borderless. Updates every minute. Uses Android's WindowInsets API (`isVisible()` on API 30+) to detect when both status bar and navigation bar are hidden. Works independently of time tracking — if enabled, the overlay service auto-starts on boot so the clock is always available. Tapping the clock does nothing; touches outside it pass through to the app below.
 - **Minimum activity duration** → activities shorter than 10 seconds are automatically discarded (not saved). Prevents accidental micro-entries when switching activities quickly.
 - **Live-update**: changing any setting (colors, size, border, opacity) updates the overlay instantly — no restart needed. Includes quick-select row text/icon colors and sizes. Changing a task's color in the app immediately updates the timeline bar colors on the overlay.
+
+### Immersive clock (gaming/video mode)
+- **Standalone feature** — works independently of time tracking. No need to start the overlay; just enable the setting.
+- Small clock pill (white text on black background) appears in the **top-right corner** whenever the phone enters immersive/fullscreen mode (e.g. gaming, video playback)
+- Shows current time and battery level (e.g. "14:30 · 72%")
+- Uses the same **text size**, **stroke settings**, and **background opacity** as the main overlay, but always black/white and borderless
+- Updates every minute, aligned to minute boundaries
+- **Detection**: uses Android's WindowInsets API (`isVisible()` on API 30+) to detect when both status bar and navigation bar are hidden. Falls back to inset height checks on older APIs.
+- **Auto-start on boot**: if enabled, the overlay service starts automatically after reboot — no need to open the app
+- Tapping the clock does nothing; touches outside it pass through to the app below
+- Toggle in settings: "Display a clock while playing videos or gaming"
 
 ### Timer
 - **Drift-proof**: uses `virtualStartTimestamp` pattern (elapsed = now − virtualStart) instead of incrementing a counter
