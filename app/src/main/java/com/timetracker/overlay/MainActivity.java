@@ -139,7 +139,7 @@ public class MainActivity extends Activity {
 
     private void setupToggle() {
         toggleBtn.setOnClickListener(v -> {
-            if (OverlayService.isServiceRunning) {
+            if (OverlayService.isOverlayVisible) {
                 stopService(new Intent(this, OverlayService.class));
                 toggleBtn.postDelayed(this::updateToggleButton, 300);
             } else {
@@ -150,14 +150,20 @@ public class MainActivity extends Activity {
                         OVERLAY_PERM_CODE);
                     return;
                 }
-                startForegroundService(new Intent(this, OverlayService.class));
+                startOverlayService();
                 toggleBtn.postDelayed(this::updateToggleButton, 300);
             }
         });
     }
 
+    private void startOverlayService() {
+        Intent svc = new Intent(this, OverlayService.class);
+        svc.putExtra(OverlayService.EXTRA_SHOW_OVERLAY, true);
+        startForegroundService(svc);
+    }
+
     private void updateToggleButton() {
-        toggleBtn.setText(OverlayService.isServiceRunning ?
+        toggleBtn.setText(OverlayService.isOverlayVisible ?
             "Stop Overlay" : "Start Overlay");
     }
 
@@ -165,7 +171,7 @@ public class MainActivity extends Activity {
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
         if (req == OVERLAY_PERM_CODE && Settings.canDrawOverlays(this)) {
-            startForegroundService(new Intent(this, OverlayService.class));
+            startOverlayService();
             toggleBtn.postDelayed(this::updateToggleButton, 300);
         }
         if (req == EXPORT_FILE_CODE && res == RESULT_OK && data != null) {
@@ -1307,6 +1313,10 @@ public class MainActivity extends Activity {
         immersiveCb.setChecked(prefs.isImmersiveClockEnabled());
         immersiveCb.setOnCheckedChangeListener((btn, checked) -> {
             prefs.setImmersiveClockEnabled(checked);
+            // Start the service in clock-only mode if not already running
+            if (checked && !OverlayService.isServiceRunning && Settings.canDrawOverlays(this)) {
+                startForegroundService(new Intent(this, OverlayService.class));
+            }
         });
         layout.addView(immersiveCb);
 

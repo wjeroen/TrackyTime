@@ -42,6 +42,7 @@ import java.util.Locale;
 public class OverlayService extends Service {
 
     public static boolean isServiceRunning = false;
+    public static boolean isOverlayVisible = false;
 
     // Live activity data (readable by MainActivity for showing current activity)
     public static String liveActivityName = "";
@@ -101,11 +102,12 @@ public class OverlayService extends Service {
     // Live-update: listen for pref changes from the settings dialog
     private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
     private Runnable applyPrefsRunnable = () -> {
-        loadTodaySegments(); // reload segment colors from DB (picks up color changes from the app)
-        applyPreferences();
-        // Force pulse to pick up new values (toggle, opacity, colors)
-        refreshPulseCache();
-        currentPulseDuration = 0; // force restart on next tick
+        if (isOverlayVisible) {
+            loadTodaySegments();
+            applyPreferences();
+            refreshPulseCache();
+            currentPulseDuration = 0; // force restart on next tick
+        }
         setupOrTeardownImmersiveClock();
         applyClockPreferences();
     };
@@ -131,11 +133,14 @@ public class OverlayService extends Service {
     private boolean isImmersiveMode = false;
     private boolean immersiveClockSetUp = false;
 
+    static final String EXTRA_SHOW_OVERLAY = "show_overlay";
+
     @Override
     public void onCreate() {
         super.onCreate();
         dbHelper = new DatabaseHelper(this);
         timerHandler = new Handler(Looper.getMainLooper());
+        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
 
         // Crash recovery heartbeat (saves running activity state every 5s)
         heartbeatHandler = new Handler(Looper.getMainLooper());
@@ -156,7 +161,6 @@ public class OverlayService extends Service {
         createNotificationChannel();
         startForeground(NOTIF_ID, buildNotification());
         isServiceRunning = true;
-        setupOverlay();
 
         // Live-update: re-apply prefs whenever settings change
         SharedPreferences sp = getSharedPreferences("overlay_prefs", MODE_PRIVATE);
@@ -165,10 +169,13 @@ public class OverlayService extends Service {
             timerHandler.postDelayed(applyPrefsRunnable, 100); // debounce
         };
         sp.registerOnSharedPreferenceChangeListener(prefsListener);
+
+        // Immersive clock works independently of the main overlay
+        setupOrTeardownImmersiveClock();
     }
 
     private void setupOverlay() {
-        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+        if (isOverlayVisible) return;
         overlayView = LayoutInflater.from(this).inflate(R.layout.overlay_layout, null);
 
         timerText = overlayView.findViewById(R.id.timerText);
@@ -200,8 +207,7 @@ public class OverlayService extends Service {
         loadTodaySegments();
 
         windowManager.addView(overlayView, params);
-
-        setupOrTeardownImmersiveClock();
+        isOverlayVisible = true;
     }
 
     // ---- Visual preferences (opacity applies to both background and border) ----
@@ -1182,12 +1188,16 @@ public class OverlayService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && intent.getBooleanExtra(EXTRA_SHOW_OVERLAY, false)) {
+            setupOverlay();
+        }
         return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
         isServiceRunning = false;
+        isOverlayVisible = false;
         liveActivityName = "";
         liveStartTime = 0;
         liveIsRunning = false;
