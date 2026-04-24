@@ -1167,6 +1167,7 @@ public class OverlayService extends Service {
         float textSize = prefs.getTextSize();
         clockText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
         clockText.setTextColor(0xFFFFFFFF);
+        clockText.setAlpha(1.0f);
 
         boolean strokeEnabled = prefs.isTextStrokeEnabled();
         int strokeWidth = prefs.getStrokeWidth();
