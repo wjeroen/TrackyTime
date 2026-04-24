@@ -1045,7 +1045,6 @@ public class OverlayService extends Service {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                 | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                 | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                 | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
@@ -1088,8 +1087,7 @@ public class OverlayService extends Service {
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
             PixelFormat.TRANSLUCENT
         );
         clockParams.gravity = Gravity.TOP | Gravity.END;
@@ -1175,8 +1173,11 @@ public class OverlayService extends Service {
         clockText.setStrokeEnabled(strokeEnabled);
         clockText.setStrokeWidth(strokeWidth);
 
-        int bgOpacity = prefs.getOpacity();
-        clockBgDrawable.setColor((bgOpacity << 24) | 0x00000000);
+        // Solid black bg, 0.79 view-level alpha (stays under Android 12+ untrusted touch threshold)
+        clockBgDrawable.setColor(0xFF000000);
+        clockText.setAlpha(0.79f);
+        clockText.setClickable(false);
+        clockText.setLongClickable(false);
     }
 
     // ---- Lifecycle ----
