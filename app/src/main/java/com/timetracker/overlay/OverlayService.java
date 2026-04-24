@@ -1148,7 +1148,7 @@ public class OverlayService extends Service {
         String pattern = android.text.format.DateFormat.is24HourFormat(this) ? "HH:mm" : "h:mm a";
         String time = new SimpleDateFormat(pattern, Locale.US).format(new Date());
         int battery = getBatteryLevel();
-        clockText.setText(time + "  " + battery + "%");
+        clockText.setText(time + " · " + battery + "%");
     }
 
     private int getBatteryLevel() {
