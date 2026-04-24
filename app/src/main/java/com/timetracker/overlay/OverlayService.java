@@ -1058,10 +1058,13 @@ public class OverlayService extends Service {
         immersiveDetectorView.setOnApplyWindowInsetsListener((view, insets) -> {
             boolean immersive;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                android.graphics.Insets statusInsets = insets.getInsets(WindowInsets.Type.statusBars());
-                immersive = statusInsets.top == 0;
+                // isVisible() is more accurate than checking inset height — handles translucent bars
+                boolean statusHidden = !insets.isVisible(WindowInsets.Type.statusBars());
+                boolean navHidden = !insets.isVisible(WindowInsets.Type.navigationBars());
+                immersive = statusHidden && navHidden;
             } else {
-                immersive = insets.getSystemWindowInsetTop() == 0;
+                immersive = insets.getSystemWindowInsetTop() == 0
+                         && insets.getSystemWindowInsetBottom() == 0;
             }
             if (immersive != isImmersiveMode) {
                 isImmersiveMode = immersive;
