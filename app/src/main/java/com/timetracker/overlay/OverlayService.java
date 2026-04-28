@@ -1043,11 +1043,11 @@ public class OverlayService extends Service {
 
         float density = getResources().getDisplayMetrics().density;
 
-        // Invisible full-screen view to receive system inset changes
+        // 1x1 pixel view to receive system inset changes without blocking touches
         immersiveDetectorView = new View(this);
         WindowManager.LayoutParams detectorParams = new WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
+            1,
+            1,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                 | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
