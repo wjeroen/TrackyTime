@@ -7,6 +7,10 @@
 
 ### Features to Implement
 - [ ] Add separate opacity slider for the timeline bar
+- [x] Task color background mode — overlay bg uses current task's color with brightness adjustment (2026-03-28)
+- [x] Breathing grayscale slider — desaturate overlay bg toward grayscale during breathing (2026-03-28)
+- [x] Instant timeline color updates — changing task color in app immediately updates overlay timeline (2026-03-28)
+- [x] Immersive clock — grayscale clock pill appears during fullscreen/immersive mode (2026-04-24)
 - [x] Unified color picker: 4x5 grid + brightness row (100/300/600/900) for both entries and settings (2026-03-22)
 - [x] Separate border opacity slider — independent from background opacity (2026-03-23)
 - [x] Customizable breathing: transparency + brightness sliders (-50% to +50%, 0 = center), replaces auto-detect darken/brighten (2026-03-23)
@@ -56,6 +60,10 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Add default task color setting (fixed color or random) + interleave palette for better color distribution (2026-04-30)
+- [x] Fix immersive detector blocking touches in other apps — shrink from fullscreen to 1x1 pixel (2026-04-30)
+- [x] Immersive clock — grayscale clock during fullscreen/immersive mode (2026-04-24)
+- [x] Task color bg mode, breathing grayscale, instant timeline color updates (2026-03-28)
 - [x] Separate border opacity + customizable breathing sliders (transparency/brightness, -50% to +50%) (2026-03-23)
 - [x] Fix color picker white space — replaced AlertDialog with plain Dialog (2026-03-23)
 - [x] Fix text stroke scaling — linear (not quadratic), proportional to text size (2026-03-23)

@@ -53,6 +53,24 @@ public class OverlayPreferences {
     public int getBreathingBrightness() { return sp.getInt("breathing_brightness", -25); }
     public void setBreathingBrightness(int v) { sp.edit().putInt("breathing_brightness", v).apply(); }
 
+    // Breathing grayscale (0 to 100, default 0)
+    // Controls how much the background desaturates toward grayscale during breathing dim point
+    public int getBreathingGrayscale() { return sp.getInt("breathing_grayscale", 0); }
+    public void setBreathingGrayscale(int v) { sp.edit().putInt("breathing_grayscale", v).apply(); }
+
+    // Use task color as background (false = custom color, true = task's color)
+    public boolean isUseTaskColorBg() { return sp.getBoolean("use_task_color_bg", false); }
+    public void setUseTaskColorBg(boolean on) { sp.edit().putBoolean("use_task_color_bg", on).apply(); }
+
+    // Task color background brightness adjustment (-100 to +100, default -30)
+    // Applied on top of task's color when use_task_color_bg is true
+    public int getTaskColorBrightness() { return sp.getInt("task_color_brightness", -30); }
+    public void setTaskColorBrightness(int v) { sp.edit().putInt("task_color_brightness", v).apply(); }
+
+    // Default task color (0 = random from palette, non-zero = specific color)
+    public int getDefaultTaskColor() { return sp.getInt("default_task_color", 0); }
+    public void setDefaultTaskColor(int c) { sp.edit().putInt("default_task_color", c).apply(); }
+
     // Text stroke/outline (TV subtitle style with auto-contrast)
     public boolean isTextStrokeEnabled() { return sp.getBoolean("text_stroke", false); }
     public void setTextStrokeEnabled(boolean on) { sp.edit().putBoolean("text_stroke", on).apply(); }
@@ -64,6 +82,10 @@ public class OverlayPreferences {
     // UI elements opacity (50-255, default 0x99=153) — buttons, separator, hint text, paused timer
     public int getUiElementsOpacity() { return sp.getInt("ui_elements_opacity", 0x99); }
     public void setUiElementsOpacity(int o) { sp.edit().putInt("ui_elements_opacity", o).apply(); }
+
+    // Immersive clock — display current time when phone is in immersive/fullscreen mode
+    public boolean isImmersiveClockEnabled() { return sp.getBoolean("immersive_clock", false); }
+    public void setImmersiveClockEnabled(boolean on) { sp.edit().putBoolean("immersive_clock", on).apply(); }
 
     // 0=small, 1=medium, 2=large, 3=extra large
     public int getSize() { return sp.getInt("size", 0); }
@@ -83,6 +105,9 @@ public class OverlayPreferences {
     public float getTimerTextSize() {
         return getTextSize();
     }
+
+    // Signal to overlay that a task color changed in the DB (timestamp, triggers pref listener)
+    public void notifyTaskColorChanged() { sp.edit().putLong("color_change_signal", System.currentTimeMillis()).apply(); }
 
     // Quick-select activity shortcuts (newline-delimited)
     public List<String> getQuickActivities() {
@@ -136,9 +161,14 @@ public class OverlayPreferences {
         sb.append("overlayPulse:").append(isOverlayPulseEnabled()).append(",");
         sb.append("breathingTransparency:").append(getBreathingTransparency()).append(",");
         sb.append("breathingBrightness:").append(getBreathingBrightness()).append(",");
+        sb.append("breathingGrayscale:").append(getBreathingGrayscale()).append(",");
+        sb.append("useTaskColorBg:").append(isUseTaskColorBg()).append(",");
+        sb.append("taskColorBrightness:").append(getTaskColorBrightness()).append(",");
+        sb.append("defaultTaskColor:0x").append(Integer.toHexString(getDefaultTaskColor())).append(",");
         sb.append("textStroke:").append(isTextStrokeEnabled()).append(",");
         sb.append("strokeWidth:").append(getStrokeWidth()).append(",");
         sb.append("uiElementsOpacity:").append(getUiElementsOpacity()).append(",");
+        sb.append("immersiveClock:").append(isImmersiveClockEnabled()).append(",");
         sb.append("size:").append(getSize());
         return sb.toString();
     }
@@ -183,6 +213,18 @@ public class OverlayPreferences {
                     case "breathingBrightness":
                         setBreathingBrightness(Integer.parseInt(value));
                         break;
+                    case "breathingGrayscale":
+                        setBreathingGrayscale(Integer.parseInt(value));
+                        break;
+                    case "useTaskColorBg":
+                        setUseTaskColorBg(Boolean.parseBoolean(value));
+                        break;
+                    case "taskColorBrightness":
+                        setTaskColorBrightness(Integer.parseInt(value));
+                        break;
+                    case "defaultTaskColor":
+                        setDefaultTaskColor((int) Long.parseLong(value.replace("0x", ""), 16));
+                        break;
                     case "textStroke":
                         setTextStrokeEnabled(Boolean.parseBoolean(value));
                         break;
@@ -191,6 +233,9 @@ public class OverlayPreferences {
                         break;
                     case "uiElementsOpacity":
                         setUiElementsOpacity(Integer.parseInt(value));
+                        break;
+                    case "immersiveClock":
+                        setImmersiveClockEnabled(Boolean.parseBoolean(value));
                         break;
                     case "size":
                         setSize(Integer.parseInt(value));
