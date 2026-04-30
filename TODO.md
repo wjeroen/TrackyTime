@@ -60,6 +60,8 @@ _(none right now)_
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
 
 ## Completed Recently
+- [x] Add default task color setting (fixed color or random) + interleave palette for better color distribution (2026-04-30)
+- [x] Fix immersive detector blocking touches in other apps — shrink from fullscreen to 1x1 pixel (2026-04-30)
 - [x] Immersive clock — grayscale clock during fullscreen/immersive mode (2026-04-24)
 - [x] Task color bg mode, breathing grayscale, instant timeline color updates (2026-03-28)
 - [x] Separate border opacity + customizable breathing sliders (transparency/brightness, -50% to +50%) (2026-03-23)

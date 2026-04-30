@@ -1114,6 +1114,69 @@ public class MainActivity extends Activity {
             }
         });
 
+        // Default Task Color
+        addSpacer(layout, 14);
+        TextView defColorLabel = new TextView(this);
+        defColorLabel.setText("Default Task Color");
+        defColorLabel.setTextColor(0xFFCDD6F4);
+        defColorLabel.setTextSize(15f);
+        layout.addView(defColorLabel);
+
+        LinearLayout defColorRow = new LinearLayout(this);
+        defColorRow.setOrientation(LinearLayout.HORIZONTAL);
+        defColorRow.setGravity(Gravity.CENTER_VERTICAL);
+        defColorRow.setPadding(0, (int)(4*d), 0, (int)(4*d));
+
+        View defSwatch = new View(this);
+        int defSwatchSize = (int)(40 * d);
+        defSwatch.setLayoutParams(new LinearLayout.LayoutParams(defSwatchSize, defSwatchSize));
+
+        TextView defStatus = new TextView(this);
+        defStatus.setTextColor(0xFF9399B2);
+        defStatus.setTextSize(14f);
+        defStatus.setPadding((int)(10*d), 0, 0, 0);
+        defStatus.setLayoutParams(new LinearLayout.LayoutParams(
+            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        Button defResetBtn = new Button(this, null, android.R.attr.buttonBarButtonStyle);
+        defResetBtn.setText("RANDOM");
+        defResetBtn.setTextColor(0xFF8AB4F8);
+        defResetBtn.setTextSize(12f);
+
+        int currentDefColor = prefs.getDefaultTaskColor();
+        if (currentDefColor != 0) {
+            setSwatchColor(defSwatch, currentDefColor, d);
+            defStatus.setText("Fixed");
+            defResetBtn.setVisibility(View.VISIBLE);
+        } else {
+            setSwatchColor(defSwatch, 0xFF757575, d);
+            defStatus.setText("Random");
+            defResetBtn.setVisibility(View.GONE);
+        }
+
+        defSwatch.setOnClickListener(v -> {
+            int cur = prefs.getDefaultTaskColor();
+            if (cur == 0) cur = 0xFF039BE5;
+            showColorPickerDialog(cur, color -> {
+                prefs.setDefaultTaskColor(color);
+                setSwatchColor(defSwatch, color, d);
+                defStatus.setText("Fixed");
+                defResetBtn.setVisibility(View.VISIBLE);
+            });
+        });
+
+        defResetBtn.setOnClickListener(v -> {
+            prefs.setDefaultTaskColor(0);
+            setSwatchColor(defSwatch, 0xFF757575, d);
+            defStatus.setText("Random");
+            defResetBtn.setVisibility(View.GONE);
+        });
+
+        defColorRow.addView(defSwatch);
+        defColorRow.addView(defStatus);
+        defColorRow.addView(defResetBtn);
+        layout.addView(defColorRow);
+
         // Size
         addSpacer(layout, 14);
         TextView sizeLabel = new TextView(this);

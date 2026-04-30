@@ -67,6 +67,10 @@ public class OverlayPreferences {
     public int getTaskColorBrightness() { return sp.getInt("task_color_brightness", -30); }
     public void setTaskColorBrightness(int v) { sp.edit().putInt("task_color_brightness", v).apply(); }
 
+    // Default task color (0 = random from palette, non-zero = specific color)
+    public int getDefaultTaskColor() { return sp.getInt("default_task_color", 0); }
+    public void setDefaultTaskColor(int c) { sp.edit().putInt("default_task_color", c).apply(); }
+
     // Text stroke/outline (TV subtitle style with auto-contrast)
     public boolean isTextStrokeEnabled() { return sp.getBoolean("text_stroke", false); }
     public void setTextStrokeEnabled(boolean on) { sp.edit().putBoolean("text_stroke", on).apply(); }
@@ -160,6 +164,7 @@ public class OverlayPreferences {
         sb.append("breathingGrayscale:").append(getBreathingGrayscale()).append(",");
         sb.append("useTaskColorBg:").append(isUseTaskColorBg()).append(",");
         sb.append("taskColorBrightness:").append(getTaskColorBrightness()).append(",");
+        sb.append("defaultTaskColor:0x").append(Integer.toHexString(getDefaultTaskColor())).append(",");
         sb.append("textStroke:").append(isTextStrokeEnabled()).append(",");
         sb.append("strokeWidth:").append(getStrokeWidth()).append(",");
         sb.append("uiElementsOpacity:").append(getUiElementsOpacity()).append(",");
@@ -216,6 +221,9 @@ public class OverlayPreferences {
                         break;
                     case "taskColorBrightness":
                         setTaskColorBrightness(Integer.parseInt(value));
+                        break;
+                    case "defaultTaskColor":
+                        setDefaultTaskColor((int) Long.parseLong(value.replace("0x", ""), 16));
                         break;
                     case "textStroke":
                         setTextStrokeEnabled(Boolean.parseBoolean(value));

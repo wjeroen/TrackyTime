@@ -49,14 +49,15 @@
 - **Tap date to return to today**: tapping the date/week text in the header jumps back to the present day or current week.
 - Date navigation (prev/next day or week)
 - Export/Import/Settings buttons at the top (above history) for quick access
-- Settings: background color mode (custom/task color + brightness slider), text color, border color (accent), border width (0–6dp) + border opacity, background opacity, text size, breathing overlay toggle + transparency/brightness/grayscale sliders, text stroke toggle + stroke width slider (1–10, linear scaling, proportional to text size so stroke scales with overlay size like icon stroke does; anchored at 16sp Medium where setting 4 = original default), UI elements opacity (buttons, separator, hints, paused clock), immersive clock toggle
+- Settings: background color mode (custom/task color + brightness slider), text color, border color (accent), border width (0–6dp) + border opacity, background opacity, default task color (fixed or random), text size, breathing overlay toggle + transparency/brightness/grayscale sliders, text stroke toggle + stroke width slider (1–10, linear scaling, proportional to text size so stroke scales with overlay size like icon stroke does; anchored at 16sp Medium where setting 4 = original default), UI elements opacity (buttons, separator, hints, paused clock), immersive clock toggle
 - **Export**: save all data as JSON to any location (Google Drive, email, etc.). Also includes quick-select shortcut names.
 - **Import**: restore data from a JSON backup (skips duplicates). Restores quick-select shortcuts if present. Backward-compatible with older exports that don't have shortcuts.
 
 ### Consistent colors
 - Activities with the **same name always get the same color** — in pie chart, history, and across all days
 - **Name matching is case- and space-insensitive**: "Coding Time", "coding time", and "CODING  TIME" are all treated as the same activity (via `normalizeName()` — trim, collapse spaces, lowercase)
-- New names get a stable color auto-assigned from a 76-color palette (19 Material Design hues × 4 brightness levels, based on normalized name hash)
+- New names get a stable color auto-assigned from a 72-color palette (18 Material Design hues × 4 brightness levels, interleaved so adjacent picks look different)
+- **Default task color**: optional setting to assign a specific color to all new tasks instead of random. Set in Settings → Default Task Color (tap swatch to pick, tap RANDOM to reset)
 - Changing an entry's color updates **all** entries with that name (case/space-insensitive)
 
 ### Grouping
