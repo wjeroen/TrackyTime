@@ -22,6 +22,7 @@ import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.CheckBox;
+import android.widget.ScrollView;
 import android.widget.Toast;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -138,7 +139,7 @@ public class MainActivity extends Activity {
 
     private void setupToggle() {
         toggleBtn.setOnClickListener(v -> {
-            if (OverlayService.isServiceRunning) {
+            if (OverlayService.isOverlayVisible) {
                 stopService(new Intent(this, OverlayService.class));
                 toggleBtn.postDelayed(this::updateToggleButton, 300);
             } else {
@@ -149,14 +150,20 @@ public class MainActivity extends Activity {
                         OVERLAY_PERM_CODE);
                     return;
                 }
-                startForegroundService(new Intent(this, OverlayService.class));
+                startOverlayService();
                 toggleBtn.postDelayed(this::updateToggleButton, 300);
             }
         });
     }
 
+    private void startOverlayService() {
+        Intent svc = new Intent(this, OverlayService.class);
+        svc.putExtra(OverlayService.EXTRA_SHOW_OVERLAY, true);
+        startForegroundService(svc);
+    }
+
     private void updateToggleButton() {
-        toggleBtn.setText(OverlayService.isServiceRunning ?
+        toggleBtn.setText(OverlayService.isOverlayVisible ?
             "Stop Overlay" : "Start Overlay");
     }
 
@@ -164,7 +171,7 @@ public class MainActivity extends Activity {
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
         if (req == OVERLAY_PERM_CODE && Settings.canDrawOverlays(this)) {
-            startForegroundService(new Intent(this, OverlayService.class));
+            startOverlayService();
             toggleBtn.postDelayed(this::updateToggleButton, 300);
         }
         if (req == EXPORT_FILE_CODE && res == RESULT_OK && data != null) {
@@ -820,6 +827,8 @@ public class MainActivity extends Activity {
         showColorPickerDialog(entry.getColor(), color -> {
             dbHelper.updateColorByName(entry.getName(), color);
             loadData();
+            // Signal overlay to reload segment colors immediately
+            prefs.notifyTaskColorChanged();
         });
     }
 
@@ -943,7 +952,90 @@ public class MainActivity extends Activity {
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding((int)(20*d), (int)(12*d), (int)(20*d), (int)(8*d));
 
-        addColorRow(layout, "Background", () -> prefs.getBgColor(), c -> prefs.setBgColor(c));
+        // Background color mode: Custom vs Task Color
+        TextView bgModeLabel = new TextView(this);
+        bgModeLabel.setText("Background Color");
+        bgModeLabel.setTextColor(0xFFCDD6F4);
+        bgModeLabel.setTextSize(15f);
+        layout.addView(bgModeLabel);
+
+        RadioGroup bgModeGroup = new RadioGroup(this);
+        bgModeGroup.setOrientation(RadioGroup.HORIZONTAL);
+        RadioButton customBgRb = new RadioButton(this);
+        customBgRb.setText("Custom");
+        customBgRb.setTextColor(0xFFCDD6F4);
+        customBgRb.setId(View.generateViewId());
+        RadioButton taskColorBgRb = new RadioButton(this);
+        taskColorBgRb.setText("Task Color");
+        taskColorBgRb.setTextColor(0xFFCDD6F4);
+        taskColorBgRb.setId(View.generateViewId());
+        bgModeGroup.addView(customBgRb);
+        bgModeGroup.addView(taskColorBgRb);
+        layout.addView(bgModeGroup);
+
+        // Custom color picker (shown only in custom mode)
+        LinearLayout customBgContainer = new LinearLayout(this);
+        customBgContainer.setOrientation(LinearLayout.VERTICAL);
+        addColorRow(customBgContainer, "Background", () -> prefs.getBgColor(), c -> prefs.setBgColor(c));
+        layout.addView(customBgContainer);
+
+        // Task color brightness slider (shown only in task color mode)
+        LinearLayout taskColorContainer = new LinearLayout(this);
+        taskColorContainer.setOrientation(LinearLayout.VERTICAL);
+        taskColorContainer.setPadding(0, (int)(4*d), 0, 0);
+        int initTaskBright = prefs.getTaskColorBrightness();
+        TextView taskBrightLabel = new TextView(this);
+        taskBrightLabel.setText("Brightness: " + (initTaskBright > 0 ? "+" : "") + initTaskBright + "%");
+        taskBrightLabel.setTextColor(0xFFCDD6F4);
+        taskBrightLabel.setTextSize(14f);
+        taskColorContainer.addView(taskBrightLabel);
+
+        SeekBar taskBrightBar = new SeekBar(this);
+        taskBrightBar.setMin(-100);
+        taskBrightBar.setMax(100);
+        taskBrightBar.setProgress(prefs.getTaskColorBrightness());
+        taskBrightBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int val, boolean u) {
+                taskBrightLabel.setText("Brightness: " + (val > 0 ? "+" : "") + val + "%");
+            }
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {
+                prefs.setTaskColorBrightness(sb.getProgress());
+            }
+        });
+        taskColorContainer.addView(taskBrightBar);
+
+        TextView taskBrightHint = new TextView(this);
+        taskBrightHint.setText("Background uses current task's color");
+        taskBrightHint.setTextColor(0xFF9399B2);
+        taskBrightHint.setTextSize(12f);
+        taskColorContainer.addView(taskBrightHint);
+        layout.addView(taskColorContainer);
+
+        // Set initial visibility based on current mode
+        boolean useTaskColor = prefs.isUseTaskColorBg();
+        if (useTaskColor) {
+            bgModeGroup.check(taskColorBgRb.getId());
+            customBgContainer.setVisibility(View.GONE);
+            taskColorContainer.setVisibility(View.VISIBLE);
+        } else {
+            bgModeGroup.check(customBgRb.getId());
+            customBgContainer.setVisibility(View.VISIBLE);
+            taskColorContainer.setVisibility(View.GONE);
+        }
+
+        bgModeGroup.setOnCheckedChangeListener((g, id) -> {
+            if (id == taskColorBgRb.getId()) {
+                prefs.setUseTaskColorBg(true);
+                customBgContainer.setVisibility(View.GONE);
+                taskColorContainer.setVisibility(View.VISIBLE);
+            } else {
+                prefs.setUseTaskColorBg(false);
+                customBgContainer.setVisibility(View.VISIBLE);
+                taskColorContainer.setVisibility(View.GONE);
+            }
+        });
+
         addColorRow(layout, "Text Color", () -> prefs.getTextColor(), c -> prefs.setTextColor(c));
         addColorRow(layout, "Border Color", () -> prefs.getAccentColor(), c -> prefs.setAccentColor(c));
 
@@ -1021,6 +1113,69 @@ public class MainActivity extends Activity {
                 prefs.setBorderWidth(sb.getProgress());
             }
         });
+
+        // Default Task Color
+        addSpacer(layout, 14);
+        TextView defColorLabel = new TextView(this);
+        defColorLabel.setText("Default Task Color");
+        defColorLabel.setTextColor(0xFFCDD6F4);
+        defColorLabel.setTextSize(15f);
+        layout.addView(defColorLabel);
+
+        LinearLayout defColorRow = new LinearLayout(this);
+        defColorRow.setOrientation(LinearLayout.HORIZONTAL);
+        defColorRow.setGravity(Gravity.CENTER_VERTICAL);
+        defColorRow.setPadding(0, (int)(4*d), 0, (int)(4*d));
+
+        View defSwatch = new View(this);
+        int defSwatchSize = (int)(40 * d);
+        defSwatch.setLayoutParams(new LinearLayout.LayoutParams(defSwatchSize, defSwatchSize));
+
+        TextView defStatus = new TextView(this);
+        defStatus.setTextColor(0xFF9399B2);
+        defStatus.setTextSize(14f);
+        defStatus.setPadding((int)(10*d), 0, 0, 0);
+        defStatus.setLayoutParams(new LinearLayout.LayoutParams(
+            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        Button defResetBtn = new Button(this, null, android.R.attr.buttonBarButtonStyle);
+        defResetBtn.setText("RANDOM");
+        defResetBtn.setTextColor(0xFF8AB4F8);
+        defResetBtn.setTextSize(12f);
+
+        int currentDefColor = prefs.getDefaultTaskColor();
+        if (currentDefColor != 0) {
+            setSwatchColor(defSwatch, currentDefColor, d);
+            defStatus.setText("Fixed");
+            defResetBtn.setVisibility(View.VISIBLE);
+        } else {
+            setSwatchColor(defSwatch, 0xFF757575, d);
+            defStatus.setText("Random");
+            defResetBtn.setVisibility(View.GONE);
+        }
+
+        defSwatch.setOnClickListener(v -> {
+            int cur = prefs.getDefaultTaskColor();
+            if (cur == 0) cur = 0xFF039BE5;
+            showColorPickerDialog(cur, color -> {
+                prefs.setDefaultTaskColor(color);
+                setSwatchColor(defSwatch, color, d);
+                defStatus.setText("Fixed");
+                defResetBtn.setVisibility(View.VISIBLE);
+            });
+        });
+
+        defResetBtn.setOnClickListener(v -> {
+            prefs.setDefaultTaskColor(0);
+            setSwatchColor(defSwatch, 0xFF757575, d);
+            defStatus.setText("Random");
+            defResetBtn.setVisibility(View.GONE);
+        });
+
+        defColorRow.addView(defSwatch);
+        defColorRow.addView(defStatus);
+        defColorRow.addView(defResetBtn);
+        layout.addView(defColorRow);
 
         // Size
         addSpacer(layout, 14);
@@ -1105,6 +1260,32 @@ public class MainActivity extends Activity {
         });
         layout.addView(brightBar);
 
+        // Breathing grayscale slider (0 to 100, default 0)
+        addSpacer(layout, 4);
+        int initGray = prefs.getBreathingGrayscale();
+        TextView grayLabel = new TextView(this);
+        grayLabel.setText("Grayscale: " + initGray + "%");
+        grayLabel.setTextColor(0xFFCDD6F4);
+        grayLabel.setTextSize(14f);
+        grayLabel.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
+        layout.addView(grayLabel);
+
+        SeekBar grayBar = new SeekBar(this);
+        grayBar.setMin(0);
+        grayBar.setMax(100);
+        grayBar.setProgress(prefs.getBreathingGrayscale());
+        grayBar.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
+        grayBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int val, boolean u) {
+                grayLabel.setText("Grayscale: " + val + "%");
+            }
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {
+                prefs.setBreathingGrayscale(sb.getProgress());
+            }
+        });
+        layout.addView(grayBar);
+
         // Toggle breathing checkbox shows/hides sub-sliders
         pulseCb.setOnCheckedChangeListener((btn, checked) -> {
             prefs.setOverlayPulseEnabled(checked);
@@ -1113,6 +1294,8 @@ public class MainActivity extends Activity {
             transBar.setVisibility(vis);
             brightLabel.setVisibility(vis);
             brightBar.setVisibility(vis);
+            grayLabel.setVisibility(vis);
+            grayBar.setVisibility(vis);
         });
 
         // Text stroke toggle
@@ -1184,9 +1367,34 @@ public class MainActivity extends Activity {
         });
         layout.addView(uiOpBar);
 
+        // Immersive clock toggle
+        addSpacer(layout, 14);
+        CheckBox immersiveCb = new CheckBox(this);
+        immersiveCb.setText("Display a clock while playing videos or gaming");
+        immersiveCb.setTextColor(0xFFCDD6F4);
+        immersiveCb.setTextSize(14f);
+        immersiveCb.setChecked(prefs.isImmersiveClockEnabled());
+        immersiveCb.setOnCheckedChangeListener((btn, checked) -> {
+            prefs.setImmersiveClockEnabled(checked);
+            // Start the service in clock-only mode if not already running
+            if (checked && !OverlayService.isServiceRunning && Settings.canDrawOverlays(this)) {
+                startForegroundService(new Intent(this, OverlayService.class));
+            }
+        });
+        layout.addView(immersiveCb);
+
+        TextView immersiveHint = new TextView(this);
+        immersiveHint.setText("Shows a grayscale clock in fullscreen/immersive mode");
+        immersiveHint.setTextColor(0xFF9399B2);
+        immersiveHint.setTextSize(12f);
+        layout.addView(immersiveHint);
+
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.addView(layout);
+
         new AlertDialog.Builder(this)
             .setTitle("Overlay Settings")
-            .setView(layout)
+            .setView(scrollView)
             .setPositiveButton("OK", null)
             .show();
     }

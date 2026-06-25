@@ -13,9 +13,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "timetracker.db";
     private static final int DB_VERSION = 1;
     private static final String TABLE = "activities";
+    private Context ctx;
 
     public DatabaseHelper(Context ctx) {
         super(ctx, DB_NAME, null, DB_VERSION);
+        this.ctx = ctx;
     }
 
     @Override
@@ -155,31 +157,35 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.close();
         if (found) return color;
 
+        // Check if user has a default task color set
+        OverlayPreferences prefs = new OverlayPreferences(ctx);
+        int defaultColor = prefs.getDefaultTaskColor();
+        if (defaultColor != 0) return defaultColor;
+
+        // Interleaved palette: each group of 4 is one hue at different brightness levels,
+        // but hues are spread apart so adjacent picks look different
         int[] palette = {
-            // 100-level (pastel)
-            0xFFFFCDD2, 0xFFFFCCBC, 0xFFFFE0B2, 0xFFFFECB3,
-            0xFFFFF9C4, 0xFFF0F4C3, 0xFFDCEDC8, 0xFFC8E6C9,
-            0xFFB2DFDB, 0xFFB2EBF2, 0xFFB3E5FC, 0xFFBBDEFB,
-            0xFFC5CAE9, 0xFFD1C4E9, 0xFFE1BEE7, 0xFFF8BBD0,
-            0xFFD7CCC8, 0xFFCFD8DC,
-            // 300-level
-            0xFFE57373, 0xFFFF8A65, 0xFFFFB74D, 0xFFFFD54F,
-            0xFFFFF176, 0xFFDCE775, 0xFFAED581, 0xFF81C784,
-            0xFF4DB6AC, 0xFF4DD0E1, 0xFF4FC3F7, 0xFF64B5F6,
-            0xFF7986CB, 0xFF9575CD, 0xFFBA68C8, 0xFFF06292,
-            0xFFA1887F, 0xFF90A4AE,
-            // 600-level
-            0xFFE53935, 0xFFF4511E, 0xFFFB8C00, 0xFFFFB300,
-            0xFFFDD835, 0xFFC0CA33, 0xFF7CB342, 0xFF43A047,
-            0xFF00897B, 0xFF00ACC1, 0xFF039BE5, 0xFF1E88E5,
-            0xFF3949AB, 0xFF5E35B1, 0xFF8E24AA, 0xFFD81B60,
-            0xFF6D4C41, 0xFF546E7A,
-            // 900-level (deep)
-            0xFFB71C1C, 0xFFBF360C, 0xFFE65100, 0xFFFF6F00,
-            0xFFF57F17, 0xFF827717, 0xFF33691E, 0xFF1B5E20,
-            0xFF004D40, 0xFF006064, 0xFF01579B, 0xFF0D47A1,
-            0xFF1A237E, 0xFF311B92, 0xFF4A148C, 0xFF880E4F,
-            0xFF3E2723, 0xFF263238
+            // Teal → Purple → Orange → Green → Blue → Pink → Yellow → Indigo
+            0xFFB2DFDB, 0xFF4DB6AC, 0xFF00897B, 0xFF004D40,
+            0xFFD1C4E9, 0xFF9575CD, 0xFF5E35B1, 0xFF311B92,
+            0xFFFFCCBC, 0xFFFF8A65, 0xFFF4511E, 0xFFBF360C,
+            0xFFDCEDC8, 0xFFAED581, 0xFF7CB342, 0xFF33691E,
+            0xFFB3E5FC, 0xFF4FC3F7, 0xFF039BE5, 0xFF01579B,
+            0xFFF8BBD0, 0xFFF06292, 0xFFD81B60, 0xFF880E4F,
+            0xFFFFF9C4, 0xFFFFF176, 0xFFFDD835, 0xFFF57F17,
+            0xFFC5CAE9, 0xFF7986CB, 0xFF3949AB, 0xFF1A237E,
+            // Cyan → DeepPurple → Amber → LightGreen → DeepBlue → Red → Lime → Brown
+            0xFFB2EBF2, 0xFF4DD0E1, 0xFF00ACC1, 0xFF006064,
+            0xFFE1BEE7, 0xFFBA68C8, 0xFF8E24AA, 0xFF4A148C,
+            0xFFFFECB3, 0xFFFFD54F, 0xFFFFB300, 0xFFFF6F00,
+            0xFFC8E6C9, 0xFF81C784, 0xFF43A047, 0xFF1B5E20,
+            0xFFBBDEFB, 0xFF64B5F6, 0xFF1E88E5, 0xFF0D47A1,
+            0xFFFFCDD2, 0xFFE57373, 0xFFE53935, 0xFFB71C1C,
+            0xFFF0F4C3, 0xFFDCE775, 0xFFC0CA33, 0xFF827717,
+            0xFFD7CCC8, 0xFFA1887F, 0xFF6D4C41, 0xFF3E2723,
+            // Orange(warm) → BlueGrey
+            0xFFFFE0B2, 0xFFFFB74D, 0xFFFB8C00, 0xFFE65100,
+            0xFFCFD8DC, 0xFF90A4AE, 0xFF546E7A, 0xFF263238
         };
         int hash = ActivityEntry.normalizeName(name).hashCode();
         return palette[Math.abs(hash) % palette.length];
