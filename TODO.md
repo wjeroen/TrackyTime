@@ -3,7 +3,7 @@
 ## Current Sprint
 
 ### High Priority
-- [ ] Verify GitHub Actions build succeeds after icon update and color bar sorting change
+- [ ] Install the real debug keystore locally: the owner has the CI keystore saved in Bitwarden. Save it to `C:\Users\jeroe\.android\debug.keystore` (overwriting the placeholder key generated 2026-07-18), then verify its SHA-256 cert fingerprint matches the CI APK's (`0c c1 65 a7 cb cc ca 7d ...`). After that, local and CI builds are interchangeable on the phone with no reinstalls.
 
 ### Features to Implement
 - [ ] Add separate opacity slider for the timeline bar
@@ -22,7 +22,8 @@
 - [x] Fix text stroke not scaling with overlay size — stroke now proportional to text size (anchored at 16sp Medium), matching icon stroke behavior (2026-03-22)
 
 ### Performance & Optimization
-_(none right now)_
+- [ ] Pause the pulse animation and 500ms timer UI ticks while the screen is off (OverlayService has no SCREEN_ON/OFF receiver today, so the breathing loop and timeline redraws keep running whenever tracking runs; the drift-proof timestamps mean tracking accuracy needs none of it, only the visible UI does)
+- [ ] Measure real overlay cost on-device when the phone is available (adb: `dumpsys gfxinfo com.timetracker.overlay`, battery stats before/after a day with breathing off) to put numbers on the "is it slowing my phone" question
 
 ### Documentation
 _(none right now)_
@@ -58,8 +59,19 @@ _(none right now)_
 - [ ] Test color bar: shows below pie chart, groups time by color, percentages on wide segments
 - [ ] Test live-update quick-select rows: changing text color/size in settings updates existing rows
 - [ ] Test APK installs and runs correctly from GitHub Actions artifact
+- [ ] Test export dialog: Today / Past week / All time / Custom ranges export the right entries
+- [ ] Test export custom range: start and end date pickers, reversed order gets swapped
+- [ ] Test export "Include settings" toggle: off = backup without settings, on = settings restored on import
+- [ ] Test export filenames reflect the chosen range
 
 ## Completed Recently
+- [x] Harden import file reading: whole-stream byte read instead of newline-dropping line joins (2026-07-18)
+- [x] Dedup 8 copy-pasted settings slider listeners into an addSlider() helper, border width slider left hand-written on purpose (2026-07-18)
+- [x] Remove deprecated package attribute from AndroidManifest.xml, build warning gone (2026-07-18)
+- [x] Export dialog: date range options (Today / Past week / All time / Custom) + "Include settings" toggle + range-based filenames (2026-07-18)
+- [x] Local build environment on the owner's Windows PC: wrapper-jar invocation + local debug keystore, documented in CLAUDE.md and README (2026-07-18)
+- [x] Reviewed MainActivity/OverlayService for god-class smells: both are large but cohesive, splitting judged optional (2026-07-18)
+- [x] Verify GitHub Actions build succeeds after icon update and color bar sorting change (2026-07-18, was already green since 2026-06-25)
 - [x] Add default task color setting (fixed color or random) + interleave palette for better color distribution (2026-04-30)
 - [x] Fix immersive detector blocking touches in other apps — shrink from fullscreen to 1x1 pixel (2026-04-30)
 - [x] Immersive clock — grayscale clock during fullscreen/immersive mode (2026-04-24)

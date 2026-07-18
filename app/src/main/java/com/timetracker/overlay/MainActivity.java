@@ -2,6 +2,7 @@ package com.timetracker.overlay;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.DatePickerDialog;
 import android.app.Dialog;
 import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
@@ -24,8 +25,8 @@ import android.widget.TextView;
 import android.widget.CheckBox;
 import android.widget.ScrollView;
 import android.widget.Toast;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -94,6 +95,12 @@ public class MainActivity extends Activity {
     private SimpleDateFormat dateFormat;
     private SimpleDateFormat timeFormat;
     private boolean isWeekView = false;
+
+    // Pending export options, set by the export dialog before the file picker opens.
+    // startDate == null means all time. Dates are "yyyy-MM-dd" strings.
+    private String pendingExportStart = null;
+    private String pendingExportEnd = null;
+    private boolean pendingExportIncludeSettings = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -835,10 +842,112 @@ public class MainActivity extends Activity {
     // ======== Export / Import ========
 
     private void exportData() {
+        float d = getResources().getDisplayMetrics().density;
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding((int)(20*d), (int)(12*d), (int)(20*d), (int)(8*d));
+
+        TextView rangeLabel = new TextView(this);
+        rangeLabel.setText("Date Range");
+        rangeLabel.setTextColor(0xFFCDD6F4);
+        rangeLabel.setTextSize(15f);
+        layout.addView(rangeLabel);
+
+        // Same id-by-index pattern as the size RadioGroup in settings
+        RadioGroup rangeGroup = new RadioGroup(this);
+        String[] ranges = {"Today", "Past week", "All time", "Custom"};
+        for (int i = 0; i < ranges.length; i++) {
+            RadioButton rb = new RadioButton(this);
+            rb.setText(ranges[i]);
+            rb.setTextColor(0xFFCDD6F4);
+            rb.setId(i);
+            rangeGroup.addView(rb);
+        }
+        rangeGroup.check(2); // All time, matches the old export behavior
+        layout.addView(rangeGroup);
+
+        addSpacer(layout, 8);
+        CheckBox settingsCb = new CheckBox(this);
+        settingsCb.setText("Include settings");
+        settingsCb.setTextColor(0xFFCDD6F4);
+        settingsCb.setTextSize(14f);
+        settingsCb.setChecked(true); // old exports always included settings
+        layout.addView(settingsCb);
+
+        new AlertDialog.Builder(this)
+            .setTitle("Export")
+            .setView(layout)
+            .setPositiveButton("Next", (dialog, which) -> {
+                boolean includeSettings = settingsCb.isChecked();
+                int sel = rangeGroup.getCheckedRadioButtonId();
+                String today = dateFormat.format(new Date());
+                if (sel == 0) {
+                    // Today
+                    launchExportFilePicker(today, today, includeSettings);
+                } else if (sel == 1) {
+                    // Past week: the last 7 days including today
+                    Calendar cal = Calendar.getInstance();
+                    cal.add(Calendar.DAY_OF_MONTH, -6);
+                    launchExportFilePicker(dateFormat.format(cal.getTime()), today, includeSettings);
+                } else if (sel == 3) {
+                    // Custom: pick start and end dates
+                    showCustomRangePicker(includeSettings);
+                } else {
+                    // All time
+                    launchExportFilePicker(null, null, includeSettings);
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    /** Custom range: two chained system date pickers (start, then end). */
+    private void showCustomRangePicker(boolean includeSettings) {
+        Calendar now = Calendar.getInstance();
+        Toast.makeText(this, "Pick the START date", Toast.LENGTH_SHORT).show();
+        DatePickerDialog startDlg = new DatePickerDialog(this, (view, y, m, day) -> {
+            Calendar sc = Calendar.getInstance();
+            sc.set(y, m, day);
+            String start = dateFormat.format(sc.getTime());
+            Toast.makeText(this, "Pick the END date", Toast.LENGTH_SHORT).show();
+            DatePickerDialog endDlg = new DatePickerDialog(this, (view2, y2, m2, day2) -> {
+                Calendar ec = Calendar.getInstance();
+                ec.set(y2, m2, day2);
+                String end = dateFormat.format(ec.getTime());
+                // Swap silently if picked in reverse order
+                if (end.compareTo(start) < 0) {
+                    launchExportFilePicker(end, start, includeSettings);
+                } else {
+                    launchExportFilePicker(start, end, includeSettings);
+                }
+            }, y, m, day);
+            endDlg.setTitle("End date");
+            endDlg.show();
+        }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
+        startDlg.setTitle("Start date");
+        startDlg.show();
+    }
+
+    /** Stores the chosen range, then opens the system file picker for the export file. */
+    private void launchExportFilePicker(String startDate, String endDate, boolean includeSettings) {
+        pendingExportStart = startDate;
+        pendingExportEnd = endDate;
+        pendingExportIncludeSettings = includeSettings;
+
+        String fileName;
+        if (startDate == null) {
+            fileName = "trackytime_backup.json";
+        } else if (startDate.equals(endDate)) {
+            fileName = "trackytime_backup_" + startDate + ".json";
+        } else {
+            fileName = "trackytime_backup_" + startDate + "_to_" + endDate + ".json";
+        }
+
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("application/json");
-        intent.putExtra(Intent.EXTRA_TITLE, "trackytime_backup.json");
+        intent.putExtra(Intent.EXTRA_TITLE, fileName);
         startActivityForResult(intent, EXPORT_FILE_CODE);
     }
 
@@ -851,7 +960,10 @@ public class MainActivity extends Activity {
 
     private void writeExportToUri(Uri uri) {
         try {
-            List<ActivityEntry> entries = dbHelper.getAllEntries();
+            // Range chosen in the export dialog (null start = all time)
+            List<ActivityEntry> entries = (pendingExportStart == null)
+                ? dbHelper.getAllEntries()
+                : dbHelper.getEntriesByDateRange(pendingExportStart, pendingExportEnd);
             JSONArray arr = new JSONArray();
             for (ActivityEntry e : entries) {
                 JSONObject obj = new JSONObject();
@@ -863,18 +975,20 @@ public class MainActivity extends Activity {
                 arr.put(obj);
             }
             // Quick-select shortcuts (backward-compatible: older imports just ignore this)
-            List<String> shortcuts = new OverlayPreferences(this).getQuickActivities();
+            List<String> shortcuts = prefs.getQuickActivities();
             JSONArray shortcutsArr = new JSONArray();
             for (String s : shortcuts) shortcutsArr.put(s);
-
-            // Customization preferences (backward-compatible: older imports just ignore this)
-            String prefsData = new OverlayPreferences(this).exportToString();
 
             JSONObject root = new JSONObject();
             root.put("version", 1);
             root.put("entries", arr);
             root.put("quick_activities", shortcutsArr);
-            root.put("preferences", prefsData);
+
+            // Customization preferences, only when the export dialog toggle is on
+            // (backward-compatible: import treats a missing field as "no settings")
+            if (pendingExportIncludeSettings) {
+                root.put("preferences", prefs.exportToString());
+            }
 
             OutputStream os = getContentResolver().openOutputStream(uri);
             if (os != null) {
@@ -891,14 +1005,16 @@ public class MainActivity extends Activity {
 
     private void readImportFromUri(Uri uri) {
         try {
-            BufferedReader reader = new BufferedReader(
-                new InputStreamReader(getContentResolver().openInputStream(uri), "UTF-8"));
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) sb.append(line);
-            reader.close();
+            // Read the whole file as raw bytes. The old line-by-line reader dropped
+            // newlines, which only worked because our exports are pretty-printed.
+            InputStream is = getContentResolver().openInputStream(uri);
+            ByteArrayOutputStream buf = new ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            int n;
+            while ((n = is.read(chunk)) != -1) buf.write(chunk, 0, n);
+            is.close();
 
-            JSONObject root = new JSONObject(sb.toString());
+            JSONObject root = new JSONObject(new String(buf.toByteArray(), "UTF-8"));
             JSONArray arr = root.getJSONArray("entries");
             List<ActivityEntry> entries = new ArrayList<>();
             for (int i = 0; i < arr.length(); i++) {
@@ -990,20 +1106,10 @@ public class MainActivity extends Activity {
         taskBrightLabel.setTextSize(14f);
         taskColorContainer.addView(taskBrightLabel);
 
-        SeekBar taskBrightBar = new SeekBar(this);
-        taskBrightBar.setMin(-100);
-        taskBrightBar.setMax(100);
-        taskBrightBar.setProgress(prefs.getTaskColorBrightness());
-        taskBrightBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int val, boolean u) {
-                taskBrightLabel.setText("Brightness: " + (val > 0 ? "+" : "") + val + "%");
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {
-                prefs.setTaskColorBrightness(sb.getProgress());
-            }
-        });
-        taskColorContainer.addView(taskBrightBar);
+        addSlider(taskColorContainer, taskBrightLabel, -100, 100,
+            prefs.getTaskColorBrightness(),
+            val -> "Brightness: " + (val > 0 ? "+" : "") + val + "%",
+            val -> prefs.setTaskColorBrightness(val));
 
         TextView taskBrightHint = new TextView(this);
         taskBrightHint.setText("Background uses current task's color");
@@ -1047,20 +1153,9 @@ public class MainActivity extends Activity {
         opLabel.setTextSize(15f);
         layout.addView(opLabel);
 
-        SeekBar opBar = new SeekBar(this);
-        opBar.setMax(255);
-        opBar.setMin(50);
-        opBar.setProgress(prefs.getOpacity());
-        opBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int val, boolean u) {
-                opLabel.setText("Background Opacity: " + (val * 100 / 255) + "%");
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {
-                prefs.setOpacity(sb.getProgress());
-            }
-        });
-        layout.addView(opBar);
+        addSlider(layout, opLabel, 50, 255, prefs.getOpacity(),
+            val -> "Background Opacity: " + (val * 100 / 255) + "%",
+            val -> prefs.setOpacity(val));
 
         // Border Width
         addSpacer(layout, 14);
@@ -1085,21 +1180,11 @@ public class MainActivity extends Activity {
         borderOpLabel.setVisibility(prefs.getBorderWidth() > 0 ? View.VISIBLE : View.GONE);
         layout.addView(borderOpLabel);
 
-        SeekBar borderOpBar = new SeekBar(this);
-        borderOpBar.setMax(255);
-        borderOpBar.setMin(10);
-        borderOpBar.setProgress(prefs.getBorderOpacity());
+        SeekBar borderOpBar = addSlider(layout, borderOpLabel, 10, 255,
+            prefs.getBorderOpacity(),
+            val -> "Border Opacity: " + (val * 100 / 255) + "%",
+            val -> prefs.setBorderOpacity(val));
         borderOpBar.setVisibility(prefs.getBorderWidth() > 0 ? View.VISIBLE : View.GONE);
-        borderOpBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int val, boolean u) {
-                borderOpLabel.setText("Border Opacity: " + (val * 100 / 255) + "%");
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {
-                prefs.setBorderOpacity(sb.getProgress());
-            }
-        });
-        layout.addView(borderOpBar);
 
         // Show/hide border opacity when border width changes
         borderBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -1218,21 +1303,11 @@ public class MainActivity extends Activity {
         transLabel.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
         layout.addView(transLabel);
 
-        SeekBar transBar = new SeekBar(this);
-        transBar.setMin(-50);
-        transBar.setMax(50);
-        transBar.setProgress(prefs.getBreathingTransparency());
+        SeekBar transBar = addSlider(layout, transLabel, -50, 50,
+            prefs.getBreathingTransparency(),
+            val -> "Transparency: " + (val > 0 ? "+" : "") + val + "%",
+            val -> prefs.setBreathingTransparency(val));
         transBar.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
-        transBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int val, boolean u) {
-                transLabel.setText("Transparency: " + (val > 0 ? "+" : "") + val + "%");
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {
-                prefs.setBreathingTransparency(sb.getProgress());
-            }
-        });
-        layout.addView(transBar);
 
         // Breathing brightness slider (-50 to +50, 0 = center)
         addSpacer(layout, 4);
@@ -1244,21 +1319,11 @@ public class MainActivity extends Activity {
         brightLabel.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
         layout.addView(brightLabel);
 
-        SeekBar brightBar = new SeekBar(this);
-        brightBar.setMin(-50);
-        brightBar.setMax(50);
-        brightBar.setProgress(prefs.getBreathingBrightness());
+        SeekBar brightBar = addSlider(layout, brightLabel, -50, 50,
+            prefs.getBreathingBrightness(),
+            val -> "Brightness: " + (val > 0 ? "+" : "") + val + "%",
+            val -> prefs.setBreathingBrightness(val));
         brightBar.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
-        brightBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int val, boolean u) {
-                brightLabel.setText("Brightness: " + (val > 0 ? "+" : "") + val + "%");
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {
-                prefs.setBreathingBrightness(sb.getProgress());
-            }
-        });
-        layout.addView(brightBar);
 
         // Breathing grayscale slider (0 to 100, default 0)
         addSpacer(layout, 4);
@@ -1270,21 +1335,11 @@ public class MainActivity extends Activity {
         grayLabel.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
         layout.addView(grayLabel);
 
-        SeekBar grayBar = new SeekBar(this);
-        grayBar.setMin(0);
-        grayBar.setMax(100);
-        grayBar.setProgress(prefs.getBreathingGrayscale());
+        SeekBar grayBar = addSlider(layout, grayLabel, 0, 100,
+            prefs.getBreathingGrayscale(),
+            val -> "Grayscale: " + val + "%",
+            val -> prefs.setBreathingGrayscale(val));
         grayBar.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
-        grayBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int val, boolean u) {
-                grayLabel.setText("Grayscale: " + val + "%");
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {
-                prefs.setBreathingGrayscale(sb.getProgress());
-            }
-        });
-        layout.addView(grayBar);
 
         // Toggle breathing checkbox shows/hides sub-sliders
         pulseCb.setOnCheckedChangeListener((btn, checked) -> {
@@ -1316,20 +1371,12 @@ public class MainActivity extends Activity {
         strokeLabel.setVisibility(prefs.isTextStrokeEnabled() ? View.VISIBLE : View.GONE);
         layout.addView(strokeLabel);
 
-        SeekBar strokeBar = new SeekBar(this);
-        strokeBar.setMax(9); // 1-10 (offset by 1)
-        strokeBar.setProgress(prefs.getStrokeWidth() - 1);
+        // Progress is 0-9 but the stored width is 1-10 (offset by 1)
+        SeekBar strokeBar = addSlider(layout, strokeLabel, 0, 9,
+            prefs.getStrokeWidth() - 1,
+            val -> "Stroke Width: " + (val + 1) + "px",
+            val -> prefs.setStrokeWidth(val + 1));
         strokeBar.setVisibility(prefs.isTextStrokeEnabled() ? View.VISIBLE : View.GONE);
-        strokeBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int val, boolean u) {
-                strokeLabel.setText("Stroke Width: " + (val + 1) + "px");
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {
-                prefs.setStrokeWidth(sb.getProgress() + 1);
-            }
-        });
-        layout.addView(strokeBar);
 
         // Toggle stroke checkbox shows/hides stroke width slider
         strokeCb.setOnCheckedChangeListener((btn, checked) -> {
@@ -1352,20 +1399,9 @@ public class MainActivity extends Activity {
         uiOpHint.setTextSize(12f);
         layout.addView(uiOpHint);
 
-        SeekBar uiOpBar = new SeekBar(this);
-        uiOpBar.setMax(255);
-        uiOpBar.setMin(25);
-        uiOpBar.setProgress(prefs.getUiElementsOpacity());
-        uiOpBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int val, boolean u) {
-                uiOpLabel.setText("UI Elements Opacity: " + (val * 100 / 255) + "%");
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {
-                prefs.setUiElementsOpacity(sb.getProgress());
-            }
-        });
-        layout.addView(uiOpBar);
+        addSlider(layout, uiOpLabel, 25, 255, prefs.getUiElementsOpacity(),
+            val -> "UI Elements Opacity: " + (val * 100 / 255) + "%",
+            val -> prefs.setUiElementsOpacity(val));
 
         // Immersive clock toggle
         addSpacer(layout, 14);
@@ -1397,6 +1433,34 @@ public class MainActivity extends Activity {
             .setView(scrollView)
             .setPositiveButton("OK", null)
             .show();
+    }
+
+    private interface SliderFormat { String label(int value); }
+
+    /**
+     * Creates a settings SeekBar wired exactly like the hand-written ones it replaces:
+     * label text updates live while dragging, the save action runs on release.
+     * Note: the border width slider is NOT built with this because its listener
+     * also shows/hides the border opacity rows, which are created after it.
+     */
+    private SeekBar addSlider(LinearLayout parent, TextView label, int min, int max,
+                              int initial, SliderFormat fmt,
+                              java.util.function.IntConsumer onSave) {
+        SeekBar bar = new SeekBar(this);
+        if (min != 0) bar.setMin(min);
+        bar.setMax(max);
+        bar.setProgress(initial);
+        bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int val, boolean u) {
+                label.setText(fmt.label(val));
+            }
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {
+                onSave.accept(sb.getProgress());
+            }
+        });
+        parent.addView(bar);
+        return bar;
     }
 
     private void addColorRow(LinearLayout parent, String label,

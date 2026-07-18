@@ -50,8 +50,8 @@
 - Date navigation (prev/next day or week)
 - Export/Import/Settings buttons at the top (above history) for quick access
 - Settings: background color mode (custom/task color + brightness slider), text color, border color (accent), border width (0–6dp) + border opacity, background opacity, default task color (fixed or random), text size, breathing overlay toggle + transparency/brightness/grayscale sliders, text stroke toggle + stroke width slider (1–10, linear scaling, proportional to text size so stroke scales with overlay size like icon stroke does; anchored at 16sp Medium where setting 4 = original default), UI elements opacity (buttons, separator, hints, paused clock), immersive clock toggle
-- **Export**: save all data as JSON to any location (Google Drive, email, etc.). Also includes quick-select shortcut names.
-- **Import**: restore data from a JSON backup (skips duplicates). Restores quick-select shortcuts if present. Backward-compatible with older exports that don't have shortcuts.
+- **Export**: tap Export → a dialog asks for a date range (**Today**, **Past week** = the last 7 days including today, **All time**, or **Custom** via start/end date pickers) plus an **Include settings** toggle (on by default). Saves the selected entries as JSON to any location (Google Drive, email, etc.). Quick-select shortcut names are always included; all customization settings are included when the toggle is on. The suggested filename reflects the range (e.g. `trackytime_backup_2026-07-12_to_2026-07-18.json`, all time keeps plain `trackytime_backup.json`).
+- **Import**: restore data from a JSON backup (skips duplicates). Restores quick-select shortcuts and settings when present in the file. Backward-compatible with older exports missing either field.
 
 ### Consistent colors
 - Activities with the **same name always get the same color** — in pie chart, history, and across all days
@@ -159,11 +159,17 @@ For consistent signing (so updates install without uninstalling), you need to co
 `TrackyTime-debug-2026-02-12-143052.apk`
 
 ### Locally (manual)
-You need JDK 17. The Gradle wrapper handles the rest — no separate Gradle install needed:
+You need JDK 17 and the Android SDK. The Gradle wrapper handles the rest, no separate Gradle install needed:
 ```bash
 ./gradlew assembleDebug
 ```
 The APK will be at `app/build/outputs/apk/debug/TrackyTime-debug-<timestamp>.apk`.
+
+**Signing note:** debug builds read the keystore path from the `DEBUG_KEYSTORE_PATH` environment variable, falling back to `app/debug.keystore` (which only exists inside CI, restored from the GitHub secret). For a local build, point the variable at any debug keystore, for example in PowerShell:
+```powershell
+$env:DEBUG_KEYSTORE_PATH = "$HOME\.android\debug.keystore"
+```
+Because the CI keystore exists only as a GitHub secret, local builds are signed with a **different key** than CI builds. Android refuses to install an APK over an app signed with a different key, so switching between local and CI builds on the same phone requires a one-time uninstall (use the app's Export first so no data is lost, then Import after reinstalling).
 
 ## Notes
 
