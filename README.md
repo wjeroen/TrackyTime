@@ -89,7 +89,7 @@
 | `app/src/main/java/.../TimelineBarView.java` | Custom View: draws day timeline as proportional colored segments on a Canvas |
 | `app/src/main/java/.../MainActivity.java` | History view (individual entries, inline rename), pie chart, color bar, day/week toggle, date nav, color picker, export/import (with shortcuts), settings (border color + width) |
 | `app/src/main/java/.../ColorBarView.java` | Custom canvas-drawn horizontal stacked bar chart — groups activity time by color, sorted by hue then duration |
-| `app/src/main/res/drawable/` | Vector drawable icons (add, open, remove, close) used in overlay buttons |
+| `app/src/main/res/drawable/` | Vector drawable icons (add, open, remove, close) used in overlay buttons, plus the app launcher icon (`ic_launcher.xml`, hand-editable paths) |
 | `app/src/main/java/.../DatabaseHelper.java` | SQLite storage + `getColorForName()` / `updateColorByName()` / `updateEntryNameAndColor()` / date range queries / export/import — all name matching is case/space-insensitive via `LOWER(TRIM())` |
 | `app/src/main/java/.../ActivityEntry.java` | Data model + `normalizeName()` helper (trim, collapse spaces, lowercase) |
 | `app/src/main/java/.../PieChartView.java` | Custom canvas-drawn pie chart |
