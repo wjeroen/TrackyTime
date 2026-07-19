@@ -1,15 +1,20 @@
 package com.timetracker.overlay;
 
 import android.animation.ValueAnimator;
+import android.app.AlertDialog;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.PixelFormat;
+import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
 import android.os.BatteryManager;
@@ -19,15 +24,19 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
+import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.text.InputType;
+import android.text.TextUtils;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -122,6 +131,11 @@ public class OverlayService extends Service {
     private float initialTouchX, initialTouchY;
     private boolean isDragging = false;
     private static final int DRAG_THRESHOLD = 10;
+
+    // Long-press state for buttons with a press-and-hold action
+    private final Handler longPressHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingLongPress;
+    private boolean longPressFired = false;
 
     // Immersive mode clock
     private View immersiveDetectorView;
@@ -378,6 +392,10 @@ public class OverlayService extends Service {
     // ---- Touch handling: each child handles drag + its own tap action ----
 
     private boolean handleDragTouch(MotionEvent event, Runnable onTap) {
+        return handleDragTouch(event, onTap, null);
+    }
+
+    private boolean handleDragTouch(MotionEvent event, Runnable onTap, Runnable onLongPress) {
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 initialX = params.x;
@@ -385,14 +403,28 @@ public class OverlayService extends Service {
                 initialTouchX = event.getRawX();
                 initialTouchY = event.getRawY();
                 isDragging = false;
+                longPressFired = false;
+                if (onLongPress != null) {
+                    pendingLongPress = () -> {
+                        pendingLongPress = null;
+                        if (!isDragging) {
+                            longPressFired = true;
+                            onLongPress.run();
+                        }
+                    };
+                    longPressHandler.postDelayed(pendingLongPress,
+                        ViewConfiguration.getLongPressTimeout());
+                }
                 return true;
             case MotionEvent.ACTION_MOVE:
+                if (longPressFired) return true; // gesture already consumed
                 int dx = (int) (event.getRawX() - initialTouchX);
                 int dy = (int) (event.getRawY() - initialTouchY);
                 if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
                     isDragging = true;
                 }
                 if (isDragging) {
+                    cancelPendingLongPress();
                     params.x = initialX + dx;
                     params.y = initialY + dy;
                     clampToScreen();
@@ -400,12 +432,23 @@ public class OverlayService extends Service {
                 }
                 return true;
             case MotionEvent.ACTION_UP:
-                if (!isDragging && onTap != null) {
+                cancelPendingLongPress();
+                if (!isDragging && !longPressFired && onTap != null) {
                     onTap.run();
                 }
                 return true;
+            case MotionEvent.ACTION_CANCEL:
+                cancelPendingLongPress();
+                return true;
         }
         return false;
+    }
+
+    private void cancelPendingLongPress() {
+        if (pendingLongPress != null) {
+            longPressHandler.removeCallbacks(pendingLongPress);
+            pendingLongPress = null;
+        }
     }
 
     private void setupTouchHandlers() {
@@ -424,9 +467,9 @@ public class OverlayService extends Service {
         timerText.setOnTouchListener((v, event) ->
             handleDragTouch(event, this::togglePause));
 
-        // Add quick-select: drag or tap-to-add
+        // Add quick-select: drag, tap-to-add, or long-press to batch-add
         addBtn.setOnTouchListener((v, event) ->
-            handleDragTouch(event, this::addQuickSelectRow));
+            handleDragTouch(event, this::addQuickSelectRow, this::showBatchAddDialog));
 
         // Open app: release focus + open (keep expanded)
         openAppBtn.setOnTouchListener((v, event) ->
@@ -1023,6 +1066,120 @@ public class OverlayService extends Service {
                 addQuickSelectRowWithName(name, false);
             }
         }
+    }
+
+    // ---- Batch-add shortcuts (long-press on +) ----
+
+    /**
+     * A dialog for adding many shortcuts at once, one activity per line. New
+     * rows are appended AFTER the existing rows, which are left exactly as they
+     * are, including names typed but not yet saved.
+     */
+    private void showBatchAddDialog() {
+        releaseFocus(); // hand keyboard focus over to the dialog window
+
+        // A Service has no UI theme of its own, so borrow the device default.
+        Context themed = new ContextThemeWrapper(this,
+            android.R.style.Theme_DeviceDefault_Dialog_Alert);
+        float density = getResources().getDisplayMetrics().density;
+        int pad = (int) (20 * density);
+
+        LinearLayout box = new LinearLayout(themed);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(pad, pad / 2, pad, 0);
+
+        TextView hint = new TextView(themed);
+        hint.setText("One activity per line. Lines are added to the end of the "
+            + "shortcut list, existing shortcuts are not touched.");
+        hint.setTextSize(13);
+        box.addView(hint);
+
+        EditText input = new EditText(themed);
+        input.setHint("first activity\nsecond activity");
+        input.setInputType(InputType.TYPE_CLASS_TEXT
+            | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        input.setMinLines(3);
+        input.setMaxLines(8); // grows until here, then scrolls inside itself
+        input.setGravity(Gravity.TOP);
+        box.addView(input);
+
+        TextView preview = new TextView(themed);
+        preview.setTextSize(12);
+        preview.setTypeface(null, Typeface.ITALIC);
+        preview.setMaxLines(3);
+        preview.setEllipsize(TextUtils.TruncateAt.END);
+        preview.setPadding(0, (int) (8 * density), 0, 0);
+        box.addView(preview);
+
+        Button pasteBtn = new Button(themed);
+        pasteBtn.setText("Paste clipboard");
+        box.addView(pasteBtn);
+
+        AlertDialog dialog = new AlertDialog.Builder(themed)
+            .setTitle("Add multiple shortcuts")
+            .setView(box)
+            .setPositiveButton("Add", (d, w) ->
+                appendBatchShortcuts(input.getText().toString()))
+            .setNegativeButton("Cancel", null)
+            .create();
+        // Dialogs opened from a service need an overlay window type to show.
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setType(
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
+        }
+
+        pasteBtn.setOnClickListener(v -> {
+            String clip = readClipboardText();
+            if (clip == null || clip.trim().isEmpty()) {
+                preview.setText("Clipboard is empty or not text.");
+                return;
+            }
+            String current = input.getText().toString();
+            if (!current.isEmpty() && !current.endsWith("\n")) current += "\n";
+            input.setText(current + clip.trim());
+            input.setSelection(input.getText().length());
+        });
+
+        // Android only lets the focused app read the clipboard, so the preview
+        // is filled in shortly after the dialog window has taken focus.
+        dialog.setOnShowListener(d -> preview.postDelayed(() -> {
+            String clip = readClipboardText();
+            if (clip == null || clip.trim().isEmpty()) {
+                preview.setText("Clipboard: empty or not text.");
+            } else {
+                String[] lines = clip.trim().split("\r?\n");
+                preview.setText("Clipboard (" + lines.length
+                    + (lines.length == 1 ? " line): " : " lines): ")
+                    + clip.trim().replaceAll("\\r?\\n", " / "));
+            }
+        }, 200));
+
+        dialog.show();
+    }
+
+    /** One shortcut per non-empty line, appended in order after everything else. */
+    private void appendBatchShortcuts(String text) {
+        if (text == null) return;
+        int added = 0;
+        for (String line : text.split("\n")) {
+            String name = line.trim();
+            if (!name.isEmpty()) {
+                addQuickSelectRowWithName(name, false);
+                added++;
+            }
+        }
+        // Saving reads back every visible row, old and new alike, so this is
+        // the same append-only path every other quick-select edit takes.
+        if (added > 0) saveQuickSelectNames();
+    }
+
+    private String readClipboardText() {
+        ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (cm == null || !cm.hasPrimaryClip()) return null;
+        ClipData clip = cm.getPrimaryClip();
+        if (clip == null || clip.getItemCount() == 0) return null;
+        CharSequence text = clip.getItemAt(0).coerceToText(this);
+        return text == null ? null : text.toString();
     }
 
     // ---- Immersive mode clock ----
