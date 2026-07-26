@@ -994,8 +994,6 @@ public class MainActivity extends Activity {
             // (backward-compatible: import treats a missing field as "no settings")
             if (pendingExportIncludeSettings) {
                 root.put("preferences", prefs.exportToString());
-                // Lets a build variant contribute its own section (see BackupExtensions).
-                BackupExtensions.addTo(root);
             }
 
             OutputStream os = getContentResolver().openOutputStream(uri);
@@ -1051,10 +1049,6 @@ public class MainActivity extends Activity {
             if (prefsData != null && !prefsData.isEmpty()) {
                 new OverlayPreferences(this).importFromString(prefsData);
             }
-
-            // Restores a variant-specific section when one is present and this build
-            // knows what to do with it; ignored entirely otherwise.
-            BackupExtensions.restoreFrom(root);
 
             int count = dbHelper.importEntries(entries);
             String shortcutMsg = (shortcutsArr != null && shortcutsArr.length() > 0)
