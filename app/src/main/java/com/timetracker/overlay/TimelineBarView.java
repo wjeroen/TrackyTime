@@ -63,7 +63,7 @@ public class TimelineBarView extends View {
         invalidate();
     }
 
-    /** Set the alpha multiplier for the pulsing segment (0.0–1.0). */
+    /** Set the alpha multiplier for the pulsing segment (0.0-1.0). */
     public void setPulseAlpha(float alpha) {
         this.pulseAlpha = alpha;
         invalidate();

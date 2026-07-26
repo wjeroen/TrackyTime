@@ -171,7 +171,7 @@ public class OverlayService extends Service {
             heartbeatHandler.postDelayed(heartbeatRunnable, HEARTBEAT_INTERVAL_MS);
         };
 
-        // Recover activity from previous crash (if any) — before setupOverlay
+        // Recover activity from previous crash (if any), before setupOverlay
         // so the recovered entry appears in the timeline
         OverlayPreferences crashPrefs = new OverlayPreferences(this);
         if (crashPrefs.hasCrashRecovery()) {
@@ -273,7 +273,7 @@ public class OverlayService extends Service {
         int borderWidthPx = (int) (borderWidth * density);
         int cornerRadiusPx = (int) (10 * density);
 
-        // Background fill (no stroke on this drawable — avoids stroke/fill overlap)
+        // Background fill (no stroke on this drawable, avoids stroke/fill overlap)
         overlayBgFill = new GradientDrawable();
         overlayBgFill.setShape(GradientDrawable.RECTANGLE);
         overlayBgFill.setCornerRadius(cornerRadiusPx);
@@ -921,7 +921,7 @@ public class OverlayService extends Service {
         liveAccumulatedMs = accumulatedMs;
     }
 
-    // ---- Notification (minimal — required by Android for foreground service) ----
+    // ---- Notification (minimal, required by Android for foreground service) ----
 
     private void createNotificationChannel() {
         NotificationChannel channel = new NotificationChannel(
@@ -1224,7 +1224,7 @@ public class OverlayService extends Service {
         immersiveDetectorView.setOnApplyWindowInsetsListener((view, insets) -> {
             boolean immersive;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                // isVisible() is more accurate than checking inset height — handles translucent bars
+                // isVisible() is more accurate than checking inset height, handles translucent bars
                 boolean statusHidden = !insets.isVisible(WindowInsets.Type.statusBars());
                 boolean navHidden = !insets.isVisible(WindowInsets.Type.navigationBars());
                 immersive = statusHidden && navHidden;
@@ -1240,7 +1240,7 @@ public class OverlayService extends Service {
         });
         windowManager.addView(immersiveDetectorView, detectorParams);
 
-        // Clock overlay — small pill showing current time
+        // Clock overlay, small pill showing current time
         clockText = new StrokeTextView(this);
         int padH = (int) (8 * density);
         int padV = (int) (4 * density);

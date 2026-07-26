@@ -20,7 +20,7 @@
         android:layout_weight="1"
         android:orientation="vertical">
 
-        <!-- EditText styled as TextView — becomes editable on tap -->
+        <!-- EditText styled as TextView, becomes editable on tap -->
         <EditText
             android:id="@+id/entryName"
             android:layout_width="match_parent"

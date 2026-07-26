@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Root is LinearLayout — bg + border applied in code via setBackground().
+<!-- Root is LinearLayout, bg + border applied in code via setBackground().
      Drawable alpha only affects the drawable, not child views, so text stays 100% opaque. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/overlayRoot"

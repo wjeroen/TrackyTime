@@ -338,7 +338,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** Group entries by name (case-insensitive), sum durations — used for pie chart. */
+    /** Group entries by name (case-insensitive), sum durations, used for pie chart. */
     private List<ActivityEntry> groupEntries(List<ActivityEntry> raw) {
         Map<String, ActivityEntry> map = new LinkedHashMap<>();
         for (ActivityEntry e : raw) {
@@ -728,7 +728,7 @@ public class MainActivity extends Activity {
         buttonRow.addView(okBtn);
         root.addView(buttonRow);
 
-        // Plain Dialog — no AlertDialog minimum-width / internal-padding nonsense
+        // Plain Dialog, no AlertDialog minimum-width / internal-padding nonsense
         Dialog dialog = new Dialog(this);
         dialog.setContentView(root);
 
@@ -768,7 +768,7 @@ public class MainActivity extends Activity {
                                               int activeGridColor, int[] selected,
                                               float d, int swatchSize, int swatchMargin,
                                               ColorCallback previewCallback) {
-        // Update grid swatches — highlight the active grid color family
+        // Update grid swatches, highlight the active grid color family
         for (int i = 0; i < grid.getChildCount(); i++) {
             View child = grid.getChildAt(i);
             int color = GRID_COLORS[i];
