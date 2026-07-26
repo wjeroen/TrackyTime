@@ -87,7 +87,7 @@
 | `app/src/main/AndroidManifest.xml` | Permissions + component declarations |
 | `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, expand/collapse/focus model, quick-select shortcuts with icon buttons, timeline bar, progressive pulse, breathing overlay (stroke-only border layer + bg darken/brighten), immersive clock (WindowInsets detection), live-update settings |
 | `app/src/main/java/.../TimelineBarView.java` | Custom View: draws day timeline as proportional colored segments on a Canvas |
-| `app/src/main/java/.../MainActivity.java` | History view (individual entries, inline rename), pie chart, color bar, day/week toggle, date nav, color picker, export/import (with shortcuts), settings (border color + width) |
+| `app/src/main/java/.../MainActivity.java` | History view (individual entries, inline rename, live activity row that shows REC while recording and PAUSED while paused), pie chart, color bar, day/week toggle, date nav, color picker, export/import (with shortcuts), settings (border color + width) |
 | `app/src/main/java/.../ColorBarView.java` | Custom canvas-drawn horizontal stacked bar chart — groups activity time by color, sorted by hue then duration |
 | `app/src/main/res/drawable/` | Vector drawable icons (add, open, remove, close) used in overlay buttons, plus the app launcher icon (`ic_launcher.xml`, hand-editable paths) |
 | `app/src/main/java/.../DatabaseHelper.java` | SQLite storage + `getColorForName()` / `updateColorByName()` / `updateEntryNameAndColor()` / date range queries / export/import — all name matching is case/space-insensitive via `LOWER(TRIM())` |

@@ -57,7 +57,13 @@ public class OverlayService extends Service {
     public static String liveActivityName = "";
     public static long liveStartTime = 0;
     public static boolean liveIsRunning = false;
+    public static boolean livePaused = false;
     public static int liveActivityColor = 0;
+    // Tracked-time bookkeeping so MainActivity can show the real duration
+    // (excluding pauses): while running, now - liveVirtualStart is the tracked
+    // time. While paused, liveAccumulatedMs holds the frozen tracked time.
+    public static long liveVirtualStart = 0;
+    public static long liveAccumulatedMs = 0;
 
     private WindowManager windowManager;
     private View overlayView;
@@ -909,7 +915,10 @@ public class OverlayService extends Service {
         liveActivityName = currentActivityName;
         liveStartTime = currentStartTime;
         liveIsRunning = isRunning;
+        livePaused = !isRunning && !currentActivityName.isEmpty();
         liveActivityColor = currentActivityColor;
+        liveVirtualStart = virtualStartTimestamp;
+        liveAccumulatedMs = accumulatedMs;
     }
 
     // ---- Notification (minimal — required by Android for foreground service) ----
@@ -1358,7 +1367,10 @@ public class OverlayService extends Service {
         liveActivityName = "";
         liveStartTime = 0;
         liveIsRunning = false;
+        livePaused = false;
         liveActivityColor = 0;
+        liveVirtualStart = 0;
+        liveAccumulatedMs = 0;
         saveCurrentActivity();
         timerHandler.removeCallbacks(timerRunnable);
         timerHandler.removeCallbacks(applyPrefsRunnable);

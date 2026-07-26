@@ -241,9 +241,9 @@ public class MainActivity extends Activity {
             try {
                 Date start = dateFormat.parse(range[0]);
                 Date end = dateFormat.parse(range[1]);
-                dateText.setText(shortFmt.format(start) + " — " + shortFmt.format(end));
+                dateText.setText(shortFmt.format(start) + " - " + shortFmt.format(end));
             } catch (Exception e) {
-                dateText.setText(range[0] + " — " + range[1]);
+                dateText.setText(range[0] + " - " + range[1]);
             }
         } else {
             String current = dateFormat.format(calendar.getTime());
@@ -299,12 +299,14 @@ public class MainActivity extends Activity {
             totalTimeText.setText("");
         }
 
-        // History shows individual entries (not grouped) — each session editable
+        // History shows individual entries (not grouped), each session editable
         historyContainer.removeAllViews();
 
-        // Show live activity at the top if overlay is running and we're viewing today
+        // Show live activity at the top if overlay is running and we're viewing
+        // today. A paused activity still counts, it just renders differently.
         boolean showLive = false;
-        if (OverlayService.isServiceRunning && OverlayService.liveIsRunning
+        if (OverlayService.isServiceRunning
+                && (OverlayService.liveIsRunning || OverlayService.livePaused)
                 && !OverlayService.liveActivityName.isEmpty()) {
             String today = dateFormat.format(new Date());
             String viewDate = dateFormat.format(calendar.getTime());
@@ -375,11 +377,11 @@ public class MainActivity extends Activity {
 
         nameEdit.setText(entry.getName());
 
-        // Time range + duration: "10:00 – 11:00 · 1h 00m"
+        // Time range + duration: "10:00 - 11:00 · 1h 00m"
         String startStr = timeFormat.format(new Date(entry.getStartTime()));
         long endMs = entry.getStartTime() + (entry.getDurationSeconds() * 1000L);
         String endStr = timeFormat.format(new Date(endMs));
-        durationText.setText(startStr + " – " + endStr + " · " + entry.getFormattedDuration());
+        durationText.setText(startStr + " - " + endStr + " · " + entry.getFormattedDuration());
 
         // Inline rename: tap name → becomes editable, press Done → saves
         nameEdit.setOnClickListener(v -> {
@@ -472,9 +474,13 @@ public class MainActivity extends Activity {
         nameText.setTypeface(null, android.graphics.Typeface.BOLD);
         textCol.addView(nameText);
 
-        // Time: "15:30 – now"
+        // Time: "15:30 - now" while recording, "15:30 - paused" while paused.
+        // Duration is tracked time (pauses excluded), matching what gets saved.
+        boolean paused = OverlayService.livePaused;
         String startStr = timeFormat.format(new Date(OverlayService.liveStartTime));
-        long elapsed = (System.currentTimeMillis() - OverlayService.liveStartTime) / 1000;
+        long elapsed = paused
+            ? OverlayService.liveAccumulatedMs / 1000
+            : (System.currentTimeMillis() - OverlayService.liveVirtualStart) / 1000;
         int eh = (int)(elapsed / 3600);
         int em = (int)((elapsed % 3600) / 60);
         String durStr = eh > 0 ?
@@ -482,17 +488,17 @@ public class MainActivity extends Activity {
             String.format(Locale.US, "%dm", em);
 
         TextView durationText = new TextView(this);
-        durationText.setText(startStr + " – now · " + durStr);
-        durationText.setTextColor(0xFF43A047); // green to indicate live
+        durationText.setText(startStr + (paused ? " - paused · " : " - now · ") + durStr);
+        durationText.setTextColor(paused ? 0xFFFFA726 : 0xFF43A047); // amber when paused, green when live
         durationText.setTextSize(13f);
         textCol.addView(durationText);
 
         item.addView(textCol);
 
-        // "LIVE" label
+        // Status label: red REC dot while recording, amber pause bars while paused
         TextView liveLabel = new TextView(this);
-        liveLabel.setText("● REC");
-        liveLabel.setTextColor(0xFFE53935); // red
+        liveLabel.setText(paused ? "❚❚ PAUSED" : "● REC");
+        liveLabel.setTextColor(paused ? 0xFFFFA726 : 0xFFE53935);
         liveLabel.setTextSize(12f);
         liveLabel.setTypeface(null, android.graphics.Typeface.BOLD);
         item.addView(liveLabel);
@@ -988,6 +994,8 @@ public class MainActivity extends Activity {
             // (backward-compatible: import treats a missing field as "no settings")
             if (pendingExportIncludeSettings) {
                 root.put("preferences", prefs.exportToString());
+                // Lets a build variant contribute its own section (see BackupExtensions).
+                BackupExtensions.addTo(root);
             }
 
             OutputStream os = getContentResolver().openOutputStream(uri);
@@ -1043,6 +1051,10 @@ public class MainActivity extends Activity {
             if (prefsData != null && !prefsData.isEmpty()) {
                 new OverlayPreferences(this).importFromString(prefsData);
             }
+
+            // Restores a variant-specific section when one is present and this build
+            // knows what to do with it; ignored entirely otherwise.
+            BackupExtensions.restoreFrom(root);
 
             int count = dbHelper.importEntries(entries);
             String shortcutMsg = (shortcutsArr != null && shortcutsArr.length() > 0)
