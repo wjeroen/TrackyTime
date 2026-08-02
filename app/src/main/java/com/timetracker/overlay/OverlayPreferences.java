@@ -136,6 +136,14 @@ public class OverlayPreferences {
         crashSp.edit().putInt("elapsed_seconds", elapsedSeconds).apply();
     }
 
+    /**
+     * Move the checkpoint's start time when the service slides an activity's
+     * recorded start forward (a resume within the first 10 tracked seconds).
+     */
+    public void updateCrashStartTime(long startTime) {
+        crashSp.edit().putLong("start_time", startTime).apply();
+    }
+
     public boolean hasCrashRecovery() { return crashSp.getBoolean("active", false); }
     public String getCrashName() { return crashSp.getString("name", ""); }
     public long getCrashStartTime() { return crashSp.getLong("start_time", 0); }

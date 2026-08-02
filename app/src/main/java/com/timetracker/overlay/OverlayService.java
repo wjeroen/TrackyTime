@@ -634,6 +634,17 @@ public class OverlayService extends Service {
     private void resumeTimer() {
         isRunning = true;
         virtualStartTimestamp = System.currentTimeMillis() - accumulatedMs;
+        // A pause within the first 10 tracked seconds usually means the name was
+        // typed in advance as a reminder (the night before bed, for instance).
+        // Slide the recorded start to this resume, minus the few seconds already
+        // tracked, so the entry is dated when the work actually happened rather
+        // than when the name was typed. Once an activity has 10 tracked seconds,
+        // the same threshold that decides whether it is saved at all, its start
+        // time is final.
+        if (accumulatedMs < MIN_ACTIVITY_SECONDS * 1000L) {
+            currentStartTime = virtualStartTimestamp;
+            new OverlayPreferences(this).updateCrashStartTime(currentStartTime);
+        }
         timerHandler.removeCallbacks(timerRunnable);
         timerHandler.post(timerRunnable);
         showTimerRunning();
