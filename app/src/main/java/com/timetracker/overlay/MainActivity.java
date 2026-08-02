@@ -8,6 +8,8 @@ import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.text.InputType;
 import android.view.Gravity;
@@ -102,6 +104,22 @@ public class MainActivity extends Activity {
     private String pendingExportEnd = null;
     private boolean pendingExportIncludeSettings = true;
 
+    // The running activity's slice keeps growing, so the graphs reload every
+    // 5 minutes while the app is open and something is being tracked. Any
+    // navigation (date tap, day/week toggle) still refreshes instantly.
+    private static final long GRAPH_REFRESH_MS = 5 * 60 * 1000;
+    private final Handler refreshHandler = new Handler(Looper.getMainLooper());
+    private final Runnable graphRefresh = new Runnable() {
+        @Override
+        public void run() {
+            if (OverlayService.isServiceRunning
+                    && !OverlayService.liveActivityName.isEmpty()) {
+                loadData();
+            }
+            refreshHandler.postDelayed(this, GRAPH_REFRESH_MS);
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -140,6 +158,14 @@ public class MainActivity extends Activity {
         super.onResume();
         updateToggleButton();
         loadData();
+        refreshHandler.removeCallbacks(graphRefresh);
+        refreshHandler.postDelayed(graphRefresh, GRAPH_REFRESH_MS);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        refreshHandler.removeCallbacks(graphRefresh);
     }
 
     // ======== Overlay toggle ========
@@ -282,29 +308,13 @@ public class MainActivity extends Activity {
             rawEntries = dbHelper.getEntriesByDate(date);
         }
 
-        // Pie chart uses grouped data (same name = one slice)
-        List<ActivityEntry> grouped = groupEntries(rawEntries);
-        pieChart.setEntries(grouped);
-        colorBar.setEntries(grouped);
-
-        int totalSec = 0;
-        for (ActivityEntry e : rawEntries) totalSec += e.getDurationSeconds();
-        if (totalSec > 0) {
-            int h = totalSec / 3600;
-            int m = (totalSec % 3600) / 60;
-            totalTimeText.setText(h > 0 ?
-                String.format(Locale.US, "Total: %dh %dm", h, m) :
-                String.format(Locale.US, "Total: %dm", m));
-        } else {
-            totalTimeText.setText("");
-        }
-
-        // History shows individual entries (not grouped), each session editable
-        historyContainer.removeAllViews();
-
-        // Show live activity at the top if overlay is running and we're viewing
-        // today. A paused activity still counts, it just renders differently.
+        // Live activity (running or paused) belonging to the viewed day/week.
+        // It gets a row at the top of the history, and once it has 10 tracked
+        // seconds (the same threshold that decides whether it will be saved at
+        // all) it also joins the graphs and the total, so the charts reflect
+        // right now rather than only what is already stored.
         boolean showLive = false;
+        ActivityEntry liveEntry = null;
         if (OverlayService.isServiceRunning
                 && (OverlayService.liveIsRunning || OverlayService.livePaused)
                 && !OverlayService.liveActivityName.isEmpty()) {
@@ -318,7 +328,47 @@ public class MainActivity extends Activity {
                     showLive = true;
                 }
             }
+            if (showLive) {
+                long elapsed = OverlayService.livePaused
+                    ? OverlayService.liveAccumulatedMs / 1000
+                    : (System.currentTimeMillis() - OverlayService.liveVirtualStart) / 1000;
+                if (elapsed >= OverlayService.MIN_ACTIVITY_SECONDS) {
+                    liveEntry = new ActivityEntry();
+                    liveEntry.setName(OverlayService.liveActivityName);
+                    liveEntry.setDurationSeconds((int) elapsed);
+                    liveEntry.setColor(OverlayService.liveActivityColor);
+                    liveEntry.setStartTime(OverlayService.liveStartTime);
+                    liveEntry.setDate(today);
+                }
+            }
         }
+
+        // Pie chart uses grouped data (same name = one slice)
+        List<ActivityEntry> counted = rawEntries;
+        if (liveEntry != null) {
+            counted = new ArrayList<>(rawEntries);
+            counted.add(liveEntry);
+        }
+        List<ActivityEntry> grouped = groupEntries(counted);
+        pieChart.setEntries(grouped);
+        colorBar.setEntries(grouped);
+
+        int totalSec = 0;
+        for (ActivityEntry e : counted) totalSec += e.getDurationSeconds();
+        if (totalSec > 0) {
+            int h = totalSec / 3600;
+            int m = (totalSec % 3600) / 60;
+            totalTimeText.setText(h > 0 ?
+                String.format(Locale.US, "Total: %dh %dm", h, m) :
+                String.format(Locale.US, "Total: %dm", m));
+        } else {
+            totalTimeText.setText("");
+        }
+
+        // History shows individual entries (not grouped), each session editable
+        historyContainer.removeAllViews();
+
+        // Live activity row at the top (showLive computed above with the graphs)
         if (showLive) {
             addLiveHistoryItem();
         }

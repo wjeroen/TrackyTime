@@ -856,7 +856,13 @@ public class OverlayService extends Service {
 
     // ---- Activity tracking ----
 
-    private static final int MIN_ACTIVITY_SECONDS = 10;
+    /**
+     * Activities under this many tracked seconds are never saved. Public
+     * because it is the one threshold the whole system shares: MainActivity
+     * uses it to decide when the running activity joins the graphs, and any
+     * other consumer of the crash-recovery checkpoint applies the same rule.
+     */
+    public static final int MIN_ACTIVITY_SECONDS = 10;
 
     private void saveCurrentActivity() {
         int elapsed = getElapsedSeconds();

@@ -41,6 +41,7 @@
 
 ### App
 - Daily pie chart with color-coded slices (entries grouped by name)
+- **Running activity counts**: the pie chart, color bar, total, and week view include the currently tracked activity's time so far (once it has 10 tracked seconds, the same rule that decides whether it gets saved), so the graphs reflect right now rather than only saved entries. Refreshes on any navigation and every 5 minutes while the app stays open.
 - **Color bar** below pie chart: horizontal stacked bar grouping all activity time by color. Full screen width (within the 16dp page margins). Activities with the same color are lumped into one segment. Percentage labels appear on segments wide enough to fit them. Sorted by hue (similar colors grouped together), then by duration descending within each hue group.
 - **Week view**: toggle between Day/Week; week view aggregates Mon-Sun
 - History list shows **individual entries** with time range (e.g. "10:00 - 11:00 · 1h 00m"), color dot, color picker, delete
