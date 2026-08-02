@@ -10,6 +10,8 @@ Whether you can build depends on where this session is running:
 
 GitHub Actions builds an APK on every push regardless of environment. Use those artifacts for installing on the phone when working from the cloud.
 
+**After any push that can affect the APK (code, resources, build config, or the workflow), verify the GitHub Actions build succeeded** (`gh run list --limit 2`). The Actions artifact is the delivery channel for installs, and the CI keystore is what lets a new build install over the phone's existing one, so a red build means there is nothing to install and it must be fixed right away. Docs-only pushes (README, this file) need no check.
+
 # Testing on the phone
 
 `adb` is available locally (`C:\Users\jeroe\AppData\Local\Android\Sdk\platform-tools\adb.exe`). When the owner's phone is connected and USB debugging is authorized, you can install and drive the app directly. Ask the owner first if a device action could interrupt what they are doing on the phone.
