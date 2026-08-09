@@ -105,10 +105,11 @@ public class MainActivity extends Activity {
     private String pendingExportEnd = null;
     private boolean pendingExportIncludeSettings = true;
 
-    // The running activity's slice keeps growing, so the graphs reload every
-    // 5 minutes while the app is open and something is being tracked. Any
-    // navigation (date tap, day/week toggle) still refreshes instantly.
-    private static final long GRAPH_REFRESH_MS = 5 * 60 * 1000;
+    // The running activity's slice keeps growing, so the graphs and the live
+    // row reload every minute while the app is open and something is being
+    // tracked. The live row shows minute resolution, so this keeps it honest.
+    // Any navigation (date tap, day/week toggle) still refreshes instantly.
+    private static final long GRAPH_REFRESH_MS = 60 * 1000;
     private final Handler refreshHandler = new Handler(Looper.getMainLooper());
     private final Runnable graphRefresh = new Runnable() {
         @Override
@@ -527,18 +528,23 @@ public class MainActivity extends Activity {
         nameText.setTypeface(null, android.graphics.Typeface.BOLD);
         textCol.addView(nameText);
 
-        // "Start: 15:30 · Duration: 12m 05s so far". Duration is tracked time
-        // (pauses excluded), matching what gets saved. The REC/PAUSED label
-        // on the right carries the running state.
+        // "Start: 15:30 · Duration: 12m so far". Minute resolution on purpose:
+        // the row refreshes once a minute, so seconds would mostly be stale.
+        // Duration is tracked time (pauses excluded), matching what gets
+        // saved. The REC/PAUSED label on the right carries the running state.
         boolean paused = OverlayService.livePaused;
         String startStr = timeFormat.format(new Date(OverlayService.liveStartTime));
         long elapsed = paused
             ? OverlayService.liveAccumulatedMs / 1000
             : (System.currentTimeMillis() - OverlayService.liveVirtualStart) / 1000;
+        int eh = (int)(elapsed / 3600);
+        int em = (int)((elapsed % 3600) / 60);
+        String durStr = eh > 0
+            ? String.format(Locale.US, "%dh %dm", eh, em)
+            : String.format(Locale.US, "%dm", em);
 
         TextView durationText = new TextView(this);
-        durationText.setText("Start: " + startStr + " · Duration: "
-            + ActivityEntry.formatDuration((int) elapsed) + " so far");
+        durationText.setText("Start: " + startStr + " · Duration: " + durStr + " so far");
         durationText.setTextColor(paused ? 0xFFFFA726 : 0xFF43A047); // amber when paused, green when live
         durationText.setTextSize(13f);
         textCol.addView(durationText);

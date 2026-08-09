@@ -41,8 +41,8 @@ public class ActivityEntry {
         int h = totalSeconds / 3600;
         int m = (totalSeconds % 3600) / 60;
         int s = totalSeconds % 60;
-        if (h > 0) return String.format(java.util.Locale.US, "%dh %dm %02ds", h, m, s);
-        return String.format(java.util.Locale.US, "%dm %02ds", m, s);
+        if (h > 0) return String.format(java.util.Locale.US, "%dh %dm %ds", h, m, s);
+        return String.format(java.util.Locale.US, "%dm %ds", m, s);
     }
 
     public String getFormattedDuration() {
