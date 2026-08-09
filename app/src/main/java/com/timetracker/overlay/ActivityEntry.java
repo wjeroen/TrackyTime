@@ -36,11 +36,16 @@ public class ActivityEntry {
         return name.trim().replaceAll("\\s+", " ").toLowerCase(java.util.Locale.US);
     }
 
+    /** Compact duration used across the history UI: "1h05m30s", or "05m30s" under an hour. */
+    public static String formatDuration(int totalSeconds) {
+        int h = totalSeconds / 3600;
+        int m = (totalSeconds % 3600) / 60;
+        int s = totalSeconds % 60;
+        if (h > 0) return String.format(java.util.Locale.US, "%dh%02dm%02ds", h, m, s);
+        return String.format(java.util.Locale.US, "%02dm%02ds", m, s);
+    }
+
     public String getFormattedDuration() {
-        int h = durationSeconds / 3600;
-        int m = (durationSeconds % 3600) / 60;
-        int s = durationSeconds % 60;
-        if (h > 0) return String.format("%d:%02d:%02d", h, m, s);
-        return String.format("%02d:%02d", m, s);
+        return formatDuration(durationSeconds);
     }
 }

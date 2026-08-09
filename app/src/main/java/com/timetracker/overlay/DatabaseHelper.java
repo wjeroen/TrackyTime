@@ -112,6 +112,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.close();
     }
 
+    /** Move an entry's start moment and its day. The duration is left untouched. */
+    public void updateEntryStart(long id, long startTime, String date) {
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues cv = new ContentValues();
+        cv.put("start_time", startTime);
+        cv.put("date", date);
+        db.update(TABLE, cv, "id = ?", new String[]{String.valueOf(id)});
+        db.close();
+    }
+
     public void updateColor(long id, int color) {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues cv = new ContentValues();

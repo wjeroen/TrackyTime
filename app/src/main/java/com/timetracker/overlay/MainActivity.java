@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.Dialog;
+import android.app.TimePickerDialog;
 import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -416,6 +417,7 @@ public class MainActivity extends Activity {
 
         View colorDot = item.findViewById(R.id.colorDot);
         EditText nameEdit = (EditText) item.findViewById(R.id.entryName);
+        TextView startText = item.findViewById(R.id.entryStart);
         TextView durationText = item.findViewById(R.id.entryDuration);
         Button colorBtn = item.findViewById(R.id.colorBtn);
         Button deleteBtn = item.findViewById(R.id.deleteBtn);
@@ -427,11 +429,11 @@ public class MainActivity extends Activity {
 
         nameEdit.setText(entry.getName());
 
-        // Time range + duration: "10:00 - 11:00 · 1h 00m"
+        // "Start 10:00 · Duration 1h05m30s". No end time: the duration
+        // excludes pauses, so start + duration is not when the entry ended.
         String startStr = timeFormat.format(new Date(entry.getStartTime()));
-        long endMs = entry.getStartTime() + (entry.getDurationSeconds() * 1000L);
-        String endStr = timeFormat.format(new Date(endMs));
-        durationText.setText(startStr + " - " + endStr + " · " + entry.getFormattedDuration());
+        startText.setText("Start " + startStr);
+        durationText.setText(" · Duration " + entry.getFormattedDuration());
 
         // Inline rename: tap name → becomes editable, press Done → saves
         nameEdit.setOnClickListener(v -> {
@@ -465,7 +467,8 @@ public class MainActivity extends Activity {
             return false;
         });
 
-        // Tap duration to edit it
+        // Separate tap targets: start moves the entry, duration edits its length
+        startText.setOnClickListener(v -> showStartTimeEditor(entry));
         durationText.setOnClickListener(v -> showDurationEditor(entry));
 
         // Color picker (updates all entries with same name)
@@ -524,21 +527,18 @@ public class MainActivity extends Activity {
         nameText.setTypeface(null, android.graphics.Typeface.BOLD);
         textCol.addView(nameText);
 
-        // Time: "15:30 - now" while recording, "15:30 - paused" while paused.
-        // Duration is tracked time (pauses excluded), matching what gets saved.
+        // "Start 15:30 · Duration 12m05s so far". Duration is tracked time
+        // (pauses excluded), matching what gets saved. The REC/PAUSED label
+        // on the right carries the running state.
         boolean paused = OverlayService.livePaused;
         String startStr = timeFormat.format(new Date(OverlayService.liveStartTime));
         long elapsed = paused
             ? OverlayService.liveAccumulatedMs / 1000
             : (System.currentTimeMillis() - OverlayService.liveVirtualStart) / 1000;
-        int eh = (int)(elapsed / 3600);
-        int em = (int)((elapsed % 3600) / 60);
-        String durStr = eh > 0 ?
-            String.format(Locale.US, "%dh %02dm", eh, em) :
-            String.format(Locale.US, "%dm", em);
 
         TextView durationText = new TextView(this);
-        durationText.setText(startStr + (paused ? " - paused · " : " - now · ") + durStr);
+        durationText.setText("Start " + startStr + " · Duration "
+            + ActivityEntry.formatDuration((int) elapsed) + " so far");
         durationText.setTextColor(paused ? 0xFFFFA726 : 0xFF43A047); // amber when paused, green when live
         durationText.setTextSize(13f);
         textCol.addView(durationText);
@@ -660,6 +660,110 @@ public class MainActivity extends Activity {
                 } catch (NumberFormatException e) {
                     Toast.makeText(this, "Invalid number", Toast.LENGTH_SHORT).show();
                 }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    // ======== Start time editor ========
+
+    /**
+     * Moves an entry's start (clock time and day). Moving the start earlier
+     * can also add the newly covered time to the duration (checked by
+     * default), for the "forgot to start the tracker" case. Moving it later
+     * never shrinks the duration: an entry that runs too long is fixed with
+     * the duration editor instead.
+     */
+    private void showStartTimeEditor(ActivityEntry entry) {
+        float d = getResources().getDisplayMetrics().density;
+
+        Calendar startCal = Calendar.getInstance();
+        startCal.setTimeInMillis(entry.getStartTime());
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding((int)(20*d), (int)(16*d), (int)(20*d), (int)(8*d));
+
+        TextView currentLabel = new TextView(this);
+        currentLabel.setText("Current: " + dateFormat.format(startCal.getTime())
+            + " " + timeFormat.format(startCal.getTime()));
+        currentLabel.setTextColor(0xFFCDD6F4);
+        currentLabel.setTextSize(14f);
+        layout.addView(currentLabel);
+
+        addSpacer(layout, 8);
+
+        // Day + clock buttons open the system pickers
+        LinearLayout pickerRow = new LinearLayout(this);
+        pickerRow.setOrientation(LinearLayout.HORIZONTAL);
+
+        Button dateBtn = new Button(this, null, android.R.attr.buttonBarButtonStyle);
+        dateBtn.setTextColor(0xFF8AB4F8);
+        Button timeBtn = new Button(this, null, android.R.attr.buttonBarButtonStyle);
+        timeBtn.setTextColor(0xFF8AB4F8);
+        pickerRow.addView(dateBtn);
+        pickerRow.addView(timeBtn);
+        layout.addView(pickerRow);
+
+        CheckBox addToDurationCb = new CheckBox(this);
+        addToDurationCb.setTextColor(0xFFCDD6F4);
+        addToDurationCb.setTextSize(14f);
+        addToDurationCb.setChecked(true);
+        layout.addView(addToDurationCb);
+
+        TextView effectHint = new TextView(this);
+        effectHint.setTextColor(0xFF9399B2);
+        effectHint.setTextSize(12f);
+        layout.addView(effectHint);
+
+        // Refreshes the picker button labels, the checkbox text (with the
+        // computed gap), and the effect hint whenever the start moves.
+        Runnable refresh = () -> {
+            dateBtn.setText(dateFormat.format(startCal.getTime()));
+            timeBtn.setText(timeFormat.format(startCal.getTime()));
+            long deltaSec = (entry.getStartTime() - startCal.getTimeInMillis()) / 1000;
+            if (deltaSec > 0) {
+                addToDurationCb.setEnabled(true);
+                addToDurationCb.setText("I was working during that time (+"
+                    + ActivityEntry.formatDuration((int) deltaSec) + ")");
+                effectHint.setText("Checked: the moved time is added to the "
+                    + "duration. Unchecked: the entry just moves.");
+            } else {
+                addToDurationCb.setEnabled(false);
+                addToDurationCb.setText("I was working during that time");
+                effectHint.setText(deltaSec == 0
+                    ? "Start unchanged"
+                    : "Start moved later: the entry just moves, duration stays");
+            }
+        };
+        refresh.run();
+
+        dateBtn.setOnClickListener(v -> new DatePickerDialog(this, (view, y, m, day) -> {
+            startCal.set(y, m, day);
+            refresh.run();
+        }, startCal.get(Calendar.YEAR), startCal.get(Calendar.MONTH),
+           startCal.get(Calendar.DAY_OF_MONTH)).show());
+
+        timeBtn.setOnClickListener(v -> new TimePickerDialog(this, (view, h, min) -> {
+            startCal.set(Calendar.HOUR_OF_DAY, h);
+            startCal.set(Calendar.MINUTE, min);
+            refresh.run();
+        }, startCal.get(Calendar.HOUR_OF_DAY), startCal.get(Calendar.MINUTE), true).show());
+
+        new AlertDialog.Builder(this)
+            .setTitle("Edit Start Time")
+            .setView(layout)
+            .setPositiveButton("Save", (dialog, which) -> {
+                long newStart = startCal.getTimeInMillis();
+                if (newStart == entry.getStartTime()) return;
+                long deltaSec = (entry.getStartTime() - newStart) / 1000;
+                dbHelper.updateEntryStart(entry.getId(), newStart,
+                    dateFormat.format(new Date(newStart)));
+                if (deltaSec > 0 && addToDurationCb.isChecked()) {
+                    dbHelper.updateEntryDuration(entry.getId(),
+                        entry.getDurationSeconds() + (int) deltaSec);
+                }
+                loadData();
             })
             .setNegativeButton("Cancel", null)
             .show();
