@@ -429,7 +429,7 @@ public class MainActivity extends Activity {
 
         nameEdit.setText(entry.getName());
 
-        // "Start: 10:00 · Duration: 1h 05m 30s". No end time: the duration
+        // "Start: 10:00 · Duration: 1h 5m 30s". No end time: the duration
         // excludes pauses, so start + duration is not when the entry ended.
         String startStr = timeFormat.format(new Date(entry.getStartTime()));
         startText.setText("Start: " + startStr);
