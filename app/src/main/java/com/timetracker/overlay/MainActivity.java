@@ -429,11 +429,11 @@ public class MainActivity extends Activity {
 
         nameEdit.setText(entry.getName());
 
-        // "Start 10:00 · Duration 1h05m30s". No end time: the duration
+        // "Start: 10:00 · Duration: 1h 05m 30s". No end time: the duration
         // excludes pauses, so start + duration is not when the entry ended.
         String startStr = timeFormat.format(new Date(entry.getStartTime()));
-        startText.setText("Start " + startStr);
-        durationText.setText(" · Duration " + entry.getFormattedDuration());
+        startText.setText("Start: " + startStr);
+        durationText.setText(" · Duration: " + entry.getFormattedDuration());
 
         // Inline rename: tap name → becomes editable, press Done → saves
         nameEdit.setOnClickListener(v -> {
@@ -527,7 +527,7 @@ public class MainActivity extends Activity {
         nameText.setTypeface(null, android.graphics.Typeface.BOLD);
         textCol.addView(nameText);
 
-        // "Start 15:30 · Duration 12m05s so far". Duration is tracked time
+        // "Start: 15:30 · Duration: 12m 05s so far". Duration is tracked time
         // (pauses excluded), matching what gets saved. The REC/PAUSED label
         // on the right carries the running state.
         boolean paused = OverlayService.livePaused;
@@ -537,7 +537,7 @@ public class MainActivity extends Activity {
             : (System.currentTimeMillis() - OverlayService.liveVirtualStart) / 1000;
 
         TextView durationText = new TextView(this);
-        durationText.setText("Start " + startStr + " · Duration "
+        durationText.setText("Start: " + startStr + " · Duration: "
             + ActivityEntry.formatDuration((int) elapsed) + " so far");
         durationText.setTextColor(paused ? 0xFFFFA726 : 0xFF43A047); // amber when paused, green when live
         durationText.setTextSize(13f);
