@@ -109,14 +109,17 @@ public class OverlayPreferences {
     // Signal to overlay that a task color changed in the DB (timestamp, triggers pref listener)
     public void notifyTaskColorChanged() { sp.edit().putLong("color_change_signal", System.currentTimeMillis()).apply(); }
 
-    // Quick-select activity shortcuts (newline-delimited)
+    // Quick-select activity shortcuts (newline-delimited). The key is public so
+    // the overlay can tell a change to this list apart from other pref changes.
+    public static final String KEY_QUICK_ACTIVITIES = "quick_activities";
+
     public List<String> getQuickActivities() {
-        String raw = sp.getString("quick_activities", "");
+        String raw = sp.getString(KEY_QUICK_ACTIVITIES, "");
         if (raw.isEmpty()) return new ArrayList<>();
         return new ArrayList<>(Arrays.asList(raw.split("\n")));
     }
     public void setQuickActivities(List<String> activities) {
-        sp.edit().putString("quick_activities", String.join("\n", activities)).apply();
+        sp.edit().putString(KEY_QUICK_ACTIVITIES, String.join("\n", activities)).apply();
     }
 
     // ---- Crash recovery (uses separate SharedPreferences file) ----

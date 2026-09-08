@@ -127,6 +127,12 @@ public class OverlayService extends Service {
         applyClockPreferences();
     };
 
+    private final Runnable rebuildQuickRunnable = () -> {
+        if (isOverlayVisible && isExpanded && overlayView.findFocus() == null) {
+            rebuildQuickSelectRows();
+        }
+    };
+
     private static final int NOTIF_ID = 1001;
     private static final String CHANNEL_ID = "timetracker_channel";
     private static final long PULSE_INTERVAL_SECONDS = 30 * 60; // speed up every 30 min
@@ -187,6 +193,15 @@ public class OverlayService extends Service {
         prefsListener = (sharedPreferences, key) -> {
             timerHandler.removeCallbacks(applyPrefsRunnable);
             timerHandler.postDelayed(applyPrefsRunnable, 100); // debounce
+            // The shortcut list can change outside the overlay (the app's Import,
+            // or a build variant adding names). Rebuild the rows so a later
+            // collapse does not save the stale rows over the new list. Skipped
+            // while something in the overlay is being typed in, when the rows on
+            // screen are the truth.
+            if (OverlayPreferences.KEY_QUICK_ACTIVITIES.equals(key)) {
+                timerHandler.removeCallbacks(rebuildQuickRunnable);
+                timerHandler.postDelayed(rebuildQuickRunnable, 150);
+            }
         };
         sp.registerOnSharedPreferenceChangeListener(prefsListener);
 
@@ -1070,7 +1085,8 @@ public class OverlayService extends Service {
         }
     }
 
-    private void saveQuickSelectNames() {
+    /** The names in the rows on screen, blank ones skipped, in order. */
+    private List<String> currentQuickNames() {
         List<String> names = new ArrayList<>();
         for (int i = 0; i < quickSelectContainer.getChildCount(); i++) {
             LinearLayout row = (LinearLayout) quickSelectContainer.getChildAt(i);
@@ -1078,7 +1094,11 @@ public class OverlayService extends Service {
             String name = nameField.getText().toString().trim();
             if (!name.isEmpty()) names.add(name);
         }
-        new OverlayPreferences(this).setQuickActivities(names);
+        return names;
+    }
+
+    private void saveQuickSelectNames() {
+        new OverlayPreferences(this).setQuickActivities(currentQuickNames());
     }
 
     private void rebuildQuickSelectRows() {
@@ -1128,6 +1148,16 @@ public class OverlayService extends Service {
         input.setMaxLines(8); // grows until here, then scrolls inside itself
         input.setGravity(Gravity.TOP);
         box.addView(input);
+
+        // A build variant may know shortcuts from elsewhere (another device, for
+        // instance) that this overlay does not have yet. They become the starting
+        // text, one per line, so an unwanted one is just a line to delete.
+        List<String> suggested = ShortcutSuggestions.suggest(currentQuickNames());
+        if (!suggested.isEmpty()) {
+            input.setText(String.join("\n", suggested));
+            hint.setText(hint.getText() + " Pre-filled with shortcuts from another "
+                + "device that are not on this one yet. Remove any line you do not want.");
+        }
 
         TextView preview = new TextView(themed);
         preview.setTextSize(12);
