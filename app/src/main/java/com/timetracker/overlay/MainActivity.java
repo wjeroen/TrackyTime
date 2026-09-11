@@ -114,8 +114,9 @@ public class MainActivity extends Activity {
     private final Runnable graphRefresh = new Runnable() {
         @Override
         public void run() {
-            if (OverlayService.isServiceRunning
-                    && !OverlayService.liveActivityName.isEmpty()) {
+            if ((OverlayService.isServiceRunning
+                    && !OverlayService.liveActivityName.isEmpty())
+                    || !RemoteActivities.current().isEmpty()) {
                 loadData();
             }
             refreshHandler.postDelayed(this, GRAPH_REFRESH_MS);
@@ -162,13 +163,18 @@ public class MainActivity extends Activity {
         loadData();
         refreshHandler.removeCallbacks(graphRefresh);
         refreshHandler.postDelayed(graphRefresh, GRAPH_REFRESH_MS);
+        RemoteActivities.addListener(remoteChanged);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         refreshHandler.removeCallbacks(graphRefresh);
+        RemoteActivities.removeListener(remoteChanged);
     }
+
+    /** Another device's running activities changed: redraw with them. */
+    private final Runnable remoteChanged = this::loadData;
 
     // ======== Overlay toggle ========
 
@@ -345,11 +351,33 @@ public class MainActivity extends Activity {
             }
         }
 
+        // Activities running on another device, when a build variant reports
+        // any. They belong to today, so they join the same views the local
+        // running activity does, under the same 10 second rule.
+        List<RemoteActivities.Live> remoteLive = new ArrayList<>();
+        List<ActivityEntry> remoteEntries = new ArrayList<>();
+        if (viewIncludesToday()) {
+            String today = dateFormat.format(new Date());
+            for (RemoteActivities.Live r : RemoteActivities.current()) {
+                int secs = r.secondsNow();
+                if (secs < OverlayService.MIN_ACTIVITY_SECONDS) continue;
+                remoteLive.add(r);
+                ActivityEntry e = new ActivityEntry();
+                e.setName(r.name);
+                e.setDurationSeconds(secs);
+                e.setColor(r.color);
+                e.setStartTime(r.startTime);
+                e.setDate(today);
+                remoteEntries.add(e);
+            }
+        }
+
         // Pie chart uses grouped data (same name = one slice)
         List<ActivityEntry> counted = rawEntries;
-        if (liveEntry != null) {
+        if (liveEntry != null || !remoteEntries.isEmpty()) {
             counted = new ArrayList<>(rawEntries);
-            counted.add(liveEntry);
+            if (liveEntry != null) counted.add(liveEntry);
+            counted.addAll(remoteEntries);
         }
         List<ActivityEntry> grouped = groupEntries(counted);
         pieChart.setEntries(grouped);
@@ -374,8 +402,11 @@ public class MainActivity extends Activity {
         if (showLive) {
             addLiveHistoryItem();
         }
+        for (RemoteActivities.Live r : remoteLive) {
+            addRemoteHistoryItem(r);
+        }
 
-        if (rawEntries.isEmpty() && !showLive) {
+        if (rawEntries.isEmpty() && !showLive && remoteLive.isEmpty()) {
             TextView empty = new TextView(this);
             empty.setText("No activities recorded");
             empty.setTextColor(0xFF888899);
@@ -487,6 +518,84 @@ public class MainActivity extends Activity {
                 .setNegativeButton("Cancel", null)
                 .show();
         });
+
+        historyContainer.addView(item);
+    }
+
+    /** Whether the day or week being viewed contains today. */
+    private boolean viewIncludesToday() {
+        String today = dateFormat.format(new Date());
+        if (!isWeekView) return dateFormat.format(calendar.getTime()).equals(today);
+        String[] range = getWeekRange();
+        return today.compareTo(range[0]) >= 0 && today.compareTo(range[1]) <= 0;
+    }
+
+    // ======== Live activity on another device ========
+
+    /**
+     * A row for an activity running on another device. Same shape as the
+     * local live row, with a blue label naming where it runs, so the two can
+     * never be mistaken for each other.
+     */
+    private void addRemoteHistoryItem(RemoteActivities.Live r) {
+        float d = getResources().getDisplayMetrics().density;
+
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.HORIZONTAL);
+        item.setGravity(Gravity.CENTER_VERTICAL);
+        item.setPadding((int)(12*d), (int)(12*d), (int)(12*d), (int)(12*d));
+        item.setBackgroundColor(0xFF2E3448);
+
+        View colorDot = new View(this);
+        LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(
+            (int)(20*d), (int)(20*d));
+        dotParams.setMarginEnd((int)(12*d));
+        colorDot.setLayoutParams(dotParams);
+        GradientDrawable dotBg = new GradientDrawable();
+        dotBg.setShape(GradientDrawable.OVAL);
+        dotBg.setColor(r.color);
+        colorDot.setBackground(dotBg);
+        item.addView(colorDot);
+
+        LinearLayout textCol = new LinearLayout(this);
+        textCol.setOrientation(LinearLayout.VERTICAL);
+        textCol.setLayoutParams(new LinearLayout.LayoutParams(
+            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        TextView nameText = new TextView(this);
+        nameText.setText(r.name);
+        nameText.setTextColor(0xFFCDD6F4);
+        nameText.setTextSize(15f);
+        nameText.setTypeface(null, android.graphics.Typeface.BOLD);
+        textCol.addView(nameText);
+
+        int secs = r.secondsNow();
+        int eh = secs / 3600;
+        int em = (secs % 3600) / 60;
+        String durStr = eh > 0
+            ? String.format(Locale.US, "%dh %dm", eh, em)
+            : String.format(Locale.US, "%dm", em);
+        TextView durationText = new TextView(this);
+        durationText.setText("Start: " + timeFormat.format(new Date(r.startTime))
+            + " · Duration: " + durStr + " so far");
+        durationText.setTextColor(r.counting ? 0xFF64B5F6 : 0xFFFFA726);
+        durationText.setTextSize(13f);
+        textCol.addView(durationText);
+
+        item.addView(textCol);
+
+        TextView whereLabel = new TextView(this);
+        whereLabel.setText((r.counting ? "● " : "❚❚ ") + r.where);
+        whereLabel.setTextColor(r.counting ? 0xFF64B5F6 : 0xFFFFA726);
+        whereLabel.setTextSize(12f);
+        whereLabel.setTypeface(null, android.graphics.Typeface.BOLD);
+        item.addView(whereLabel);
+
+        LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT);
+        itemParams.setMargins(0, 0, 0, (int)(4*d));
+        item.setLayoutParams(itemParams);
 
         historyContainer.addView(item);
     }

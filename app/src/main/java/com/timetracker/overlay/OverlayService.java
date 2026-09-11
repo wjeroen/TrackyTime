@@ -127,6 +127,22 @@ public class OverlayService extends Service {
         applyClockPreferences();
     };
 
+    // Redraws the bar when another device's running activities change, and
+    // keeps them growing every 30 seconds while this overlay's own timer is
+    // stopped, since the timer loop is what normally redraws the bar.
+    private final Runnable remoteChanged = () -> {
+        if (isOverlayVisible) updateTimelineBar();
+    };
+    private final Runnable remoteTick = new Runnable() {
+        @Override
+        public void run() {
+            if (isOverlayVisible && !isRunning && !RemoteActivities.current().isEmpty()) {
+                updateTimelineBar();
+            }
+            timerHandler.postDelayed(this, 30_000);
+        }
+    };
+
     private final Runnable rebuildQuickRunnable = () -> {
         if (isOverlayVisible && isExpanded && overlayView.findFocus() == null) {
             rebuildQuickSelectRows();
@@ -204,6 +220,9 @@ public class OverlayService extends Service {
             }
         };
         sp.registerOnSharedPreferenceChangeListener(prefsListener);
+
+        RemoteActivities.addListener(remoteChanged);
+        timerHandler.postDelayed(remoteTick, 30_000);
 
         // Immersive clock works independently of the main overlay
         setupOrTeardownImmersiveClock();
@@ -854,7 +873,17 @@ public class OverlayService extends Service {
     }
 
     private void updateTimelineBar() {
+        if (timelineBar == null) return;
         List<TimelineBarView.Segment> all = new ArrayList<>(savedSegments);
+        // Activities running on another device, when a build variant reports
+        // any. They go before this device's own running segment, which stays
+        // last so it is still the one that pulses.
+        for (RemoteActivities.Live r : RemoteActivities.current()) {
+            int secs = r.secondsNow();
+            if (secs >= MIN_ACTIVITY_SECONDS) {
+                all.add(new TimelineBarView.Segment(r.color, secs, true));
+            }
+        }
         // Add the currently-running activity as a live segment
         if (!currentActivityName.isEmpty()) {
             int elapsed = getElapsedSeconds();
@@ -1421,6 +1450,8 @@ public class OverlayService extends Service {
         saveCurrentActivity();
         timerHandler.removeCallbacks(timerRunnable);
         timerHandler.removeCallbacks(applyPrefsRunnable);
+        timerHandler.removeCallbacks(remoteTick);
+        RemoteActivities.removeListener(remoteChanged);
         heartbeatHandler.removeCallbacks(heartbeatRunnable);
         stopProgressPulse();
         teardownImmersiveClock();

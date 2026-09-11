@@ -12,6 +12,7 @@
 - **+ add shortcut** → adds a quick-select row below the timeline. Type an activity name, then tap ▶ to instantly switch to it (overlay stays expanded, focus released). Tap X icon on a row to remove it. Shortcuts persist across sessions.
 - **Long-press +** → batch-add dialog: type or paste multiple activities, one per line, and they are appended to the end of the shortcut list (existing shortcuts are never touched). Includes a clipboard preview and a "Paste clipboard" button (the preview fills in once the dialog has focus, an Android privacy rule). The dialog starts empty unless the build registers a suggestions provider (see `ShortcutSuggestions.java`), in which case it is pre-filled with suggested names, one per line.
 - **Shortcut list changes made elsewhere** (an Import, or a suggestions provider adding names) show up in the expanded overlay right away, so collapsing never saves stale rows over the new list.
+- **Activities running on another device**, when the build registers a `RemoteActivities` provider, appear as a striped segment in the overlay's timeline bar (it never pulses, so it cannot be mistaken for this device's own), as a row in today's history with a blue label naming where it runs, and in the pie chart, color bar and total under the same 10 second rule as the local running activity. The standard build registers none, so none of this appears there.
 - **➚ open app** → opens the full TrackyTime app (releases focus, overlay stays expanded)
 - **− collapse** → collapses the expanded overlay back to the compact pill
 - **Timeline bar** → 6dp colored bar at the bottom showing the day's activity history as proportional segments. Each activity session is a colored rectangle. The currently-running activity grows live. The live segment pulses immediately, speeding up 2x every 30 minutes as a gentle nudge. Not affected by the opacity slider. White tick marks (2px wide) at every hour (full height) and half-hour (bottom half). Both fully opaque. Half-hour marks are hidden once total tracked time exceeds 5 hours.
@@ -102,6 +103,7 @@
 | `app/src/main/java/.../BootReceiver.java` | Auto-starts OverlayService on boot when immersive clock is enabled |
 | `app/src/main/java/.../BackupExtensions.java` | Optional extension point: a build variant can add its own section to the backup file, inert in the standard build |
 | `app/src/main/java/.../ShortcutSuggestions.java` | Optional extension point: a build variant can pre-fill the batch-add dialog with suggested shortcut names, inert in the standard build |
+| `app/src/main/java/.../RemoteActivities.java` | Optional extension point: a build variant can report activities running right now on another device, which then get a history row, a striped timeline segment, and a place in the day's totals. Inert in the standard build |
 | `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance (bg/text/border colors, border width, opacity, size, overlay pulse toggle + breathing transparency/brightness/grayscale, task color bg mode + brightness, text stroke toggle + stroke width, UI elements opacity, quick-select activities, color change signal) + crash recovery checkpoint (separate `crash_recovery` file) |
 | `.github/workflows/android.yml` | GitHub Actions workflow, builds APK on every push |
 
@@ -133,6 +135,7 @@ TrackyTime/
 │       │   ├── OverlayPreferences.java
 │       │   ├── OverlayService.java
 │       │   ├── PieChartView.java
+│       │   ├── RemoteActivities.java
 │       │   ├── ShortcutSuggestions.java
 │       │   ├── StrokeEditText.java
 │       │   ├── StrokeImageView.java
