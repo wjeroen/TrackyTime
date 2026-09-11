@@ -10,7 +10,7 @@ public class OverlayPreferences {
 
     private static final String PREFS = "overlay_prefs";
     private SharedPreferences sp;
-    private SharedPreferences crashSp; // separate file — avoids triggering live-update listener
+    private SharedPreferences crashSp; // separate file, avoids triggering live-update listener
 
     public OverlayPreferences(Context ctx) {
         sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -27,7 +27,7 @@ public class OverlayPreferences {
     public int getOpacity() { return sp.getInt("opacity", 153); }
     public void setOpacity(int o) { sp.edit().putInt("opacity", o).apply(); }
 
-    // Border color (accent) — used for the overlay border
+    // Border color (accent), used for the overlay border
     public int getAccentColor() { return sp.getInt("accent_color", 0xFF000000); }
     public void setAccentColor(int c) { sp.edit().putInt("accent_color", c).apply(); }
 
@@ -35,7 +35,7 @@ public class OverlayPreferences {
     public int getBorderWidth() { return sp.getInt("border_width", 2); }
     public void setBorderWidth(int w) { sp.edit().putInt("border_width", w).apply(); }
 
-    // Border opacity (0-255, default 153 ≈ 60%) — independent from background opacity
+    // Border opacity (0-255, default 153 ≈ 60%), independent from background opacity
     public int getBorderOpacity() { return sp.getInt("border_opacity", 153); }
     public void setBorderOpacity(int o) { sp.edit().putInt("border_opacity", o).apply(); }
 
@@ -75,15 +75,15 @@ public class OverlayPreferences {
     public boolean isTextStrokeEnabled() { return sp.getBoolean("text_stroke", false); }
     public void setTextStrokeEnabled(boolean on) { sp.edit().putBoolean("text_stroke", on).apply(); }
 
-    // Stroke width in pixels (1-10, default 4) — applies to text stroke AND icon stroke
+    // Stroke width in pixels (1-10, default 4), applies to text stroke AND icon stroke
     public int getStrokeWidth() { return sp.getInt("stroke_width", 4); }
     public void setStrokeWidth(int w) { sp.edit().putInt("stroke_width", w).apply(); }
 
-    // UI elements opacity (50-255, default 0x99=153) — buttons, separator, hint text, paused timer
+    // UI elements opacity (50-255, default 0x99=153): buttons, separator, hint text, paused timer
     public int getUiElementsOpacity() { return sp.getInt("ui_elements_opacity", 0x99); }
     public void setUiElementsOpacity(int o) { sp.edit().putInt("ui_elements_opacity", o).apply(); }
 
-    // Immersive clock — display current time when phone is in immersive/fullscreen mode
+    // Immersive clock, display current time when phone is in immersive/fullscreen mode
     public boolean isImmersiveClockEnabled() { return sp.getBoolean("immersive_clock", false); }
     public void setImmersiveClockEnabled(boolean on) { sp.edit().putBoolean("immersive_clock", on).apply(); }
 
@@ -91,7 +91,7 @@ public class OverlayPreferences {
     public int getSize() { return sp.getInt("size", 0); }
     public void setSize(int s) { sp.edit().putInt("size", s).apply(); }
 
-    /** Unified text size — activity name, timer, separator all use this. */
+    /** Unified text size: activity name, timer, separator all use this. */
     public float getTextSize() {
         switch (getSize()) {
             case 0: return 14f;
@@ -101,7 +101,7 @@ public class OverlayPreferences {
         }
     }
 
-    /** Same as getTextSize() — timer matches activity text. */
+    /** Same as getTextSize(), timer matches activity text. */
     public float getTimerTextSize() {
         return getTextSize();
     }
@@ -109,14 +109,17 @@ public class OverlayPreferences {
     // Signal to overlay that a task color changed in the DB (timestamp, triggers pref listener)
     public void notifyTaskColorChanged() { sp.edit().putLong("color_change_signal", System.currentTimeMillis()).apply(); }
 
-    // Quick-select activity shortcuts (newline-delimited)
+    // Quick-select activity shortcuts (newline-delimited). The key is public so
+    // the overlay can tell a change to this list apart from other pref changes.
+    public static final String KEY_QUICK_ACTIVITIES = "quick_activities";
+
     public List<String> getQuickActivities() {
-        String raw = sp.getString("quick_activities", "");
+        String raw = sp.getString(KEY_QUICK_ACTIVITIES, "");
         if (raw.isEmpty()) return new ArrayList<>();
         return new ArrayList<>(Arrays.asList(raw.split("\n")));
     }
     public void setQuickActivities(List<String> activities) {
-        sp.edit().putString("quick_activities", String.join("\n", activities)).apply();
+        sp.edit().putString(KEY_QUICK_ACTIVITIES, String.join("\n", activities)).apply();
     }
 
     // ---- Crash recovery (uses separate SharedPreferences file) ----
@@ -134,6 +137,14 @@ public class OverlayPreferences {
     /** Update the heartbeat with current elapsed seconds (called every 5s). */
     public void updateCrashHeartbeat(int elapsedSeconds) {
         crashSp.edit().putInt("elapsed_seconds", elapsedSeconds).apply();
+    }
+
+    /**
+     * Move the checkpoint's start time when the service slides an activity's
+     * recorded start forward (a resume within the first 10 tracked seconds).
+     */
+    public void updateCrashStartTime(long startTime) {
+        crashSp.edit().putLong("start_time", startTime).apply();
     }
 
     public boolean hasCrashRecovery() { return crashSp.getBoolean("active", false); }

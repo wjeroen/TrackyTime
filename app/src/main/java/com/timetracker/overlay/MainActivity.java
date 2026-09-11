@@ -2,11 +2,15 @@ package com.timetracker.overlay;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.DatePickerDialog;
 import android.app.Dialog;
+import android.app.TimePickerDialog;
 import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.text.InputType;
 import android.view.Gravity;
@@ -24,8 +28,8 @@ import android.widget.TextView;
 import android.widget.CheckBox;
 import android.widget.ScrollView;
 import android.widget.Toast;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -95,6 +99,30 @@ public class MainActivity extends Activity {
     private SimpleDateFormat timeFormat;
     private boolean isWeekView = false;
 
+    // Pending export options, set by the export dialog before the file picker opens.
+    // startDate == null means all time. Dates are "yyyy-MM-dd" strings.
+    private String pendingExportStart = null;
+    private String pendingExportEnd = null;
+    private boolean pendingExportIncludeSettings = true;
+
+    // The running activity's slice keeps growing, so the graphs and the live
+    // row reload every minute while the app is open and something is being
+    // tracked. The live row shows minute resolution, so this keeps it honest.
+    // Any navigation (date tap, day/week toggle) still refreshes instantly.
+    private static final long GRAPH_REFRESH_MS = 60 * 1000;
+    private final Handler refreshHandler = new Handler(Looper.getMainLooper());
+    private final Runnable graphRefresh = new Runnable() {
+        @Override
+        public void run() {
+            if ((OverlayService.isServiceRunning
+                    && !OverlayService.liveActivityName.isEmpty())
+                    || !RemoteActivities.current().isEmpty()) {
+                loadData();
+            }
+            refreshHandler.postDelayed(this, GRAPH_REFRESH_MS);
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -133,7 +161,20 @@ public class MainActivity extends Activity {
         super.onResume();
         updateToggleButton();
         loadData();
+        refreshHandler.removeCallbacks(graphRefresh);
+        refreshHandler.postDelayed(graphRefresh, GRAPH_REFRESH_MS);
+        RemoteActivities.addListener(remoteChanged);
     }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        refreshHandler.removeCallbacks(graphRefresh);
+        RemoteActivities.removeListener(remoteChanged);
+    }
+
+    /** Another device's running activities changed: redraw with them. */
+    private final Runnable remoteChanged = this::loadData;
 
     // ======== Overlay toggle ========
 
@@ -234,9 +275,9 @@ public class MainActivity extends Activity {
             try {
                 Date start = dateFormat.parse(range[0]);
                 Date end = dateFormat.parse(range[1]);
-                dateText.setText(shortFmt.format(start) + " — " + shortFmt.format(end));
+                dateText.setText(shortFmt.format(start) + " - " + shortFmt.format(end));
             } catch (Exception e) {
-                dateText.setText(range[0] + " — " + range[1]);
+                dateText.setText(range[0] + " - " + range[1]);
             }
         } else {
             String current = dateFormat.format(calendar.getTime());
@@ -275,29 +316,15 @@ public class MainActivity extends Activity {
             rawEntries = dbHelper.getEntriesByDate(date);
         }
 
-        // Pie chart uses grouped data (same name = one slice)
-        List<ActivityEntry> grouped = groupEntries(rawEntries);
-        pieChart.setEntries(grouped);
-        colorBar.setEntries(grouped);
-
-        int totalSec = 0;
-        for (ActivityEntry e : rawEntries) totalSec += e.getDurationSeconds();
-        if (totalSec > 0) {
-            int h = totalSec / 3600;
-            int m = (totalSec % 3600) / 60;
-            totalTimeText.setText(h > 0 ?
-                String.format(Locale.US, "Total: %dh %dm", h, m) :
-                String.format(Locale.US, "Total: %dm", m));
-        } else {
-            totalTimeText.setText("");
-        }
-
-        // History shows individual entries (not grouped) — each session editable
-        historyContainer.removeAllViews();
-
-        // Show live activity at the top if overlay is running and we're viewing today
+        // Live activity (running or paused) belonging to the viewed day/week.
+        // It gets a row at the top of the history, and once it has 10 tracked
+        // seconds (the same threshold that decides whether it will be saved at
+        // all) it also joins the graphs and the total, so the charts reflect
+        // right now rather than only what is already stored.
         boolean showLive = false;
-        if (OverlayService.isServiceRunning && OverlayService.liveIsRunning
+        ActivityEntry liveEntry = null;
+        if (OverlayService.isServiceRunning
+                && (OverlayService.liveIsRunning || OverlayService.livePaused)
                 && !OverlayService.liveActivityName.isEmpty()) {
             String today = dateFormat.format(new Date());
             String viewDate = dateFormat.format(calendar.getTime());
@@ -309,12 +336,77 @@ public class MainActivity extends Activity {
                     showLive = true;
                 }
             }
+            if (showLive) {
+                long elapsed = OverlayService.livePaused
+                    ? OverlayService.liveAccumulatedMs / 1000
+                    : (System.currentTimeMillis() - OverlayService.liveVirtualStart) / 1000;
+                if (elapsed >= OverlayService.MIN_ACTIVITY_SECONDS) {
+                    liveEntry = new ActivityEntry();
+                    liveEntry.setName(OverlayService.liveActivityName);
+                    liveEntry.setDurationSeconds((int) elapsed);
+                    liveEntry.setColor(OverlayService.liveActivityColor);
+                    liveEntry.setStartTime(OverlayService.liveStartTime);
+                    liveEntry.setDate(today);
+                }
+            }
         }
+
+        // Activities running on another device, when a build variant reports
+        // any. They belong to today, so they join the same views the local
+        // running activity does, under the same 10 second rule.
+        List<RemoteActivities.Live> remoteLive = new ArrayList<>();
+        List<ActivityEntry> remoteEntries = new ArrayList<>();
+        if (viewIncludesToday()) {
+            String today = dateFormat.format(new Date());
+            for (RemoteActivities.Live r : RemoteActivities.current()) {
+                int secs = r.secondsNow();
+                if (secs < OverlayService.MIN_ACTIVITY_SECONDS) continue;
+                remoteLive.add(r);
+                ActivityEntry e = new ActivityEntry();
+                e.setName(r.name);
+                e.setDurationSeconds(secs);
+                e.setColor(r.color);
+                e.setStartTime(r.startTime);
+                e.setDate(today);
+                remoteEntries.add(e);
+            }
+        }
+
+        // Pie chart uses grouped data (same name = one slice)
+        List<ActivityEntry> counted = rawEntries;
+        if (liveEntry != null || !remoteEntries.isEmpty()) {
+            counted = new ArrayList<>(rawEntries);
+            if (liveEntry != null) counted.add(liveEntry);
+            counted.addAll(remoteEntries);
+        }
+        List<ActivityEntry> grouped = groupEntries(counted);
+        pieChart.setEntries(grouped);
+        colorBar.setEntries(grouped);
+
+        int totalSec = 0;
+        for (ActivityEntry e : counted) totalSec += e.getDurationSeconds();
+        if (totalSec > 0) {
+            int h = totalSec / 3600;
+            int m = (totalSec % 3600) / 60;
+            totalTimeText.setText(h > 0 ?
+                String.format(Locale.US, "Total: %dh %dm", h, m) :
+                String.format(Locale.US, "Total: %dm", m));
+        } else {
+            totalTimeText.setText("");
+        }
+
+        // History shows individual entries (not grouped), each session editable
+        historyContainer.removeAllViews();
+
+        // Live activity row at the top (showLive computed above with the graphs)
         if (showLive) {
             addLiveHistoryItem();
         }
+        for (RemoteActivities.Live r : remoteLive) {
+            addRemoteHistoryItem(r);
+        }
 
-        if (rawEntries.isEmpty() && !showLive) {
+        if (rawEntries.isEmpty() && !showLive && remoteLive.isEmpty()) {
             TextView empty = new TextView(this);
             empty.setText("No activities recorded");
             empty.setTextColor(0xFF888899);
@@ -329,7 +421,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** Group entries by name (case-insensitive), sum durations — used for pie chart. */
+    /** Group entries by name (case-insensitive), sum durations, used for pie chart. */
     private List<ActivityEntry> groupEntries(List<ActivityEntry> raw) {
         Map<String, ActivityEntry> map = new LinkedHashMap<>();
         for (ActivityEntry e : raw) {
@@ -357,6 +449,7 @@ public class MainActivity extends Activity {
 
         View colorDot = item.findViewById(R.id.colorDot);
         EditText nameEdit = (EditText) item.findViewById(R.id.entryName);
+        TextView startText = item.findViewById(R.id.entryStart);
         TextView durationText = item.findViewById(R.id.entryDuration);
         Button colorBtn = item.findViewById(R.id.colorBtn);
         Button deleteBtn = item.findViewById(R.id.deleteBtn);
@@ -368,11 +461,11 @@ public class MainActivity extends Activity {
 
         nameEdit.setText(entry.getName());
 
-        // Time range + duration: "10:00 – 11:00 · 1h 00m"
+        // "Start: 10:00 · Duration: 1h 5m 30s". No end time: the duration
+        // excludes pauses, so start + duration is not when the entry ended.
         String startStr = timeFormat.format(new Date(entry.getStartTime()));
-        long endMs = entry.getStartTime() + (entry.getDurationSeconds() * 1000L);
-        String endStr = timeFormat.format(new Date(endMs));
-        durationText.setText(startStr + " – " + endStr + " · " + entry.getFormattedDuration());
+        startText.setText("Start: " + startStr);
+        durationText.setText(" · Duration: " + entry.getFormattedDuration());
 
         // Inline rename: tap name → becomes editable, press Done → saves
         nameEdit.setOnClickListener(v -> {
@@ -406,7 +499,8 @@ public class MainActivity extends Activity {
             return false;
         });
 
-        // Tap duration to edit it
+        // Separate tap targets: start moves the entry, duration edits its length
+        startText.setOnClickListener(v -> showStartTimeEditor(entry));
         durationText.setOnClickListener(v -> showDurationEditor(entry));
 
         // Color picker (updates all entries with same name)
@@ -424,6 +518,84 @@ public class MainActivity extends Activity {
                 .setNegativeButton("Cancel", null)
                 .show();
         });
+
+        historyContainer.addView(item);
+    }
+
+    /** Whether the day or week being viewed contains today. */
+    private boolean viewIncludesToday() {
+        String today = dateFormat.format(new Date());
+        if (!isWeekView) return dateFormat.format(calendar.getTime()).equals(today);
+        String[] range = getWeekRange();
+        return today.compareTo(range[0]) >= 0 && today.compareTo(range[1]) <= 0;
+    }
+
+    // ======== Live activity on another device ========
+
+    /**
+     * A row for an activity running on another device. Same shape as the
+     * local live row, with a blue label naming where it runs, so the two can
+     * never be mistaken for each other.
+     */
+    private void addRemoteHistoryItem(RemoteActivities.Live r) {
+        float d = getResources().getDisplayMetrics().density;
+
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.HORIZONTAL);
+        item.setGravity(Gravity.CENTER_VERTICAL);
+        item.setPadding((int)(12*d), (int)(12*d), (int)(12*d), (int)(12*d));
+        item.setBackgroundColor(0xFF2E3448);
+
+        View colorDot = new View(this);
+        LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(
+            (int)(20*d), (int)(20*d));
+        dotParams.setMarginEnd((int)(12*d));
+        colorDot.setLayoutParams(dotParams);
+        GradientDrawable dotBg = new GradientDrawable();
+        dotBg.setShape(GradientDrawable.OVAL);
+        dotBg.setColor(r.color);
+        colorDot.setBackground(dotBg);
+        item.addView(colorDot);
+
+        LinearLayout textCol = new LinearLayout(this);
+        textCol.setOrientation(LinearLayout.VERTICAL);
+        textCol.setLayoutParams(new LinearLayout.LayoutParams(
+            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        TextView nameText = new TextView(this);
+        nameText.setText(r.name);
+        nameText.setTextColor(0xFFCDD6F4);
+        nameText.setTextSize(15f);
+        nameText.setTypeface(null, android.graphics.Typeface.BOLD);
+        textCol.addView(nameText);
+
+        int secs = r.secondsNow();
+        int eh = secs / 3600;
+        int em = (secs % 3600) / 60;
+        String durStr = eh > 0
+            ? String.format(Locale.US, "%dh %dm", eh, em)
+            : String.format(Locale.US, "%dm", em);
+        TextView durationText = new TextView(this);
+        durationText.setText("Start: " + timeFormat.format(new Date(r.startTime))
+            + " · Duration: " + durStr + " so far");
+        durationText.setTextColor(r.counting ? 0xFF64B5F6 : 0xFFFFA726);
+        durationText.setTextSize(13f);
+        textCol.addView(durationText);
+
+        item.addView(textCol);
+
+        TextView whereLabel = new TextView(this);
+        whereLabel.setText((r.counting ? "● " : "❚❚ ") + r.where);
+        whereLabel.setTextColor(r.counting ? 0xFF64B5F6 : 0xFFFFA726);
+        whereLabel.setTextSize(12f);
+        whereLabel.setTypeface(null, android.graphics.Typeface.BOLD);
+        item.addView(whereLabel);
+
+        LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT);
+        itemParams.setMargins(0, 0, 0, (int)(4*d));
+        item.setLayoutParams(itemParams);
 
         historyContainer.addView(item);
     }
@@ -465,27 +637,33 @@ public class MainActivity extends Activity {
         nameText.setTypeface(null, android.graphics.Typeface.BOLD);
         textCol.addView(nameText);
 
-        // Time: "15:30 – now"
+        // "Start: 15:30 · Duration: 12m so far". Minute resolution on purpose:
+        // the row refreshes once a minute, so seconds would mostly be stale.
+        // Duration is tracked time (pauses excluded), matching what gets
+        // saved. The REC/PAUSED label on the right carries the running state.
+        boolean paused = OverlayService.livePaused;
         String startStr = timeFormat.format(new Date(OverlayService.liveStartTime));
-        long elapsed = (System.currentTimeMillis() - OverlayService.liveStartTime) / 1000;
+        long elapsed = paused
+            ? OverlayService.liveAccumulatedMs / 1000
+            : (System.currentTimeMillis() - OverlayService.liveVirtualStart) / 1000;
         int eh = (int)(elapsed / 3600);
         int em = (int)((elapsed % 3600) / 60);
-        String durStr = eh > 0 ?
-            String.format(Locale.US, "%dh %02dm", eh, em) :
-            String.format(Locale.US, "%dm", em);
+        String durStr = eh > 0
+            ? String.format(Locale.US, "%dh %dm", eh, em)
+            : String.format(Locale.US, "%dm", em);
 
         TextView durationText = new TextView(this);
-        durationText.setText(startStr + " – now · " + durStr);
-        durationText.setTextColor(0xFF43A047); // green to indicate live
+        durationText.setText("Start: " + startStr + " · Duration: " + durStr + " so far");
+        durationText.setTextColor(paused ? 0xFFFFA726 : 0xFF43A047); // amber when paused, green when live
         durationText.setTextSize(13f);
         textCol.addView(durationText);
 
         item.addView(textCol);
 
-        // "LIVE" label
+        // Status label: red REC dot while recording, amber pause bars while paused
         TextView liveLabel = new TextView(this);
-        liveLabel.setText("● REC");
-        liveLabel.setTextColor(0xFFE53935); // red
+        liveLabel.setText(paused ? "❚❚ PAUSED" : "● REC");
+        liveLabel.setTextColor(paused ? 0xFFFFA726 : 0xFFE53935);
         liveLabel.setTextSize(12f);
         liveLabel.setTypeface(null, android.graphics.Typeface.BOLD);
         item.addView(liveLabel);
@@ -597,6 +775,110 @@ public class MainActivity extends Activity {
                 } catch (NumberFormatException e) {
                     Toast.makeText(this, "Invalid number", Toast.LENGTH_SHORT).show();
                 }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    // ======== Start time editor ========
+
+    /**
+     * Moves an entry's start (clock time and day). Moving the start earlier
+     * can also add the newly covered time to the duration (checked by
+     * default), for the "forgot to start the tracker" case. Moving it later
+     * never shrinks the duration: an entry that runs too long is fixed with
+     * the duration editor instead.
+     */
+    private void showStartTimeEditor(ActivityEntry entry) {
+        float d = getResources().getDisplayMetrics().density;
+
+        Calendar startCal = Calendar.getInstance();
+        startCal.setTimeInMillis(entry.getStartTime());
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding((int)(20*d), (int)(16*d), (int)(20*d), (int)(8*d));
+
+        TextView currentLabel = new TextView(this);
+        currentLabel.setText("Current: " + dateFormat.format(startCal.getTime())
+            + " " + timeFormat.format(startCal.getTime()));
+        currentLabel.setTextColor(0xFFCDD6F4);
+        currentLabel.setTextSize(14f);
+        layout.addView(currentLabel);
+
+        addSpacer(layout, 8);
+
+        // Day + clock buttons open the system pickers
+        LinearLayout pickerRow = new LinearLayout(this);
+        pickerRow.setOrientation(LinearLayout.HORIZONTAL);
+
+        Button dateBtn = new Button(this, null, android.R.attr.buttonBarButtonStyle);
+        dateBtn.setTextColor(0xFF8AB4F8);
+        Button timeBtn = new Button(this, null, android.R.attr.buttonBarButtonStyle);
+        timeBtn.setTextColor(0xFF8AB4F8);
+        pickerRow.addView(dateBtn);
+        pickerRow.addView(timeBtn);
+        layout.addView(pickerRow);
+
+        CheckBox addToDurationCb = new CheckBox(this);
+        addToDurationCb.setTextColor(0xFFCDD6F4);
+        addToDurationCb.setTextSize(14f);
+        addToDurationCb.setChecked(true);
+        layout.addView(addToDurationCb);
+
+        TextView effectHint = new TextView(this);
+        effectHint.setTextColor(0xFF9399B2);
+        effectHint.setTextSize(12f);
+        layout.addView(effectHint);
+
+        // Refreshes the picker button labels, the checkbox text (with the
+        // computed gap), and the effect hint whenever the start moves.
+        Runnable refresh = () -> {
+            dateBtn.setText(dateFormat.format(startCal.getTime()));
+            timeBtn.setText(timeFormat.format(startCal.getTime()));
+            long deltaSec = (entry.getStartTime() - startCal.getTimeInMillis()) / 1000;
+            if (deltaSec > 0) {
+                addToDurationCb.setEnabled(true);
+                addToDurationCb.setText("I was working during that time (+"
+                    + ActivityEntry.formatDuration((int) deltaSec) + ")");
+                effectHint.setText("Checked: the moved time is added to the "
+                    + "duration. Unchecked: the entry just moves.");
+            } else {
+                addToDurationCb.setEnabled(false);
+                addToDurationCb.setText("I was working during that time");
+                effectHint.setText(deltaSec == 0
+                    ? "Start unchanged"
+                    : "Start moved later: the entry just moves, duration stays");
+            }
+        };
+        refresh.run();
+
+        dateBtn.setOnClickListener(v -> new DatePickerDialog(this, (view, y, m, day) -> {
+            startCal.set(y, m, day);
+            refresh.run();
+        }, startCal.get(Calendar.YEAR), startCal.get(Calendar.MONTH),
+           startCal.get(Calendar.DAY_OF_MONTH)).show());
+
+        timeBtn.setOnClickListener(v -> new TimePickerDialog(this, (view, h, min) -> {
+            startCal.set(Calendar.HOUR_OF_DAY, h);
+            startCal.set(Calendar.MINUTE, min);
+            refresh.run();
+        }, startCal.get(Calendar.HOUR_OF_DAY), startCal.get(Calendar.MINUTE), true).show());
+
+        new AlertDialog.Builder(this)
+            .setTitle("Edit Start Time")
+            .setView(layout)
+            .setPositiveButton("Save", (dialog, which) -> {
+                long newStart = startCal.getTimeInMillis();
+                if (newStart == entry.getStartTime()) return;
+                long deltaSec = (entry.getStartTime() - newStart) / 1000;
+                dbHelper.updateEntryStart(entry.getId(), newStart,
+                    dateFormat.format(new Date(newStart)));
+                if (deltaSec > 0 && addToDurationCb.isChecked()) {
+                    dbHelper.updateEntryDuration(entry.getId(),
+                        entry.getDurationSeconds() + (int) deltaSec);
+                }
+                loadData();
             })
             .setNegativeButton("Cancel", null)
             .show();
@@ -715,7 +997,7 @@ public class MainActivity extends Activity {
         buttonRow.addView(okBtn);
         root.addView(buttonRow);
 
-        // Plain Dialog — no AlertDialog minimum-width / internal-padding nonsense
+        // Plain Dialog, no AlertDialog minimum-width / internal-padding nonsense
         Dialog dialog = new Dialog(this);
         dialog.setContentView(root);
 
@@ -755,7 +1037,7 @@ public class MainActivity extends Activity {
                                               int activeGridColor, int[] selected,
                                               float d, int swatchSize, int swatchMargin,
                                               ColorCallback previewCallback) {
-        // Update grid swatches — highlight the active grid color family
+        // Update grid swatches, highlight the active grid color family
         for (int i = 0; i < grid.getChildCount(); i++) {
             View child = grid.getChildAt(i);
             int color = GRID_COLORS[i];
@@ -835,10 +1117,112 @@ public class MainActivity extends Activity {
     // ======== Export / Import ========
 
     private void exportData() {
+        float d = getResources().getDisplayMetrics().density;
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding((int)(20*d), (int)(12*d), (int)(20*d), (int)(8*d));
+
+        TextView rangeLabel = new TextView(this);
+        rangeLabel.setText("Date Range");
+        rangeLabel.setTextColor(0xFFCDD6F4);
+        rangeLabel.setTextSize(15f);
+        layout.addView(rangeLabel);
+
+        // Same id-by-index pattern as the size RadioGroup in settings
+        RadioGroup rangeGroup = new RadioGroup(this);
+        String[] ranges = {"Today", "Past week", "All time", "Custom"};
+        for (int i = 0; i < ranges.length; i++) {
+            RadioButton rb = new RadioButton(this);
+            rb.setText(ranges[i]);
+            rb.setTextColor(0xFFCDD6F4);
+            rb.setId(i);
+            rangeGroup.addView(rb);
+        }
+        rangeGroup.check(2); // All time, matches the old export behavior
+        layout.addView(rangeGroup);
+
+        addSpacer(layout, 8);
+        CheckBox settingsCb = new CheckBox(this);
+        settingsCb.setText("Include settings");
+        settingsCb.setTextColor(0xFFCDD6F4);
+        settingsCb.setTextSize(14f);
+        settingsCb.setChecked(true); // old exports always included settings
+        layout.addView(settingsCb);
+
+        new AlertDialog.Builder(this)
+            .setTitle("Export")
+            .setView(layout)
+            .setPositiveButton("Next", (dialog, which) -> {
+                boolean includeSettings = settingsCb.isChecked();
+                int sel = rangeGroup.getCheckedRadioButtonId();
+                String today = dateFormat.format(new Date());
+                if (sel == 0) {
+                    // Today
+                    launchExportFilePicker(today, today, includeSettings);
+                } else if (sel == 1) {
+                    // Past week: the last 7 days including today
+                    Calendar cal = Calendar.getInstance();
+                    cal.add(Calendar.DAY_OF_MONTH, -6);
+                    launchExportFilePicker(dateFormat.format(cal.getTime()), today, includeSettings);
+                } else if (sel == 3) {
+                    // Custom: pick start and end dates
+                    showCustomRangePicker(includeSettings);
+                } else {
+                    // All time
+                    launchExportFilePicker(null, null, includeSettings);
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    /** Custom range: two chained system date pickers (start, then end). */
+    private void showCustomRangePicker(boolean includeSettings) {
+        Calendar now = Calendar.getInstance();
+        Toast.makeText(this, "Pick the START date", Toast.LENGTH_SHORT).show();
+        DatePickerDialog startDlg = new DatePickerDialog(this, (view, y, m, day) -> {
+            Calendar sc = Calendar.getInstance();
+            sc.set(y, m, day);
+            String start = dateFormat.format(sc.getTime());
+            Toast.makeText(this, "Pick the END date", Toast.LENGTH_SHORT).show();
+            DatePickerDialog endDlg = new DatePickerDialog(this, (view2, y2, m2, day2) -> {
+                Calendar ec = Calendar.getInstance();
+                ec.set(y2, m2, day2);
+                String end = dateFormat.format(ec.getTime());
+                // Swap silently if picked in reverse order
+                if (end.compareTo(start) < 0) {
+                    launchExportFilePicker(end, start, includeSettings);
+                } else {
+                    launchExportFilePicker(start, end, includeSettings);
+                }
+            }, y, m, day);
+            endDlg.setTitle("End date");
+            endDlg.show();
+        }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
+        startDlg.setTitle("Start date");
+        startDlg.show();
+    }
+
+    /** Stores the chosen range, then opens the system file picker for the export file. */
+    private void launchExportFilePicker(String startDate, String endDate, boolean includeSettings) {
+        pendingExportStart = startDate;
+        pendingExportEnd = endDate;
+        pendingExportIncludeSettings = includeSettings;
+
+        String fileName;
+        if (startDate == null) {
+            fileName = "trackytime_backup.json";
+        } else if (startDate.equals(endDate)) {
+            fileName = "trackytime_backup_" + startDate + ".json";
+        } else {
+            fileName = "trackytime_backup_" + startDate + "_to_" + endDate + ".json";
+        }
+
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("application/json");
-        intent.putExtra(Intent.EXTRA_TITLE, "trackytime_backup.json");
+        intent.putExtra(Intent.EXTRA_TITLE, fileName);
         startActivityForResult(intent, EXPORT_FILE_CODE);
     }
 
@@ -851,7 +1235,10 @@ public class MainActivity extends Activity {
 
     private void writeExportToUri(Uri uri) {
         try {
-            List<ActivityEntry> entries = dbHelper.getAllEntries();
+            // Range chosen in the export dialog (null start = all time)
+            List<ActivityEntry> entries = (pendingExportStart == null)
+                ? dbHelper.getAllEntries()
+                : dbHelper.getEntriesByDateRange(pendingExportStart, pendingExportEnd);
             JSONArray arr = new JSONArray();
             for (ActivityEntry e : entries) {
                 JSONObject obj = new JSONObject();
@@ -863,18 +1250,20 @@ public class MainActivity extends Activity {
                 arr.put(obj);
             }
             // Quick-select shortcuts (backward-compatible: older imports just ignore this)
-            List<String> shortcuts = new OverlayPreferences(this).getQuickActivities();
+            List<String> shortcuts = prefs.getQuickActivities();
             JSONArray shortcutsArr = new JSONArray();
             for (String s : shortcuts) shortcutsArr.put(s);
-
-            // Customization preferences (backward-compatible: older imports just ignore this)
-            String prefsData = new OverlayPreferences(this).exportToString();
 
             JSONObject root = new JSONObject();
             root.put("version", 1);
             root.put("entries", arr);
             root.put("quick_activities", shortcutsArr);
-            root.put("preferences", prefsData);
+
+            // Customization preferences, only when the export dialog toggle is on
+            // (backward-compatible: import treats a missing field as "no settings")
+            if (pendingExportIncludeSettings) {
+                root.put("preferences", prefs.exportToString());
+            }
 
             OutputStream os = getContentResolver().openOutputStream(uri);
             if (os != null) {
@@ -891,14 +1280,16 @@ public class MainActivity extends Activity {
 
     private void readImportFromUri(Uri uri) {
         try {
-            BufferedReader reader = new BufferedReader(
-                new InputStreamReader(getContentResolver().openInputStream(uri), "UTF-8"));
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) sb.append(line);
-            reader.close();
+            // Read the whole file as raw bytes. The old line-by-line reader dropped
+            // newlines, which only worked because our exports are pretty-printed.
+            InputStream is = getContentResolver().openInputStream(uri);
+            ByteArrayOutputStream buf = new ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            int n;
+            while ((n = is.read(chunk)) != -1) buf.write(chunk, 0, n);
+            is.close();
 
-            JSONObject root = new JSONObject(sb.toString());
+            JSONObject root = new JSONObject(new String(buf.toByteArray(), "UTF-8"));
             JSONArray arr = root.getJSONArray("entries");
             List<ActivityEntry> entries = new ArrayList<>();
             for (int i = 0; i < arr.length(); i++) {
@@ -990,20 +1381,10 @@ public class MainActivity extends Activity {
         taskBrightLabel.setTextSize(14f);
         taskColorContainer.addView(taskBrightLabel);
 
-        SeekBar taskBrightBar = new SeekBar(this);
-        taskBrightBar.setMin(-100);
-        taskBrightBar.setMax(100);
-        taskBrightBar.setProgress(prefs.getTaskColorBrightness());
-        taskBrightBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int val, boolean u) {
-                taskBrightLabel.setText("Brightness: " + (val > 0 ? "+" : "") + val + "%");
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {
-                prefs.setTaskColorBrightness(sb.getProgress());
-            }
-        });
-        taskColorContainer.addView(taskBrightBar);
+        addSlider(taskColorContainer, taskBrightLabel, -100, 100,
+            prefs.getTaskColorBrightness(),
+            val -> "Brightness: " + (val > 0 ? "+" : "") + val + "%",
+            val -> prefs.setTaskColorBrightness(val));
 
         TextView taskBrightHint = new TextView(this);
         taskBrightHint.setText("Background uses current task's color");
@@ -1047,20 +1428,9 @@ public class MainActivity extends Activity {
         opLabel.setTextSize(15f);
         layout.addView(opLabel);
 
-        SeekBar opBar = new SeekBar(this);
-        opBar.setMax(255);
-        opBar.setMin(50);
-        opBar.setProgress(prefs.getOpacity());
-        opBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int val, boolean u) {
-                opLabel.setText("Background Opacity: " + (val * 100 / 255) + "%");
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {
-                prefs.setOpacity(sb.getProgress());
-            }
-        });
-        layout.addView(opBar);
+        addSlider(layout, opLabel, 50, 255, prefs.getOpacity(),
+            val -> "Background Opacity: " + (val * 100 / 255) + "%",
+            val -> prefs.setOpacity(val));
 
         // Border Width
         addSpacer(layout, 14);
@@ -1085,21 +1455,11 @@ public class MainActivity extends Activity {
         borderOpLabel.setVisibility(prefs.getBorderWidth() > 0 ? View.VISIBLE : View.GONE);
         layout.addView(borderOpLabel);
 
-        SeekBar borderOpBar = new SeekBar(this);
-        borderOpBar.setMax(255);
-        borderOpBar.setMin(10);
-        borderOpBar.setProgress(prefs.getBorderOpacity());
+        SeekBar borderOpBar = addSlider(layout, borderOpLabel, 10, 255,
+            prefs.getBorderOpacity(),
+            val -> "Border Opacity: " + (val * 100 / 255) + "%",
+            val -> prefs.setBorderOpacity(val));
         borderOpBar.setVisibility(prefs.getBorderWidth() > 0 ? View.VISIBLE : View.GONE);
-        borderOpBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int val, boolean u) {
-                borderOpLabel.setText("Border Opacity: " + (val * 100 / 255) + "%");
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {
-                prefs.setBorderOpacity(sb.getProgress());
-            }
-        });
-        layout.addView(borderOpBar);
 
         // Show/hide border opacity when border width changes
         borderBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -1218,21 +1578,11 @@ public class MainActivity extends Activity {
         transLabel.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
         layout.addView(transLabel);
 
-        SeekBar transBar = new SeekBar(this);
-        transBar.setMin(-50);
-        transBar.setMax(50);
-        transBar.setProgress(prefs.getBreathingTransparency());
+        SeekBar transBar = addSlider(layout, transLabel, -50, 50,
+            prefs.getBreathingTransparency(),
+            val -> "Transparency: " + (val > 0 ? "+" : "") + val + "%",
+            val -> prefs.setBreathingTransparency(val));
         transBar.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
-        transBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int val, boolean u) {
-                transLabel.setText("Transparency: " + (val > 0 ? "+" : "") + val + "%");
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {
-                prefs.setBreathingTransparency(sb.getProgress());
-            }
-        });
-        layout.addView(transBar);
 
         // Breathing brightness slider (-50 to +50, 0 = center)
         addSpacer(layout, 4);
@@ -1244,21 +1594,11 @@ public class MainActivity extends Activity {
         brightLabel.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
         layout.addView(brightLabel);
 
-        SeekBar brightBar = new SeekBar(this);
-        brightBar.setMin(-50);
-        brightBar.setMax(50);
-        brightBar.setProgress(prefs.getBreathingBrightness());
+        SeekBar brightBar = addSlider(layout, brightLabel, -50, 50,
+            prefs.getBreathingBrightness(),
+            val -> "Brightness: " + (val > 0 ? "+" : "") + val + "%",
+            val -> prefs.setBreathingBrightness(val));
         brightBar.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
-        brightBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int val, boolean u) {
-                brightLabel.setText("Brightness: " + (val > 0 ? "+" : "") + val + "%");
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {
-                prefs.setBreathingBrightness(sb.getProgress());
-            }
-        });
-        layout.addView(brightBar);
 
         // Breathing grayscale slider (0 to 100, default 0)
         addSpacer(layout, 4);
@@ -1270,21 +1610,11 @@ public class MainActivity extends Activity {
         grayLabel.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
         layout.addView(grayLabel);
 
-        SeekBar grayBar = new SeekBar(this);
-        grayBar.setMin(0);
-        grayBar.setMax(100);
-        grayBar.setProgress(prefs.getBreathingGrayscale());
+        SeekBar grayBar = addSlider(layout, grayLabel, 0, 100,
+            prefs.getBreathingGrayscale(),
+            val -> "Grayscale: " + val + "%",
+            val -> prefs.setBreathingGrayscale(val));
         grayBar.setVisibility(prefs.isOverlayPulseEnabled() ? View.VISIBLE : View.GONE);
-        grayBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int val, boolean u) {
-                grayLabel.setText("Grayscale: " + val + "%");
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {
-                prefs.setBreathingGrayscale(sb.getProgress());
-            }
-        });
-        layout.addView(grayBar);
 
         // Toggle breathing checkbox shows/hides sub-sliders
         pulseCb.setOnCheckedChangeListener((btn, checked) -> {
@@ -1316,20 +1646,12 @@ public class MainActivity extends Activity {
         strokeLabel.setVisibility(prefs.isTextStrokeEnabled() ? View.VISIBLE : View.GONE);
         layout.addView(strokeLabel);
 
-        SeekBar strokeBar = new SeekBar(this);
-        strokeBar.setMax(9); // 1-10 (offset by 1)
-        strokeBar.setProgress(prefs.getStrokeWidth() - 1);
+        // Progress is 0-9 but the stored width is 1-10 (offset by 1)
+        SeekBar strokeBar = addSlider(layout, strokeLabel, 0, 9,
+            prefs.getStrokeWidth() - 1,
+            val -> "Stroke Width: " + (val + 1) + "px",
+            val -> prefs.setStrokeWidth(val + 1));
         strokeBar.setVisibility(prefs.isTextStrokeEnabled() ? View.VISIBLE : View.GONE);
-        strokeBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int val, boolean u) {
-                strokeLabel.setText("Stroke Width: " + (val + 1) + "px");
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {
-                prefs.setStrokeWidth(sb.getProgress() + 1);
-            }
-        });
-        layout.addView(strokeBar);
 
         // Toggle stroke checkbox shows/hides stroke width slider
         strokeCb.setOnCheckedChangeListener((btn, checked) -> {
@@ -1352,20 +1674,9 @@ public class MainActivity extends Activity {
         uiOpHint.setTextSize(12f);
         layout.addView(uiOpHint);
 
-        SeekBar uiOpBar = new SeekBar(this);
-        uiOpBar.setMax(255);
-        uiOpBar.setMin(25);
-        uiOpBar.setProgress(prefs.getUiElementsOpacity());
-        uiOpBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar sb, int val, boolean u) {
-                uiOpLabel.setText("UI Elements Opacity: " + (val * 100 / 255) + "%");
-            }
-            public void onStartTrackingTouch(SeekBar sb) {}
-            public void onStopTrackingTouch(SeekBar sb) {
-                prefs.setUiElementsOpacity(sb.getProgress());
-            }
-        });
-        layout.addView(uiOpBar);
+        addSlider(layout, uiOpLabel, 25, 255, prefs.getUiElementsOpacity(),
+            val -> "UI Elements Opacity: " + (val * 100 / 255) + "%",
+            val -> prefs.setUiElementsOpacity(val));
 
         // Immersive clock toggle
         addSpacer(layout, 14);
@@ -1397,6 +1708,34 @@ public class MainActivity extends Activity {
             .setView(scrollView)
             .setPositiveButton("OK", null)
             .show();
+    }
+
+    private interface SliderFormat { String label(int value); }
+
+    /**
+     * Creates a settings SeekBar wired exactly like the hand-written ones it replaces:
+     * label text updates live while dragging, the save action runs on release.
+     * Note: the border width slider is NOT built with this because its listener
+     * also shows/hides the border opacity rows, which are created after it.
+     */
+    private SeekBar addSlider(LinearLayout parent, TextView label, int min, int max,
+                              int initial, SliderFormat fmt,
+                              java.util.function.IntConsumer onSave) {
+        SeekBar bar = new SeekBar(this);
+        if (min != 0) bar.setMin(min);
+        bar.setMax(max);
+        bar.setProgress(initial);
+        bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar sb, int val, boolean u) {
+                label.setText(fmt.label(val));
+            }
+            public void onStartTrackingTouch(SeekBar sb) {}
+            public void onStopTrackingTouch(SeekBar sb) {
+                onSave.accept(sb.getProgress());
+            }
+        });
+        parent.addView(bar);
+        return bar;
     }
 
     private void addColorRow(LinearLayout parent, String label,

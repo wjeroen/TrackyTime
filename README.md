@@ -4,32 +4,35 @@
 
 ### Overlay (floating pill)
 - **Compact pill shape**: activity name on the left, timer on the right, 10dp rounded corners
-- **Border**: configurable color (uses accent/border color setting), width (0–6dp, default 2dp black), and opacity (separate from background opacity, default ~60%). Uses LayerDrawable: bottom layer = bg fill (inset by border width), top layer = stroke-only drawable (transparent fill + stroke). This avoids both the filled-rectangle-behind-bg bug and the stroke/fill overlap bug. Padding offsets content so the border doesn't overlap it.
-- **Tap activity text** → expand overlay (keyboard pops up, +/➚/− icon buttons appear, quick-select rows show). Icon buttons scale with overlay text size for consistent tap targets. Type a new name and press Done — the previous activity is saved, timer restarts, and overlay collapses.
+- **Border**: configurable color (uses accent/border color setting), width (0-6dp, default 2dp black), and opacity (separate from background opacity, default ~60%). Uses LayerDrawable: bottom layer = bg fill (inset by border width), top layer = stroke-only drawable (transparent fill + stroke). This avoids both the filled-rectangle-behind-bg bug and the stroke/fill overlap bug. Padding offsets content so the border doesn't overlap it.
+- **Tap activity text** → expand overlay (keyboard pops up, +/➚/− icon buttons appear, quick-select rows show). Icon buttons scale with overlay text size for consistent tap targets. Type a new name and press Done, the previous activity is saved, timer restarts, and overlay collapses.
 - **Tap timer** → pause/resume (timer dims to icon opacity 0x99 when paused)
 - **Drag anywhere** → reposition the pill on screen (clamped to screen bounds)
 - **Tap outside overlay** → releases keyboard focus (overlay stays expanded, phone becomes usable for typing elsewhere)
 - **+ add shortcut** → adds a quick-select row below the timeline. Type an activity name, then tap ▶ to instantly switch to it (overlay stays expanded, focus released). Tap X icon on a row to remove it. Shortcuts persist across sessions.
+- **Long-press +** → batch-add dialog: type or paste multiple activities, one per line, and they are appended to the end of the shortcut list (existing shortcuts are never touched). Includes a clipboard preview and a "Paste clipboard" button (the preview fills in once the dialog has focus, an Android privacy rule). The dialog starts empty unless the build registers a suggestions provider (see `ShortcutSuggestions.java`), in which case it is pre-filled with suggested names, one per line.
+- **Shortcut list changes made elsewhere** (an Import, or a suggestions provider adding names) show up in the expanded overlay right away, so collapsing never saves stale rows over the new list.
+- **Activities running on another device**, when the build registers a `RemoteActivities` provider, appear as a striped segment in the overlay's timeline bar (it never pulses, so it cannot be mistaken for this device's own), as a row in today's history with a blue label naming where it runs, and in the pie chart, color bar and total under the same 10 second rule as the local running activity. The standard build registers none, so none of this appears there.
 - **➚ open app** → opens the full TrackyTime app (releases focus, overlay stays expanded)
 - **− collapse** → collapses the expanded overlay back to the compact pill
 - **Timeline bar** → 6dp colored bar at the bottom showing the day's activity history as proportional segments. Each activity session is a colored rectangle. The currently-running activity grows live. The live segment pulses immediately, speeding up 2x every 30 minutes as a gentle nudge. Not affected by the opacity slider. White tick marks (2px wide) at every hour (full height) and half-hour (bottom half). Both fully opaque. Half-hour marks are hidden once total tracked time exceeds 5 hours.
 - **Background color mode** → choose between a **custom color** (the color picker) or **task color** (automatically uses the current task's assigned color). When task color mode is selected, a **brightness slider** (-50% to +50%, default -30%) adjusts the task color. The background color changes instantly whenever you switch tasks.
 - **Breathing overlay** → optional (default on): the border and background pulse in sync with the timeline bar. When enabled, three sub-sliders appear:
   - **Transparency** (-50% to +50%, default +30%): controls how much the **background** opacity oscillates during breathing. Positive = more transparent at dim point, negative = more opaque. Effect is subtle (30% scaling). The **border** always breathes independently (fades from transparent → its set opacity), unaffected by this slider.
-  - **Brightness** (-50% to +50%, default -25%): controls color shift direction and amount. Negative = darkens toward black, positive = brightens toward white. Slide to the opposite direction to reverse the effect — no auto-detect needed.
+  - **Brightness** (-50% to +50%, default -25%): controls color shift direction and amount. Negative = darkens toward black, positive = brightens toward white. Slide to the opposite direction to reverse the effect, no auto-detect needed.
   - **Grayscale** (0% to 100%, default 0%): controls how much the background desaturates toward grayscale at the breathing dim point. At 100%, the background goes fully grayscale during the dim phase. Uses ITU BT.601 luminance for natural-looking desaturation.
   Values clamp silently at physical limits (can't go below 0% or above 100% opacity). Works regardless of border width (even 0). Live-updates when toggled/adjusted in settings. All pulse animations run at 30fps to reduce battery/compositor load.
-- **Minimum activity duration** → activities shorter than 10 seconds are automatically discarded (not saved). Prevents accidental micro-entries when switching activities quickly.
-- **Live-update**: changing any setting (colors, size, border, opacity) updates the overlay instantly — no restart needed. Includes quick-select row text/icon colors and sizes. Changing a task's color in the app immediately updates the timeline bar colors on the overlay.
+- **Minimum activity duration** → activities shorter than 10 seconds are automatically discarded (not saved). Prevents accidental micro-entries when switching activities quickly. The recorded start time follows the same 10-second rule: pausing before an activity has 10 tracked seconds slides its start forward to the next resume (minus the seconds already tracked), so a task typed the night before as a reminder gets dated at the morning resume instead of midnight. An activity that runs 10 seconds without pausing keeps its original start time exactly as before.
+- **Live-update**: changing any setting (colors, size, border, opacity) updates the overlay instantly, no restart needed. Includes quick-select row text/icon colors and sizes. Changing a task's color in the app immediately updates the timeline bar colors on the overlay.
 
 ### Immersive clock (gaming/video mode)
-- **Standalone feature** — works independently of time tracking. No need to start the overlay; just enable the setting.
+- **Standalone feature**, works independently of time tracking. No need to start the overlay; just enable the setting.
 - Small clock pill (white text on black background) appears in the **top-right corner** whenever the phone enters immersive/fullscreen mode (e.g. gaming, video playback)
 - Shows current time and battery level (e.g. "14:30 · 72%")
 - Uses the same **text size**, **stroke settings**, and **background opacity** as the main overlay, but always black/white and borderless
 - Updates every minute, aligned to minute boundaries
 - **Detection**: uses Android's WindowInsets API (`isVisible()` on API 30+) to detect when both status bar and navigation bar are hidden. Falls back to inset height checks on older APIs.
-- **Auto-start on boot**: if enabled, the overlay service starts automatically after reboot — no need to open the app
+- **Auto-start on boot**: if enabled, the overlay service starts automatically after reboot, no need to open the app
 - Tapping the clock does nothing; touches outside it pass through to the app below
 - Toggle in settings: "Display a clock while playing videos or gaming"
 
@@ -40,22 +43,24 @@
 
 ### App
 - Daily pie chart with color-coded slices (entries grouped by name)
+- **Running activity counts**: the pie chart, color bar, total, and week view include the currently tracked activity's time so far (once it has 10 tracked seconds, the same rule that decides whether it gets saved), so the graphs reflect right now rather than only saved entries. Refreshes on any navigation and every minute while the app stays open.
 - **Color bar** below pie chart: horizontal stacked bar grouping all activity time by color. Full screen width (within the 16dp page margins). Activities with the same color are lumped into one segment. Percentage labels appear on segments wide enough to fit them. Sorted by hue (similar colors grouped together), then by duration descending within each hue group.
 - **Week view**: toggle between Day/Week; week view aggregates Mon-Sun
-- History list shows **individual entries** with time range (e.g. "10:00 – 11:00 · 1h 00m"), color dot, color picker, delete
+- History list shows **individual entries** with start time and duration (e.g. "Start: 10:00 · Duration: 1h 5m 30s"), color dot, color picker, delete. End times are not shown: durations exclude pauses, so "start + duration" is not when an activity actually ended.
 - **Inline rename**: tap an entry's name → it becomes editable. Press Done → saves new name and auto-assigns a matching color.
-- **Inline duration edit**: tap an entry's duration/time text → dialog appears with hours/minutes/seconds fields. Save updates the duration (start time stays the same, end time recalculates).
-- **Live activity indicator**: when the overlay is recording, a "● REC" entry appears at the top of today's history list showing the current activity name, start time, and elapsed duration in green.
+- **Inline duration edit**: tap an entry's duration text → dialog appears with hours/minutes/seconds fields. Save updates the duration, nothing else changes.
+- **Inline start edit**: tap an entry's start text → dialog with a day picker and a clock picker. Moving the start earlier offers a checkbox (checked by default) that adds the newly covered time to the duration, for the "forgot to start the tracker" case. Unchecked, or when moving later, the entry just moves. Picking another day moves the entry to that day's list.
+- **Live activity indicator**: when the overlay is recording, a "● REC" entry appears at the top of today's history list showing the current activity name, start time, and tracked duration so far in green ("Start: 15:30 · Duration: 12m so far"), amber with "❚❚ PAUSED" while paused. Minute resolution, matching the once-a-minute auto-refresh.
 - **Tap date to return to today**: tapping the date/week text in the header jumps back to the present day or current week.
 - Date navigation (prev/next day or week)
 - Export/Import/Settings buttons at the top (above history) for quick access
-- Settings: background color mode (custom/task color + brightness slider), text color, border color (accent), border width (0–6dp) + border opacity, background opacity, default task color (fixed or random), text size, breathing overlay toggle + transparency/brightness/grayscale sliders, text stroke toggle + stroke width slider (1–10, linear scaling, proportional to text size so stroke scales with overlay size like icon stroke does; anchored at 16sp Medium where setting 4 = original default), UI elements opacity (buttons, separator, hints, paused clock), immersive clock toggle
-- **Export**: save all data as JSON to any location (Google Drive, email, etc.). Also includes quick-select shortcut names.
-- **Import**: restore data from a JSON backup (skips duplicates). Restores quick-select shortcuts if present. Backward-compatible with older exports that don't have shortcuts.
+- Settings: background color mode (custom/task color + brightness slider), text color, border color (accent), border width (0-6dp) + border opacity, background opacity, default task color (fixed or random), text size, breathing overlay toggle + transparency/brightness/grayscale sliders, text stroke toggle + stroke width slider (1-10, linear scaling, proportional to text size so stroke scales with overlay size like icon stroke does; anchored at 16sp Medium where setting 4 = original default), UI elements opacity (buttons, separator, hints, paused clock), immersive clock toggle
+- **Export**: tap Export → a dialog asks for a date range (**Today**, **Past week** = the last 7 days including today, **All time**, or **Custom** via start/end date pickers) plus an **Include settings** toggle (on by default). Saves the selected entries as JSON to any location (Google Drive, email, etc.). Quick-select shortcut names are always included; all customization settings are included when the toggle is on. The suggested filename reflects the range (e.g. `trackytime_backup_2026-07-12_to_2026-07-18.json`, all time keeps plain `trackytime_backup.json`).
+- **Import**: restore data from a JSON backup (skips duplicates). Restores quick-select shortcuts and settings when present in the file. Backward-compatible with older exports missing either field.
 
 ### Consistent colors
-- Activities with the **same name always get the same color** — in pie chart, history, and across all days
-- **Name matching is case- and space-insensitive**: "Coding Time", "coding time", and "CODING  TIME" are all treated as the same activity (via `normalizeName()` — trim, collapse spaces, lowercase)
+- Activities with the **same name always get the same color**, in pie chart, history, and across all days
+- **Name matching is case- and space-insensitive**: "Coding Time", "coding time", and "CODING  TIME" are all treated as the same activity (via `normalizeName()`: trim, collapse spaces, lowercase)
 - New names get a stable color auto-assigned from a 72-color palette (18 Material Design hues × 4 brightness levels, interleaved so adjacent picks look different)
 - **Default task color**: optional setting to assign a specific color to all new tasks instead of random. Set in Settings → Default Task Color (tap swatch to pick, tap RANDOM to reset)
 - Changing an entry's color updates **all** entries with that name (case/space-insensitive)
@@ -72,32 +77,35 @@
 - With breathing enabled: transparency and brightness sliders control how much the opacity and color shift during the pulse cycle
 - Without breathing: everything stays at the set opacity
 - Text (activity name) and timeline bar are always fully visible (100% alpha)
-- The **UI elements opacity** slider controls the transparency of secondary UI elements: close/add/open-app buttons, separator dot, hint text, play buttons in quick-select rows, and the timer when paused (default ~60%, range 10–100%)
+- The **UI elements opacity** slider controls the transparency of secondary UI elements: close/add/open-app buttons, separator dot, hint text, play buttons in quick-select rows, and the timer when paused (default ~60%, range 10-100%)
 
 ## Quick Reference File Structure
 
 | File | Purpose |
 |------|---------|
-| `settings.gradle` | Gradle project config — declares the `app` module and plugin repositories |
-| `gradlew` / `gradlew.bat` | Gradle wrapper scripts — runs the correct Gradle version automatically |
+| `settings.gradle` | Gradle project config, declares the `app` module and plugin repositories |
+| `gradlew` / `gradlew.bat` | Gradle wrapper scripts: runs the correct Gradle version automatically |
 | `gradle/wrapper/gradle-wrapper.properties` | Pins the Gradle version (currently 8.14.3) |
-| `app/build.gradle` | Android build config — SDK versions, package name, build types |
+| `app/build.gradle` | Android build config: SDK versions, package name, build types |
 | `app/proguard-rules.pro` | ProGuard rules for release builds (currently empty) |
 | `app/src/main/AndroidManifest.xml` | Permissions + component declarations |
 | `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, expand/collapse/focus model, quick-select shortcuts with icon buttons, timeline bar, progressive pulse, breathing overlay (stroke-only border layer + bg darken/brighten), immersive clock (WindowInsets detection), live-update settings |
 | `app/src/main/java/.../TimelineBarView.java` | Custom View: draws day timeline as proportional colored segments on a Canvas |
-| `app/src/main/java/.../MainActivity.java` | History view (individual entries, inline rename), pie chart, color bar, day/week toggle, date nav, color picker, export/import (with shortcuts), settings (border color + width) |
-| `app/src/main/java/.../ColorBarView.java` | Custom canvas-drawn horizontal stacked bar chart — groups activity time by color, sorted by hue then duration |
-| `app/src/main/res/drawable/` | Vector drawable icons (add, open, remove, close) used in overlay buttons |
-| `app/src/main/java/.../DatabaseHelper.java` | SQLite storage + `getColorForName()` / `updateColorByName()` / `updateEntryNameAndColor()` / date range queries / export/import — all name matching is case/space-insensitive via `LOWER(TRIM())` |
+| `app/src/main/java/.../MainActivity.java` | History view (individual entries, inline rename, live activity row that shows REC while recording and PAUSED while paused), pie chart, color bar, day/week toggle, date nav, color picker, export/import (with shortcuts), settings (border color + width) |
+| `app/src/main/java/.../ColorBarView.java` | Custom canvas-drawn horizontal stacked bar chart, groups activity time by color, sorted by hue then duration |
+| `app/src/main/res/drawable/` | Vector drawable icons (add, open, remove, close) used in overlay buttons, plus the app launcher icon (`ic_launcher.xml`, hand-editable paths) |
+| `app/src/main/java/.../DatabaseHelper.java` | SQLite storage + `getColorForName()` / `updateColorByName()` / `updateEntryNameAndColor()` / date range queries / export/import. All name matching is case/space-insensitive via `LOWER(TRIM())` |
 | `app/src/main/java/.../ActivityEntry.java` | Data model + `normalizeName()` helper (trim, collapse spaces, lowercase) |
 | `app/src/main/java/.../PieChartView.java` | Custom canvas-drawn pie chart |
-| `app/src/main/java/.../StrokeTextView.java` | Custom TextView with TV subtitle-style text stroke/outline — auto-contrast via ITU BT.601 brightness (black stroke for light text, white for dark) |
-| `app/src/main/java/.../StrokeEditText.java` | Custom EditText with same stroke/outline — uses Layout.draw() directly to bypass Editor's hardware-acceleration cache |
-| `app/src/main/java/.../StrokeImageView.java` | Custom ImageView with same stroke outline — draws icon at 8 offset positions in contrasting color, then normally on top (same auto-contrast as StrokeTextView) |
+| `app/src/main/java/.../StrokeTextView.java` | Custom TextView with TV subtitle-style text stroke/outline, auto-contrast via ITU BT.601 brightness (black stroke for light text, white for dark) |
+| `app/src/main/java/.../StrokeEditText.java` | Custom EditText with same stroke/outline, uses Layout.draw() directly to bypass Editor's hardware-acceleration cache |
+| `app/src/main/java/.../StrokeImageView.java` | Custom ImageView with same stroke outline, draws icon at 8 offset positions in contrasting color, then normally on top (same auto-contrast as StrokeTextView) |
 | `app/src/main/java/.../BootReceiver.java` | Auto-starts OverlayService on boot when immersive clock is enabled |
+| `app/src/main/java/.../BackupExtensions.java` | Optional extension point: a build variant can add its own section to the backup file, inert in the standard build |
+| `app/src/main/java/.../ShortcutSuggestions.java` | Optional extension point: a build variant can pre-fill the batch-add dialog with suggested shortcut names, inert in the standard build |
+| `app/src/main/java/.../RemoteActivities.java` | Optional extension point: a build variant can report activities running right now on another device, which then get a history row, a striped timeline segment, and a place in the day's totals. Inert in the standard build |
 | `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance (bg/text/border colors, border width, opacity, size, overlay pulse toggle + breathing transparency/brightness/grayscale, task color bg mode + brightness, text stroke toggle + stroke width, UI elements opacity, quick-select activities, color change signal) + crash recovery checkpoint (separate `crash_recovery` file) |
-| `.github/workflows/android.yml` | GitHub Actions workflow — builds APK on every push |
+| `.github/workflows/android.yml` | GitHub Actions workflow, builds APK on every push |
 
 > **Note:** Java files live under `app/src/main/java/com/timetracker/overlay/`. The `...` above abbreviates that path.
 
@@ -119,6 +127,7 @@ TrackyTime/
 │       ├── AndroidManifest.xml  ← Permissions & components
 │       ├── java/com/timetracker/overlay/
 │       │   ├── ActivityEntry.java
+│       │   ├── BackupExtensions.java
 │       │   ├── BootReceiver.java
 │       │   ├── ColorBarView.java
 │       │   ├── DatabaseHelper.java
@@ -126,6 +135,8 @@ TrackyTime/
 │       │   ├── OverlayPreferences.java
 │       │   ├── OverlayService.java
 │       │   ├── PieChartView.java
+│       │   ├── RemoteActivities.java
+│       │   ├── ShortcutSuggestions.java
 │       │   ├── StrokeEditText.java
 │       │   ├── StrokeImageView.java
 │       │   ├── StrokeTextView.java
@@ -159,19 +170,25 @@ For consistent signing (so updates install without uninstalling), you need to co
 `TrackyTime-debug-2026-02-12-143052.apk`
 
 ### Locally (manual)
-You need JDK 17. The Gradle wrapper handles the rest — no separate Gradle install needed:
+You need JDK 17 and the Android SDK. The Gradle wrapper handles the rest, no separate Gradle install needed:
 ```bash
 ./gradlew assembleDebug
 ```
 The APK will be at `app/build/outputs/apk/debug/TrackyTime-debug-<timestamp>.apk`.
 
+**Signing note:** debug builds read the keystore path from the `DEBUG_KEYSTORE_PATH` environment variable, falling back to `app/debug.keystore` (which only exists inside CI, restored from the GitHub secret). For a local build, point the variable at any debug keystore, for example in PowerShell:
+```powershell
+$env:DEBUG_KEYSTORE_PATH = "$HOME\.android\debug.keystore"
+```
+Because the CI keystore exists only as a GitHub secret, local builds are signed with a **different key** than CI builds. Android refuses to install an APK over an app signed with a different key, so switching between local and CI builds on the same phone requires a one-time uninstall (use the app's Export first so no data is lost, then Import after reinstalling).
+
 ## Notes
 
 - Requires Android 8.0+ (API 26) for overlay + foreground service
-- No external dependencies — pure Android SDK
+- No external dependencies, pure Android SDK
 - Data persists in SQLite across app restarts
 - Overlay runs as foreground service (won't be killed by OS)
-- compileSdk: 34 (Android 14) — needed for `specialUse` foreground service type
+- compileSdk: 34 (Android 14), needed for `specialUse` foreground service type
 - targetSdk: 33 (Android 13)
 - minSdk: 26 (Android 8.0)
 - Package: `com.timetracker.overlay`

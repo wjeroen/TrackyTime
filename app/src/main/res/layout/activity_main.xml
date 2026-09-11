@@ -124,7 +124,7 @@
             android:layout_gravity="center"
             android:layout_marginBottom="16dp" />
 
-        <!-- Controls row: export, import, settings — above history -->
+        <!-- Controls row: export, import, settings, above history -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

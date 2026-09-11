@@ -17,7 +17,7 @@ import android.widget.ImageView;
  * The icon is first rendered into an off-screen Bitmap via super.onDraw() so that
  * ImageView's full scale/center matrix is applied correctly at every size. That bitmap
  * is then stamped at 8 offset positions in the contrasting color, and finally drawn
- * once more normally on top — matching the look of StrokeTextView at every overlay size.
+ * once more normally on top, matching the look of StrokeTextView at every overlay size.
  *
  * Auto-contrast: black stroke for light tint, white stroke for dark tint (ITU BT.601).
  * Offset scales proportionally with the view's pixel width so the stroke weight is
@@ -73,7 +73,7 @@ public class StrokeImageView extends ImageView {
 
         // Render the icon into a correctly-sized bitmap via super.onDraw().
         // This lets ImageView apply its full scale/center matrix, so the bitmap
-        // always matches the view's actual pixel size — not the drawable's natural size.
+        // always matches the view's actual pixel size, not the drawable's natural size.
         Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         Canvas bmpCanvas = new Canvas(bmp);
         super.onDraw(bmpCanvas);
@@ -96,7 +96,7 @@ public class StrokeImageView extends ImageView {
             canvas.drawBitmap(bmp, off[0], off[1], strokePaint);
         }
 
-        // Draw the icon normally on top (no color filter — bitmap already has the tint)
+        // Draw the icon normally on top (no color filter, bitmap already has the tint)
         canvas.drawBitmap(bmp, 0, 0, null);
         bmp.recycle();
     }
