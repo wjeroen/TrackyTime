@@ -22,10 +22,17 @@ public class TimelineBarView extends View {
     public static class Segment {
         public int color;
         public int durationSeconds;
+        /** An activity running on another device: drawn striped, never pulses. */
+        public boolean remote;
 
         public Segment(int color, int durationSeconds) {
             this.color = color;
             this.durationSeconds = durationSeconds;
+        }
+
+        public Segment(int color, int durationSeconds, boolean remote) {
+            this(color, durationSeconds);
+            this.remote = remote;
         }
     }
 
@@ -36,6 +43,7 @@ public class TimelineBarView extends View {
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint tickPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint stripePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path clipPath = new Path();
     private final RectF bounds = new RectF();
 
@@ -63,7 +71,7 @@ public class TimelineBarView extends View {
         invalidate();
     }
 
-    /** Set the alpha multiplier for the pulsing segment (0.0–1.0). */
+    /** Set the alpha multiplier for the pulsing segment (0.0-1.0). */
     public void setPulseAlpha(float alpha) {
         this.pulseAlpha = alpha;
         invalidate();
@@ -113,6 +121,29 @@ public class TimelineBarView extends View {
         }
     }
 
+    /**
+     * A segment for an activity running on another device: its color at half
+     * strength, crossed by diagonal stripes in full strength. It reads as
+     * "running elsewhere" next to this device's own solid segment.
+     */
+    private void drawStriped(Canvas canvas, float x, float y, float w, float h,
+                             int color, float density) {
+        if (w <= 0) return;
+        canvas.save();
+        canvas.clipRect(x, y, x + w, y + h);
+        paint.setColor(color);
+        paint.setAlpha(110);
+        canvas.drawRect(x, y, x + w, y + h, paint);
+        stripePaint.setColor(color);
+        stripePaint.setAlpha(255);
+        stripePaint.setStrokeWidth(1.5f * density);
+        float step = 4f * density;
+        for (float sx = x - h; sx < x + w; sx += step) {
+            canvas.drawLine(sx, y + h, sx + h, y, stripePaint);
+        }
+        canvas.restore();
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
         if (segments.isEmpty()) return;
@@ -150,6 +181,13 @@ public class TimelineBarView extends View {
                 segWidth = w - x;
             } else {
                 segWidth = (s.durationSeconds / (float) totalDuration) * w;
+            }
+
+            if (s.remote) {
+                drawStriped(canvas, x, timelineTop, segWidth,
+                    timelineBottom - timelineTop, s.color, density);
+                x += segWidth;
+                continue;
             }
 
             paint.setColor(s.color);

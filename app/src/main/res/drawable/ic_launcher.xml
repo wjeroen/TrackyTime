@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Launcher icon: cyan-blue rounded square, white clock face, and a light
+    cyan check mark. Editable by hand, every shape below is a path.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Rounded-square background -->
+    <path
+        android:fillColor="#0288D1"
+        android:pathData="M26,6 L82,6 A20,20 0 0 1 102,26 L102,82 A20,20 0 0 1 82,102 L26,102 A20,20 0 0 1 6,82 L6,26 A20,20 0 0 1 26,6 Z" />
+
+    <!-- Clock face -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6"
+        android:pathData="M50,48 m-26,0 a26,26 0 1,0 52,0 a26,26 0 1,0 -52,0" />
+
+    <!-- Hands, pointing to roughly 12 and 4 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:pathData="M50,48 L50,32 M50,48 L62,55" />
+
+    <!-- Check mark, bottom right -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#84FFFF"
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M64,84 L74,94 L94,70" />
+</vector>

@@ -1,33 +1,38 @@
 package com.timetracker.overlay;
 
 import android.animation.ValueAnimator;
+import android.app.AlertDialog;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.PixelFormat;
+import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
-import android.os.BatteryManager;
-import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
+import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.WindowInsets;
+import android.view.ViewConfiguration;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.text.InputType;
+import android.text.TextUtils;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -48,7 +53,13 @@ public class OverlayService extends Service {
     public static String liveActivityName = "";
     public static long liveStartTime = 0;
     public static boolean liveIsRunning = false;
+    public static boolean livePaused = false;
     public static int liveActivityColor = 0;
+    // Tracked-time bookkeeping so MainActivity can show the real duration
+    // (excluding pauses): while running, now - liveVirtualStart is the tracked
+    // time. While paused, liveAccumulatedMs holds the frozen tracked time.
+    public static long liveVirtualStart = 0;
+    public static long liveAccumulatedMs = 0;
 
     private WindowManager windowManager;
     private View overlayView;
@@ -108,8 +119,28 @@ public class OverlayService extends Service {
             refreshPulseCache();
             currentPulseDuration = 0; // force restart on next tick
         }
-        setupOrTeardownImmersiveClock();
-        applyClockPreferences();
+    };
+
+    // Redraws the bar when another device's running activities change, and
+    // keeps them growing every 30 seconds while this overlay's own timer is
+    // stopped, since the timer loop is what normally redraws the bar.
+    private final Runnable remoteChanged = () -> {
+        if (isOverlayVisible) updateTimelineBar();
+    };
+    private final Runnable remoteTick = new Runnable() {
+        @Override
+        public void run() {
+            if (isOverlayVisible && !isRunning && !RemoteActivities.current().isEmpty()) {
+                updateTimelineBar();
+            }
+            timerHandler.postDelayed(this, 30_000);
+        }
+    };
+
+    private final Runnable rebuildQuickRunnable = () -> {
+        if (isOverlayVisible && isExpanded && overlayView.findFocus() == null) {
+            rebuildQuickSelectRows();
+        }
     };
 
     private static final int NOTIF_ID = 1001;
@@ -123,15 +154,10 @@ public class OverlayService extends Service {
     private boolean isDragging = false;
     private static final int DRAG_THRESHOLD = 10;
 
-    // Immersive mode clock
-    private View immersiveDetectorView;
-    private StrokeTextView clockText;
-    private GradientDrawable clockBgDrawable;
-    private WindowManager.LayoutParams clockParams;
-    private Handler clockHandler;
-    private Runnable clockRunnable;
-    private boolean isImmersiveMode = false;
-    private boolean immersiveClockSetUp = false;
+    // Long-press state for buttons with a press-and-hold action
+    private final Handler longPressHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingLongPress;
+    private boolean longPressFired = false;
 
     static final String EXTRA_SHOW_OVERLAY = "show_overlay";
 
@@ -151,15 +177,15 @@ public class OverlayService extends Service {
             heartbeatHandler.postDelayed(heartbeatRunnable, HEARTBEAT_INTERVAL_MS);
         };
 
-        // Recover activity from previous crash (if any) — before setupOverlay
+        // Recover activity from previous crash (if any), before setupOverlay
         // so the recovered entry appears in the timeline
         OverlayPreferences crashPrefs = new OverlayPreferences(this);
         if (crashPrefs.hasCrashRecovery()) {
             recoverCrashedActivity(crashPrefs);
         }
 
-        createNotificationChannel();
-        startForeground(NOTIF_ID, buildNotification());
+        createNotificationChannel(this);
+        startForeground(NOTIF_ID, buildNotification(this));
         isServiceRunning = true;
 
         // Live-update: re-apply prefs whenever settings change
@@ -167,11 +193,20 @@ public class OverlayService extends Service {
         prefsListener = (sharedPreferences, key) -> {
             timerHandler.removeCallbacks(applyPrefsRunnable);
             timerHandler.postDelayed(applyPrefsRunnable, 100); // debounce
+            // The shortcut list can change outside the overlay (the app's Import,
+            // or a build variant adding names). Rebuild the rows so a later
+            // collapse does not save the stale rows over the new list. Skipped
+            // while something in the overlay is being typed in, when the rows on
+            // screen are the truth.
+            if (OverlayPreferences.KEY_QUICK_ACTIVITIES.equals(key)) {
+                timerHandler.removeCallbacks(rebuildQuickRunnable);
+                timerHandler.postDelayed(rebuildQuickRunnable, 150);
+            }
         };
         sp.registerOnSharedPreferenceChangeListener(prefsListener);
 
-        // Immersive clock works independently of the main overlay
-        setupOrTeardownImmersiveClock();
+        RemoteActivities.addListener(remoteChanged);
+        timerHandler.postDelayed(remoteTick, 30_000);
     }
 
     private void setupOverlay() {
@@ -253,7 +288,7 @@ public class OverlayService extends Service {
         int borderWidthPx = (int) (borderWidth * density);
         int cornerRadiusPx = (int) (10 * density);
 
-        // Background fill (no stroke on this drawable — avoids stroke/fill overlap)
+        // Background fill (no stroke on this drawable, avoids stroke/fill overlap)
         overlayBgFill = new GradientDrawable();
         overlayBgFill.setShape(GradientDrawable.RECTANGLE);
         overlayBgFill.setCornerRadius(cornerRadiusPx);
@@ -378,6 +413,10 @@ public class OverlayService extends Service {
     // ---- Touch handling: each child handles drag + its own tap action ----
 
     private boolean handleDragTouch(MotionEvent event, Runnable onTap) {
+        return handleDragTouch(event, onTap, null);
+    }
+
+    private boolean handleDragTouch(MotionEvent event, Runnable onTap, Runnable onLongPress) {
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 initialX = params.x;
@@ -385,14 +424,28 @@ public class OverlayService extends Service {
                 initialTouchX = event.getRawX();
                 initialTouchY = event.getRawY();
                 isDragging = false;
+                longPressFired = false;
+                if (onLongPress != null) {
+                    pendingLongPress = () -> {
+                        pendingLongPress = null;
+                        if (!isDragging) {
+                            longPressFired = true;
+                            onLongPress.run();
+                        }
+                    };
+                    longPressHandler.postDelayed(pendingLongPress,
+                        ViewConfiguration.getLongPressTimeout());
+                }
                 return true;
             case MotionEvent.ACTION_MOVE:
+                if (longPressFired) return true; // gesture already consumed
                 int dx = (int) (event.getRawX() - initialTouchX);
                 int dy = (int) (event.getRawY() - initialTouchY);
                 if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
                     isDragging = true;
                 }
                 if (isDragging) {
+                    cancelPendingLongPress();
                     params.x = initialX + dx;
                     params.y = initialY + dy;
                     clampToScreen();
@@ -400,12 +453,23 @@ public class OverlayService extends Service {
                 }
                 return true;
             case MotionEvent.ACTION_UP:
-                if (!isDragging && onTap != null) {
+                cancelPendingLongPress();
+                if (!isDragging && !longPressFired && onTap != null) {
                     onTap.run();
                 }
                 return true;
+            case MotionEvent.ACTION_CANCEL:
+                cancelPendingLongPress();
+                return true;
         }
         return false;
+    }
+
+    private void cancelPendingLongPress() {
+        if (pendingLongPress != null) {
+            longPressHandler.removeCallbacks(pendingLongPress);
+            pendingLongPress = null;
+        }
     }
 
     private void setupTouchHandlers() {
@@ -424,9 +488,9 @@ public class OverlayService extends Service {
         timerText.setOnTouchListener((v, event) ->
             handleDragTouch(event, this::togglePause));
 
-        // Add quick-select: drag or tap-to-add
+        // Add quick-select: drag, tap-to-add, or long-press to batch-add
         addBtn.setOnTouchListener((v, event) ->
-            handleDragTouch(event, this::addQuickSelectRow));
+            handleDragTouch(event, this::addQuickSelectRow, this::showBatchAddDialog));
 
         // Open app: release focus + open (keep expanded)
         openAppBtn.setOnTouchListener((v, event) ->
@@ -585,6 +649,17 @@ public class OverlayService extends Service {
     private void resumeTimer() {
         isRunning = true;
         virtualStartTimestamp = System.currentTimeMillis() - accumulatedMs;
+        // A pause within the first 10 tracked seconds usually means the name was
+        // typed in advance as a reminder (the night before bed, for instance).
+        // Slide the recorded start to this resume, minus the few seconds already
+        // tracked, so the entry is dated when the work actually happened rather
+        // than when the name was typed. Once an activity has 10 tracked seconds,
+        // the same threshold that decides whether it is saved at all, its start
+        // time is final.
+        if (accumulatedMs < MIN_ACTIVITY_SECONDS * 1000L) {
+            currentStartTime = virtualStartTimestamp;
+            new OverlayPreferences(this).updateCrashStartTime(currentStartTime);
+        }
         timerHandler.removeCallbacks(timerRunnable);
         timerHandler.post(timerRunnable);
         showTimerRunning();
@@ -779,7 +854,17 @@ public class OverlayService extends Service {
     }
 
     private void updateTimelineBar() {
+        if (timelineBar == null) return;
         List<TimelineBarView.Segment> all = new ArrayList<>(savedSegments);
+        // Activities running on another device, when a build variant reports
+        // any. They go before this device's own running segment, which stays
+        // last so it is still the one that pulses.
+        for (RemoteActivities.Live r : RemoteActivities.current()) {
+            int secs = r.secondsNow();
+            if (secs >= MIN_ACTIVITY_SECONDS) {
+                all.add(new TimelineBarView.Segment(r.color, secs, true));
+            }
+        }
         // Add the currently-running activity as a live segment
         if (!currentActivityName.isEmpty()) {
             int elapsed = getElapsedSeconds();
@@ -796,7 +881,13 @@ public class OverlayService extends Service {
 
     // ---- Activity tracking ----
 
-    private static final int MIN_ACTIVITY_SECONDS = 10;
+    /**
+     * Activities under this many tracked seconds are never saved. Public
+     * because it is the one threshold the whole system shares: MainActivity
+     * uses it to decide when the running activity joins the graphs, and any
+     * other consumer of the crash-recovery checkpoint applies the same rule.
+     */
+    public static final int MIN_ACTIVITY_SECONDS = 10;
 
     private void saveCurrentActivity() {
         int elapsed = getElapsedSeconds();
@@ -846,7 +937,6 @@ public class OverlayService extends Service {
         if (taskPrefs.isUseTaskColorBg()) {
             applyPreferences();
             refreshPulseCache();
-            applyClockPreferences();
         }
 
         timerText.setVisibility(View.VISIBLE);
@@ -866,21 +956,25 @@ public class OverlayService extends Service {
         liveActivityName = currentActivityName;
         liveStartTime = currentStartTime;
         liveIsRunning = isRunning;
+        livePaused = !isRunning && !currentActivityName.isEmpty();
         liveActivityColor = currentActivityColor;
+        liveVirtualStart = virtualStartTimestamp;
+        liveAccumulatedMs = accumulatedMs;
     }
 
-    // ---- Notification (minimal — required by Android for foreground service) ----
+    // ---- Notification (minimal, required by Android for foreground service) ----
+    // Shared with ClockService, which needs the same one.
 
-    private void createNotificationChannel() {
+    static void createNotificationChannel(Context context) {
         NotificationChannel channel = new NotificationChannel(
             CHANNEL_ID, "TrackyTime", NotificationManager.IMPORTANCE_MIN);
         channel.setShowBadge(false);
-        ((NotificationManager) getSystemService(NOTIFICATION_SERVICE))
+        ((NotificationManager) context.getSystemService(NOTIFICATION_SERVICE))
             .createNotificationChannel(channel);
     }
 
-    private Notification buildNotification() {
-        return new Notification.Builder(this, CHANNEL_ID)
+    static Notification buildNotification(Context context) {
+        return new Notification.Builder(context, CHANNEL_ID)
             .setContentTitle("TrackyTime")
             .setSmallIcon(android.R.drawable.ic_menu_recent_history)
             .setOngoing(true)
@@ -1001,7 +1095,8 @@ public class OverlayService extends Service {
         }
     }
 
-    private void saveQuickSelectNames() {
+    /** The names in the rows on screen, blank ones skipped, in order. */
+    private List<String> currentQuickNames() {
         List<String> names = new ArrayList<>();
         for (int i = 0; i < quickSelectContainer.getChildCount(); i++) {
             LinearLayout row = (LinearLayout) quickSelectContainer.getChildAt(i);
@@ -1009,7 +1104,11 @@ public class OverlayService extends Service {
             String name = nameField.getText().toString().trim();
             if (!name.isEmpty()) names.add(name);
         }
-        new OverlayPreferences(this).setQuickActivities(names);
+        return names;
+    }
+
+    private void saveQuickSelectNames() {
+        new OverlayPreferences(this).setQuickActivities(currentQuickNames());
     }
 
     private void rebuildQuickSelectRows() {
@@ -1025,163 +1124,128 @@ public class OverlayService extends Service {
         }
     }
 
-    // ---- Immersive mode clock ----
+    // ---- Batch-add shortcuts (long-press on +) ----
 
-    private void setupOrTeardownImmersiveClock() {
-        OverlayPreferences prefs = new OverlayPreferences(this);
-        if (prefs.isImmersiveClockEnabled()) {
-            setupImmersiveClock();
-            applyClockPreferences();
-        } else {
-            teardownImmersiveClock();
-        }
-    }
+    /**
+     * A dialog for adding many shortcuts at once, one activity per line. New
+     * rows are appended AFTER the existing rows, which are left exactly as they
+     * are, including names typed but not yet saved.
+     */
+    private void showBatchAddDialog() {
+        releaseFocus(); // hand keyboard focus over to the dialog window
 
-    private void setupImmersiveClock() {
-        if (immersiveClockSetUp) return;
-        immersiveClockSetUp = true;
-
+        // A Service has no UI theme of its own, so borrow the device default.
+        Context themed = new ContextThemeWrapper(this,
+            android.R.style.Theme_DeviceDefault_Dialog_Alert);
         float density = getResources().getDisplayMetrics().density;
+        int pad = (int) (20 * density);
 
-        // 1x1 pixel view to receive system inset changes without blocking touches
-        immersiveDetectorView = new View(this);
-        WindowManager.LayoutParams detectorParams = new WindowManager.LayoutParams(
-            1,
-            1,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            PixelFormat.TRANSLUCENT
-        );
-        immersiveDetectorView.setOnApplyWindowInsetsListener((view, insets) -> {
-            boolean immersive;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                // isVisible() is more accurate than checking inset height — handles translucent bars
-                boolean statusHidden = !insets.isVisible(WindowInsets.Type.statusBars());
-                boolean navHidden = !insets.isVisible(WindowInsets.Type.navigationBars());
-                immersive = statusHidden && navHidden;
-            } else {
-                immersive = insets.getSystemWindowInsetTop() == 0
-                         && insets.getSystemWindowInsetBottom() == 0;
+        LinearLayout box = new LinearLayout(themed);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(pad, pad / 2, pad, 0);
+
+        TextView hint = new TextView(themed);
+        hint.setText("One activity per line. Lines are added to the end of the "
+            + "shortcut list, existing shortcuts are not touched.");
+        hint.setTextSize(13);
+        box.addView(hint);
+
+        EditText input = new EditText(themed);
+        input.setHint("first activity\nsecond activity");
+        input.setInputType(InputType.TYPE_CLASS_TEXT
+            | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        input.setMinLines(3);
+        input.setMaxLines(8); // grows until here, then scrolls inside itself
+        input.setGravity(Gravity.TOP);
+        box.addView(input);
+
+        // A build variant may know shortcuts from elsewhere (another device, for
+        // instance) that this overlay does not have yet. They become the starting
+        // text, one per line, so an unwanted one is just a line to delete.
+        List<String> suggested = ShortcutSuggestions.suggest(currentQuickNames());
+        if (!suggested.isEmpty()) {
+            input.setText(String.join("\n", suggested));
+            hint.setText(hint.getText() + " Pre-filled with shortcuts from another "
+                + "device that are not on this one yet. Remove any line you do not want.");
+        }
+
+        TextView preview = new TextView(themed);
+        preview.setTextSize(12);
+        preview.setTypeface(null, Typeface.ITALIC);
+        preview.setMaxLines(3);
+        preview.setEllipsize(TextUtils.TruncateAt.END);
+        preview.setPadding(0, (int) (8 * density), 0, 0);
+        box.addView(preview);
+
+        Button pasteBtn = new Button(themed);
+        pasteBtn.setText("Paste clipboard");
+        box.addView(pasteBtn);
+
+        AlertDialog dialog = new AlertDialog.Builder(themed)
+            .setTitle("Add multiple shortcuts")
+            .setView(box)
+            .setPositiveButton("Add", (d, w) ->
+                appendBatchShortcuts(input.getText().toString()))
+            .setNegativeButton("Cancel", null)
+            .create();
+        // Dialogs opened from a service need an overlay window type to show.
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setType(
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
+        }
+
+        pasteBtn.setOnClickListener(v -> {
+            String clip = readClipboardText();
+            if (clip == null || clip.trim().isEmpty()) {
+                preview.setText("Clipboard is empty or not text.");
+                return;
             }
-            if (immersive != isImmersiveMode) {
-                isImmersiveMode = immersive;
-                updateClockVisibility(immersive);
-            }
-            return insets;
+            String current = input.getText().toString();
+            if (!current.isEmpty() && !current.endsWith("\n")) current += "\n";
+            input.setText(current + clip.trim());
+            input.setSelection(input.getText().length());
         });
-        windowManager.addView(immersiveDetectorView, detectorParams);
 
-        // Clock overlay — small pill showing current time
-        clockText = new StrokeTextView(this);
-        int padH = (int) (8 * density);
-        int padV = (int) (4 * density);
-        clockText.setPadding(padH, padV, padH, padV);
-
-        clockBgDrawable = new GradientDrawable();
-        clockBgDrawable.setShape(GradientDrawable.RECTANGLE);
-        clockBgDrawable.setCornerRadius(10 * density);
-        clockText.setBackground(clockBgDrawable);
-
-        applyClockPreferences();
-        updateClockDisplay();
-
-        clockParams = new WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-            PixelFormat.TRANSLUCENT
-        );
-        clockParams.gravity = Gravity.TOP | Gravity.END;
-        clockParams.x = (int) (16 * density);
-        clockParams.y = (int) (8 * density);
-
-        clockText.setVisibility(View.GONE);
-        windowManager.addView(clockText, clockParams);
-
-        // Clock update handler
-        clockHandler = new Handler(Looper.getMainLooper());
-        clockRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (isImmersiveMode && immersiveClockSetUp) {
-                    updateClockDisplay();
-                    long delay = 60000 - (System.currentTimeMillis() % 60000);
-                    clockHandler.postDelayed(this, delay);
-                }
+        // Android only lets the focused app read the clipboard, so the preview
+        // is filled in shortly after the dialog window has taken focus.
+        dialog.setOnShowListener(d -> preview.postDelayed(() -> {
+            String clip = readClipboardText();
+            if (clip == null || clip.trim().isEmpty()) {
+                preview.setText("Clipboard: empty or not text.");
+            } else {
+                String[] lines = clip.trim().split("\r?\n");
+                preview.setText("Clipboard (" + lines.length
+                    + (lines.length == 1 ? " line): " : " lines): ")
+                    + clip.trim().replaceAll("\\r?\\n", " / "));
             }
-        };
+        }, 200));
+
+        dialog.show();
     }
 
-    private void teardownImmersiveClock() {
-        if (!immersiveClockSetUp) return;
-        immersiveClockSetUp = false;
-        isImmersiveMode = false;
-
-        if (clockHandler != null) {
-            clockHandler.removeCallbacks(clockRunnable);
+    /** One shortcut per non-empty line, appended in order after everything else. */
+    private void appendBatchShortcuts(String text) {
+        if (text == null) return;
+        int added = 0;
+        for (String line : text.split("\n")) {
+            String name = line.trim();
+            if (!name.isEmpty()) {
+                addQuickSelectRowWithName(name, false);
+                added++;
+            }
         }
-        if (immersiveDetectorView != null && immersiveDetectorView.isAttachedToWindow()) {
-            windowManager.removeView(immersiveDetectorView);
-        }
-        immersiveDetectorView = null;
-        if (clockText != null && clockText.isAttachedToWindow()) {
-            windowManager.removeView(clockText);
-        }
-        clockText = null;
-        clockBgDrawable = null;
+        // Saving reads back every visible row, old and new alike, so this is
+        // the same append-only path every other quick-select edit takes.
+        if (added > 0) saveQuickSelectNames();
     }
 
-    private void updateClockVisibility(boolean show) {
-        if (clockText == null) return;
-        clockText.setVisibility(show ? View.VISIBLE : View.GONE);
-        if (show) {
-            updateClockDisplay();
-            clockHandler.removeCallbacks(clockRunnable);
-            long delay = 60000 - (System.currentTimeMillis() % 60000);
-            clockHandler.postDelayed(clockRunnable, delay);
-        } else {
-            clockHandler.removeCallbacks(clockRunnable);
-        }
-    }
-
-    private void updateClockDisplay() {
-        if (clockText == null) return;
-        String pattern = android.text.format.DateFormat.is24HourFormat(this) ? "HH:mm" : "h:mm a";
-        String time = new SimpleDateFormat(pattern, Locale.US).format(new Date());
-        int battery = getBatteryLevel();
-        clockText.setText(time + " · " + battery + "%");
-    }
-
-    private int getBatteryLevel() {
-        IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-        Intent batteryStatus = registerReceiver(null, filter);
-        if (batteryStatus == null) return -1;
-        int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-        int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, 100);
-        return (int) (level * 100f / scale);
-    }
-
-    private void applyClockPreferences() {
-        if (clockText == null || clockBgDrawable == null) return;
-        OverlayPreferences prefs = new OverlayPreferences(this);
-
-        float textSize = prefs.getTextSize();
-        clockText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
-        clockText.setTextColor(0xFFFFFFFF);
-        clockText.setAlpha(1.0f);
-
-        boolean strokeEnabled = prefs.isTextStrokeEnabled();
-        int strokeWidth = prefs.getStrokeWidth();
-        clockText.setStrokeEnabled(strokeEnabled);
-        clockText.setStrokeWidth(strokeWidth);
-
-        int bgOpacity = prefs.getOpacity();
-        clockBgDrawable.setColor((bgOpacity << 24) | 0x00000000);
+    private String readClipboardText() {
+        ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (cm == null || !cm.hasPrimaryClip()) return null;
+        ClipData clip = cm.getPrimaryClip();
+        if (clip == null || clip.getItemCount() == 0) return null;
+        CharSequence text = clip.getItemAt(0).coerceToText(this);
+        return text == null ? null : text.toString();
     }
 
     // ---- Lifecycle ----
@@ -1190,7 +1254,14 @@ public class OverlayService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && intent.getBooleanExtra(EXTRA_SHOW_OVERLAY, false)) {
             setupOverlay();
+            // Safeguard: the clock should already run if it is enabled, but a
+            // force stop or a crash can leave it off until the next reboot.
+            ClockService.sync(this);
         }
+        // This service only exists for the pill (the clock has its own). A
+        // restart by the system after it was killed brings no pill, so there
+        // is nothing to do. The crash checkpoint was already saved in onCreate.
+        if (!isOverlayVisible) stopSelf();
         return START_STICKY;
     }
 
@@ -1201,13 +1272,17 @@ public class OverlayService extends Service {
         liveActivityName = "";
         liveStartTime = 0;
         liveIsRunning = false;
+        livePaused = false;
         liveActivityColor = 0;
+        liveVirtualStart = 0;
+        liveAccumulatedMs = 0;
         saveCurrentActivity();
         timerHandler.removeCallbacks(timerRunnable);
         timerHandler.removeCallbacks(applyPrefsRunnable);
+        timerHandler.removeCallbacks(remoteTick);
+        RemoteActivities.removeListener(remoteChanged);
         heartbeatHandler.removeCallbacks(heartbeatRunnable);
         stopProgressPulse();
-        teardownImmersiveClock();
         // Unregister pref listener
         getSharedPreferences("overlay_prefs", MODE_PRIVATE)
             .unregisterOnSharedPreferenceChangeListener(prefsListener);

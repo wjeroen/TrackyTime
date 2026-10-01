@@ -33,8 +33,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldV, int newV) {
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE);
-        onCreate(db);
+        // Never drop the table here: this database is the user's entire
+        // tracking history and there is no copy anywhere else. When bumping
+        // DB_VERSION, add one additive migration block per step, e.g.:
+        //   if (oldV < 2) db.execSQL("ALTER TABLE " + TABLE + " ADD COLUMN ...");
+        // A forgotten migration then surfaces as a visible query error
+        // instead of silently erasing everything.
     }
 
     public long insertActivity(ActivityEntry entry) {
@@ -108,6 +112,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues cv = new ContentValues();
         cv.put("duration_seconds", durationSeconds);
+        db.update(TABLE, cv, "id = ?", new String[]{String.valueOf(id)});
+        db.close();
+    }
+
+    /** Move an entry's start moment and its day. The duration is left untouched. */
+    public void updateEntryStart(long id, long startTime, String date) {
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues cv = new ContentValues();
+        cv.put("start_time", startTime);
+        cv.put("date", date);
         db.update(TABLE, cv, "id = ?", new String[]{String.valueOf(id)});
         db.close();
     }
