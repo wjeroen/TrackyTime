@@ -154,11 +154,18 @@ public class MainActivity extends Activity {
         settingsBtn.setOnClickListener(v -> showSettingsDialog());
         exportBtn.setOnClickListener(v -> exportData());
         importBtn.setOnClickListener(v -> importData());
+
+        // The "Start/stop overlay" shortcut is made here rather than declared
+        // in the manifest, see ToggleOverlayActivity.publishShortcut
+        ToggleOverlayActivity.publishShortcut(this);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        // Brings back a clock that a force stop switched off, and starts one
+        // that an Import just enabled
+        ClockService.sync(this);
         updateToggleButton();
         loadData();
         refreshHandler.removeCallbacks(graphRefresh);
@@ -1687,10 +1694,7 @@ public class MainActivity extends Activity {
         immersiveCb.setChecked(prefs.isImmersiveClockEnabled());
         immersiveCb.setOnCheckedChangeListener((btn, checked) -> {
             prefs.setImmersiveClockEnabled(checked);
-            // Start the service in clock-only mode if not already running
-            if (checked && !OverlayService.isServiceRunning && Settings.canDrawOverlays(this)) {
-                startForegroundService(new Intent(this, OverlayService.class));
-            }
+            ClockService.sync(this);
         });
         layout.addView(immersiveCb);
 

@@ -29,18 +29,19 @@
 - **Long-press the app icon → "Start/stop overlay"** does the same as the app's Start/Stop Overlay button without opening the app: when the pill shows, it stops the overlay (the running activity is saved, exactly like the button), otherwise it starts it. If the overlay permission is missing, the permission screen opens first, like with the button.
 - It runs on an invisible screen (`ToggleOverlayActivity`) that closes right away, so whatever app was on screen stays there.
 - **Two kinds of entry**, so other apps can trigger it too:
-  - an **app shortcut** (`res/xml/shortcuts.xml`), for the launcher and for automation apps that run app shortcuts (for example Samsung Modes and Routines, "Open an app or do an app action")
-  - an **older-style shortcut** (`ACTION_CREATE_SHORTCUT`), listed in the home screen's widget/shortcut picker and in gesture apps that add "home screen shortcuts" (for example One Hand Operation+)
-- `shortcuts.xml` has to name the application ID. A build variant with a different application ID needs its own copy of the file in its own `res/xml` folder, otherwise its shortcut points at the other app.
+  - an **app shortcut**, for the launcher and for gesture and automation apps that run app shortcuts (for example One Hand Operation+, or Samsung Modes and Routines with "Open an app or do an app action")
+  - an **older-style shortcut** (`ACTION_CREATE_SHORTCUT`), listed in the home screen's widget/shortcut picker and in apps that still use that list
+- **The app shortcut is made in code** (`ToggleOverlayActivity.publishShortcut`, called when the app opens), so it appears after the app has been opened once. It is deliberately not declared in a `res/xml/shortcuts.xml` file: Android launches every shortcut from that file with `FLAG_ACTIVITY_TASK_ON_HOME`, which sends you to the home screen when the invisible screen closes, so the app you were in seemed to close. A shortcut made in code is launched without that flag, and it uses the right application ID in every build variant by itself.
 
 ### Immersive clock (gaming/video mode)
-- **Standalone feature**, works independently of time tracking. No need to start the overlay; just enable the setting.
+- **Standalone feature**, works independently of time tracking. It runs in its own service (`ClockService`), so starting or stopping the overlay never affects it. No need to start the overlay, just enable the setting.
+- **Kept running when enabled**: boot, the settings checkbox, opening the app, and starting the overlay all check that the clock runs when the setting is on (`ClockService.sync`), which brings it back after a force stop. Switching the setting off stops the service.
 - Small clock pill (white text on black background) appears in the **top-right corner** whenever the phone enters immersive/fullscreen mode (e.g. gaming, video playback)
 - Shows current time and battery level (e.g. "14:30 · 72%")
 - Uses the same **text size**, **stroke settings**, and **background opacity** as the main overlay, but always black/white and borderless
 - Updates every minute, aligned to minute boundaries
 - **Detection**: uses Android's WindowInsets API (`isVisible()` on API 30+) to detect when both status bar and navigation bar are hidden. Falls back to inset height checks on older APIs.
-- **Auto-start on boot**: if enabled, the overlay service starts automatically after reboot, no need to open the app
+- **Auto-start on boot**: if enabled, the clock service starts automatically after reboot, no need to open the app
 - Tapping the clock does nothing; touches outside it pass through to the app below
 - Toggle in settings: "Display a clock while playing videos or gaming"
 
@@ -97,7 +98,8 @@
 | `app/build.gradle` | Android build config: SDK versions, package name, build types |
 | `app/proguard-rules.pro` | ProGuard rules for release builds (currently empty) |
 | `app/src/main/AndroidManifest.xml` | Permissions + component declarations |
-| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, expand/collapse/focus model, quick-select shortcuts with icon buttons, timeline bar, progressive pulse, breathing overlay (stroke-only border layer + bg darken/brighten), immersive clock (WindowInsets detection), live-update settings |
+| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, expand/collapse/focus model, quick-select shortcuts with icon buttons, timeline bar, progressive pulse, breathing overlay (stroke-only border layer + bg darken/brighten), live-update settings. Runs only while the pill shows |
+| `app/src/main/java/.../ClockService.java` | Foreground service for the immersive clock (WindowInsets detection, time + battery pill), separate from the overlay. `ClockService.sync()` starts or stops it to match the setting |
 | `app/src/main/java/.../TimelineBarView.java` | Custom View: draws day timeline as proportional colored segments on a Canvas |
 | `app/src/main/java/.../MainActivity.java` | History view (individual entries, inline rename, live activity row that shows REC while recording and PAUSED while paused), pie chart, color bar, day/week toggle, date nav, color picker, export/import (with shortcuts), settings (border color + width) |
 | `app/src/main/java/.../ColorBarView.java` | Custom canvas-drawn horizontal stacked bar chart, groups activity time by color, sorted by hue then duration |
@@ -108,9 +110,8 @@
 | `app/src/main/java/.../StrokeTextView.java` | Custom TextView with TV subtitle-style text stroke/outline, auto-contrast via ITU BT.601 brightness (black stroke for light text, white for dark) |
 | `app/src/main/java/.../StrokeEditText.java` | Custom EditText with same stroke/outline, uses Layout.draw() directly to bypass Editor's hardware-acceleration cache |
 | `app/src/main/java/.../StrokeImageView.java` | Custom ImageView with same stroke outline, draws icon at 8 offset positions in contrasting color, then normally on top (same auto-contrast as StrokeTextView) |
-| `app/src/main/java/.../ToggleOverlayActivity.java` | Invisible screen behind the "Start/stop overlay" shortcut: does what the Start/Stop Overlay button does, then closes. Also answers `ACTION_CREATE_SHORTCUT` for the older shortcut picker |
-| `app/src/main/res/xml/shortcuts.xml` | The app shortcut definition ("Start/stop overlay" on long-press of the app icon). Names the application ID, so a variant with another ID needs its own copy |
-| `app/src/main/java/.../BootReceiver.java` | Auto-starts OverlayService on boot when immersive clock is enabled |
+| `app/src/main/java/.../ToggleOverlayActivity.java` | Invisible screen behind the "Start/stop overlay" shortcut: does what the Start/Stop Overlay button does, then closes. Publishes the app shortcut in code and answers `ACTION_CREATE_SHORTCUT` for the older shortcut picker |
+| `app/src/main/java/.../BootReceiver.java` | Auto-starts ClockService on boot when immersive clock is enabled |
 | `app/src/main/java/.../BackupExtensions.java` | Optional extension point: a build variant can add its own section to the backup file, inert in the standard build |
 | `app/src/main/java/.../ShortcutSuggestions.java` | Optional extension point: a build variant can pre-fill the batch-add dialog with suggested shortcut names, inert in the standard build |
 | `app/src/main/java/.../RemoteActivities.java` | Optional extension point: a build variant can report activities running right now on another device, which then get a history row, a striped timeline segment, and a place in the day's totals. Inert in the standard build |
@@ -139,6 +140,7 @@ TrackyTime/
 │       │   ├── ActivityEntry.java
 │       │   ├── BackupExtensions.java
 │       │   ├── BootReceiver.java
+│       │   ├── ClockService.java
 │       │   ├── ColorBarView.java
 │       │   ├── DatabaseHelper.java
 │       │   ├── MainActivity.java
@@ -154,8 +156,7 @@ TrackyTime/
 │       │   └── ToggleOverlayActivity.java
 │       └── res/
 │           ├── layout/          ← XML layouts
-│           ├── values/          ← Strings, colors, styles
-│           └── xml/             ← App shortcut definition (shortcuts.xml)
+│           └── values/          ← Strings, colors, styles
 ├── settings.gradle              ← Gradle project settings
 ├── CLAUDE.md                    ← Instructions for Claude
 └── README.md                    ← This file

@@ -1,6 +1,7 @@
 package com.timetracker.overlay;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ShortcutInfo;
 import android.content.pm.ShortcutManager;
@@ -8,6 +9,7 @@ import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
+import java.util.Collections;
 
 /**
  * Invisible screen behind the "Start/stop overlay" shortcut. It does what the
@@ -15,15 +17,54 @@ import android.provider.Settings;
  * on screen stays there and the app never opens.
  *
  * Two ways in:
- * - the app shortcut from res/xml/shortcuts.xml (long-press the app icon, or
- *   any automation app that lists app shortcuts)
+ * - the app shortcut made by publishShortcut (long-press the app icon, or any
+ *   gesture or automation app that lists app shortcuts)
  * - the older "create shortcut" list (home screen widget picker, gesture apps),
  *   which asks this activity for a shortcut via ACTION_CREATE_SHORTCUT
  */
 public class ToggleOverlayActivity extends Activity {
 
     private static final int OVERLAY_PERM_CODE = 100;
-    private static final String SHORTCUT_ID = "toggle_overlay";
+    // Not "toggle_overlay": that id belonged to an earlier shortcut declared in
+    // the manifest, and a pinned leftover of it would block reusing the id
+    private static final String SHORTCUT_ID = "start_stop_overlay";
+
+    /**
+     * Publishes the app shortcut. It is made in code instead of declared in
+     * res/xml/shortcuts.xml on purpose: Android launches every shortcut from
+     * that file with FLAG_ACTIVITY_TASK_ON_HOME, which sends the user to the
+     * home screen when this invisible screen closes, so the app they were in
+     * seemed to close. A shortcut made in code is launched without that flag.
+     * It also picks up the application ID by itself, which a manifest shortcut
+     * has to spell out. Called each time the app opens, safe to repeat.
+     */
+    static void publishShortcut(Context context) {
+        try {
+            ShortcutManager sm = context.getSystemService(ShortcutManager.class);
+            if (sm != null) {
+                sm.addDynamicShortcuts(Collections.singletonList(buildShortcutInfo(context)));
+            }
+        } catch (RuntimeException e) {
+            // A missing shortcut must never stop the app from opening
+        }
+    }
+
+    private static ShortcutInfo buildShortcutInfo(Context context) {
+        String label = context.getString(R.string.toggle_overlay_label);
+        // The app's own icon, so a build variant with its own icon gets that one
+        int iconRes = context.getApplicationInfo().icon;
+        return new ShortcutInfo.Builder(context, SHORTCUT_ID)
+            .setShortLabel(label)
+            .setLongLabel(label)
+            .setIcon(Icon.createWithResource(context, iconRes))
+            .setIntent(toggleIntent(context))
+            .build();
+    }
+
+    private static Intent toggleIntent(Context context) {
+        return new Intent(context, ToggleOverlayActivity.class)
+            .setAction(Intent.ACTION_VIEW);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,32 +121,21 @@ public class ToggleOverlayActivity extends Activity {
      */
     @SuppressWarnings("deprecation")
     private Intent buildShortcutResult() {
-        String label = getString(R.string.toggle_overlay_label);
-        // The app's own icon, so a build variant with its own icon gets that one
-        int iconRes = getApplicationInfo().icon;
-        Intent toggle = new Intent(this, ToggleOverlayActivity.class)
-            .setAction(Intent.ACTION_VIEW);
-
         Intent result = null;
         try {
             ShortcutManager sm = getSystemService(ShortcutManager.class);
             if (sm != null) {
-                ShortcutInfo info = new ShortcutInfo.Builder(this, SHORTCUT_ID)
-                    .setShortLabel(label)
-                    .setIcon(Icon.createWithResource(this, iconRes))
-                    .setIntent(toggle)
-                    .build();
-                result = sm.createShortcutResultIntent(info);
+                result = sm.createShortcutResultIntent(buildShortcutInfo(this));
             }
         } catch (RuntimeException e) {
             // The older extras below still work without the pin request
         }
         if (result == null) result = new Intent();
 
-        result.putExtra(Intent.EXTRA_SHORTCUT_INTENT, toggle);
-        result.putExtra(Intent.EXTRA_SHORTCUT_NAME, label);
+        result.putExtra(Intent.EXTRA_SHORTCUT_INTENT, toggleIntent(this));
+        result.putExtra(Intent.EXTRA_SHORTCUT_NAME, getString(R.string.toggle_overlay_label));
         result.putExtra(Intent.EXTRA_SHORTCUT_ICON_RESOURCE,
-            Intent.ShortcutIconResource.fromContext(this, iconRes));
+            Intent.ShortcutIconResource.fromContext(this, getApplicationInfo().icon));
         return result;
     }
 }

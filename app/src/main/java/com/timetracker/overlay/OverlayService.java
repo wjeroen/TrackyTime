@@ -10,15 +10,12 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.PixelFormat;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
-import android.os.BatteryManager;
-import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -30,7 +27,6 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
-import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
@@ -123,8 +119,6 @@ public class OverlayService extends Service {
             refreshPulseCache();
             currentPulseDuration = 0; // force restart on next tick
         }
-        setupOrTeardownImmersiveClock();
-        applyClockPreferences();
     };
 
     // Redraws the bar when another device's running activities change, and
@@ -165,16 +159,6 @@ public class OverlayService extends Service {
     private Runnable pendingLongPress;
     private boolean longPressFired = false;
 
-    // Immersive mode clock
-    private View immersiveDetectorView;
-    private StrokeTextView clockText;
-    private GradientDrawable clockBgDrawable;
-    private WindowManager.LayoutParams clockParams;
-    private Handler clockHandler;
-    private Runnable clockRunnable;
-    private boolean isImmersiveMode = false;
-    private boolean immersiveClockSetUp = false;
-
     static final String EXTRA_SHOW_OVERLAY = "show_overlay";
 
     @Override
@@ -200,8 +184,8 @@ public class OverlayService extends Service {
             recoverCrashedActivity(crashPrefs);
         }
 
-        createNotificationChannel();
-        startForeground(NOTIF_ID, buildNotification());
+        createNotificationChannel(this);
+        startForeground(NOTIF_ID, buildNotification(this));
         isServiceRunning = true;
 
         // Live-update: re-apply prefs whenever settings change
@@ -223,9 +207,6 @@ public class OverlayService extends Service {
 
         RemoteActivities.addListener(remoteChanged);
         timerHandler.postDelayed(remoteTick, 30_000);
-
-        // Immersive clock works independently of the main overlay
-        setupOrTeardownImmersiveClock();
     }
 
     private void setupOverlay() {
@@ -956,7 +937,6 @@ public class OverlayService extends Service {
         if (taskPrefs.isUseTaskColorBg()) {
             applyPreferences();
             refreshPulseCache();
-            applyClockPreferences();
         }
 
         timerText.setVisibility(View.VISIBLE);
@@ -983,17 +963,18 @@ public class OverlayService extends Service {
     }
 
     // ---- Notification (minimal, required by Android for foreground service) ----
+    // Shared with ClockService, which needs the same one.
 
-    private void createNotificationChannel() {
+    static void createNotificationChannel(Context context) {
         NotificationChannel channel = new NotificationChannel(
             CHANNEL_ID, "TrackyTime", NotificationManager.IMPORTANCE_MIN);
         channel.setShowBadge(false);
-        ((NotificationManager) getSystemService(NOTIFICATION_SERVICE))
+        ((NotificationManager) context.getSystemService(NOTIFICATION_SERVICE))
             .createNotificationChannel(channel);
     }
 
-    private Notification buildNotification() {
-        return new Notification.Builder(this, CHANNEL_ID)
+    static Notification buildNotification(Context context) {
+        return new Notification.Builder(context, CHANNEL_ID)
             .setContentTitle("TrackyTime")
             .setSmallIcon(android.R.drawable.ic_menu_recent_history)
             .setOngoing(true)
@@ -1267,172 +1248,20 @@ public class OverlayService extends Service {
         return text == null ? null : text.toString();
     }
 
-    // ---- Immersive mode clock ----
-
-    private void setupOrTeardownImmersiveClock() {
-        OverlayPreferences prefs = new OverlayPreferences(this);
-        if (prefs.isImmersiveClockEnabled()) {
-            setupImmersiveClock();
-            applyClockPreferences();
-        } else {
-            teardownImmersiveClock();
-        }
-    }
-
-    private void setupImmersiveClock() {
-        if (immersiveClockSetUp) return;
-        immersiveClockSetUp = true;
-
-        float density = getResources().getDisplayMetrics().density;
-
-        // 1x1 pixel view to receive system inset changes without blocking touches
-        immersiveDetectorView = new View(this);
-        WindowManager.LayoutParams detectorParams = new WindowManager.LayoutParams(
-            1,
-            1,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            PixelFormat.TRANSLUCENT
-        );
-        immersiveDetectorView.setOnApplyWindowInsetsListener((view, insets) -> {
-            boolean immersive;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                // isVisible() is more accurate than checking inset height, handles translucent bars
-                boolean statusHidden = !insets.isVisible(WindowInsets.Type.statusBars());
-                boolean navHidden = !insets.isVisible(WindowInsets.Type.navigationBars());
-                immersive = statusHidden && navHidden;
-            } else {
-                immersive = insets.getSystemWindowInsetTop() == 0
-                         && insets.getSystemWindowInsetBottom() == 0;
-            }
-            if (immersive != isImmersiveMode) {
-                isImmersiveMode = immersive;
-                updateClockVisibility(immersive);
-            }
-            return insets;
-        });
-        windowManager.addView(immersiveDetectorView, detectorParams);
-
-        // Clock overlay, small pill showing current time
-        clockText = new StrokeTextView(this);
-        int padH = (int) (8 * density);
-        int padV = (int) (4 * density);
-        clockText.setPadding(padH, padV, padH, padV);
-
-        clockBgDrawable = new GradientDrawable();
-        clockBgDrawable.setShape(GradientDrawable.RECTANGLE);
-        clockBgDrawable.setCornerRadius(10 * density);
-        clockText.setBackground(clockBgDrawable);
-
-        applyClockPreferences();
-        updateClockDisplay();
-
-        clockParams = new WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-            PixelFormat.TRANSLUCENT
-        );
-        clockParams.gravity = Gravity.TOP | Gravity.END;
-        clockParams.x = (int) (16 * density);
-        clockParams.y = (int) (8 * density);
-
-        clockText.setVisibility(View.GONE);
-        windowManager.addView(clockText, clockParams);
-
-        // Clock update handler
-        clockHandler = new Handler(Looper.getMainLooper());
-        clockRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (isImmersiveMode && immersiveClockSetUp) {
-                    updateClockDisplay();
-                    long delay = 60000 - (System.currentTimeMillis() % 60000);
-                    clockHandler.postDelayed(this, delay);
-                }
-            }
-        };
-    }
-
-    private void teardownImmersiveClock() {
-        if (!immersiveClockSetUp) return;
-        immersiveClockSetUp = false;
-        isImmersiveMode = false;
-
-        if (clockHandler != null) {
-            clockHandler.removeCallbacks(clockRunnable);
-        }
-        if (immersiveDetectorView != null && immersiveDetectorView.isAttachedToWindow()) {
-            windowManager.removeView(immersiveDetectorView);
-        }
-        immersiveDetectorView = null;
-        if (clockText != null && clockText.isAttachedToWindow()) {
-            windowManager.removeView(clockText);
-        }
-        clockText = null;
-        clockBgDrawable = null;
-    }
-
-    private void updateClockVisibility(boolean show) {
-        if (clockText == null) return;
-        clockText.setVisibility(show ? View.VISIBLE : View.GONE);
-        if (show) {
-            updateClockDisplay();
-            clockHandler.removeCallbacks(clockRunnable);
-            long delay = 60000 - (System.currentTimeMillis() % 60000);
-            clockHandler.postDelayed(clockRunnable, delay);
-        } else {
-            clockHandler.removeCallbacks(clockRunnable);
-        }
-    }
-
-    private void updateClockDisplay() {
-        if (clockText == null) return;
-        String pattern = android.text.format.DateFormat.is24HourFormat(this) ? "HH:mm" : "h:mm a";
-        String time = new SimpleDateFormat(pattern, Locale.US).format(new Date());
-        int battery = getBatteryLevel();
-        clockText.setText(time + " · " + battery + "%");
-    }
-
-    private int getBatteryLevel() {
-        IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-        Intent batteryStatus = registerReceiver(null, filter);
-        if (batteryStatus == null) return -1;
-        int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-        int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, 100);
-        return (int) (level * 100f / scale);
-    }
-
-    private void applyClockPreferences() {
-        if (clockText == null || clockBgDrawable == null) return;
-        OverlayPreferences prefs = new OverlayPreferences(this);
-
-        float textSize = prefs.getTextSize();
-        clockText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
-        clockText.setTextColor(0xFFFFFFFF);
-        clockText.setAlpha(1.0f);
-
-        boolean strokeEnabled = prefs.isTextStrokeEnabled();
-        int strokeWidth = prefs.getStrokeWidth();
-        clockText.setStrokeEnabled(strokeEnabled);
-        clockText.setStrokeWidth(strokeWidth);
-
-        int bgOpacity = prefs.getOpacity();
-        clockBgDrawable.setColor((bgOpacity << 24) | 0x00000000);
-    }
-
     // ---- Lifecycle ----
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && intent.getBooleanExtra(EXTRA_SHOW_OVERLAY, false)) {
             setupOverlay();
+            // Safeguard: the clock should already run if it is enabled, but a
+            // force stop or a crash can leave it off until the next reboot.
+            ClockService.sync(this);
         }
+        // This service only exists for the pill (the clock has its own). A
+        // restart by the system after it was killed brings no pill, so there
+        // is nothing to do. The crash checkpoint was already saved in onCreate.
+        if (!isOverlayVisible) stopSelf();
         return START_STICKY;
     }
 
@@ -1454,7 +1283,6 @@ public class OverlayService extends Service {
         RemoteActivities.removeListener(remoteChanged);
         heartbeatHandler.removeCallbacks(heartbeatRunnable);
         stopProgressPulse();
-        teardownImmersiveClock();
         // Unregister pref listener
         getSharedPreferences("overlay_prefs", MODE_PRIVATE)
             .unregisterOnSharedPreferenceChangeListener(prefsListener);
