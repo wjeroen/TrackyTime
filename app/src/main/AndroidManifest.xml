@@ -19,6 +19,28 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity>
+
+        <!--
+            Invisible, closes right away. Exported because other apps (the home
+            screen, gesture and automation apps) start it from their shortcuts.
+            Its own empty task affinity keeps the app's main screen from coming
+            to the front when it runs.
+        -->
+        <activity
+            android:name=".ToggleOverlayActivity"
+            android:exported="true"
+            android:label="@string/toggle_overlay_label"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:taskAffinity=""
+            android:excludeFromRecents="true">
+            <intent-filter>
+                <action android:name="android.intent.action.CREATE_SHORTCUT" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <service

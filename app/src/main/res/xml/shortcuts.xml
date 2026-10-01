@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    App shortcut shown when the app icon is long-pressed, and offered to apps
+    that run app shortcuts (automation and gesture apps). It does the same as
+    the Start/Stop Overlay button without opening the app.
+
+    targetPackage must be the application ID, which a build variant may change.
+    A variant with another application ID needs its own copy of this file in
+    its own res/xml folder.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="toggle_overlay"
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher"
+        android:shortcutShortLabel="@string/toggle_overlay_label"
+        android:shortcutLongLabel="@string/toggle_overlay_label">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.timetracker.overlay"
+            android:targetClass="com.timetracker.overlay.ToggleOverlayActivity" />
+    </shortcut>
+</shortcuts>
