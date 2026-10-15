@@ -236,6 +236,9 @@ public class OverlayService extends Service {
         params.x = (int) (16 * density);
         params.y = (int) (100 * density);
 
+        // Before applyPreferences, so a task-color background starts in the
+        // restored activity's color
+        restoreLastActivity();
         applyPreferences();
         setupTouchHandlers();
         setupEditText();
@@ -947,6 +950,40 @@ public class OverlayService extends Service {
         updateLiveStatics();
 
         // Set crash recovery checkpoint and start heartbeat
+        new OverlayPreferences(this).setCrashRecovery(name, currentStartTime);
+        heartbeatHandler.removeCallbacks(heartbeatRunnable);
+        heartbeatHandler.post(heartbeatRunnable);
+        // Kept for the next overlay start, see restoreLastActivity
+        new OverlayPreferences(this).setLastActivityName(name);
+    }
+
+    /**
+     * Shows the last chosen activity again when the overlay starts, always
+     * paused at 00:00, whether it was running or paused before. What it
+     * tracked earlier was already saved (by the stop, or by crash recovery in
+     * onCreate), so this is a new entry that only counts once the timer is
+     * tapped. resumeTimer then moves its start time to that tap, the same
+     * 10-second rule that dates a name typed in advance.
+     */
+    private void restoreLastActivity() {
+        String name = new OverlayPreferences(this).getLastActivityName();
+        if (name.isEmpty()) return;
+        currentActivityName = name;
+        editText.setText(name);
+        currentActivityColor = dbHelper.getColorForName(name);
+        currentStartTime = System.currentTimeMillis();
+        accumulatedMs = 0;
+        virtualStartTimestamp = -1;
+        isRunning = false;
+
+        timerText.setVisibility(View.VISIBLE);
+        separator.setVisibility(View.VISIBLE);
+        updateTimerDisplay();
+        showTimerPaused();
+        updateLiveStatics();
+
+        // Same checkpoint and heartbeat as startNewActivity, so a crash after
+        // the timer is resumed still recovers the entry
         new OverlayPreferences(this).setCrashRecovery(name, currentStartTime);
         heartbeatHandler.removeCallbacks(heartbeatRunnable);
         heartbeatHandler.post(heartbeatRunnable);

@@ -11,10 +11,12 @@ public class OverlayPreferences {
     private static final String PREFS = "overlay_prefs";
     private SharedPreferences sp;
     private SharedPreferences crashSp; // separate file, avoids triggering live-update listener
+    private SharedPreferences stateSp; // separate file for the same reason, see getLastActivityName
 
     public OverlayPreferences(Context ctx) {
         sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         crashSp = ctx.getSharedPreferences("crash_recovery", Context.MODE_PRIVATE);
+        stateSp = ctx.getSharedPreferences("overlay_state", Context.MODE_PRIVATE);
     }
 
     public int getBgColor() { return sp.getInt("bg_color", 0xFFFFFFFF); }
@@ -121,6 +123,18 @@ public class OverlayPreferences {
     public void setQuickActivities(List<String> activities) {
         sp.edit().putString(KEY_QUICK_ACTIVITIES, String.join("\n", activities)).apply();
     }
+
+    // ---- Last chosen activity (uses separate SharedPreferences file) ----
+
+    /**
+     * The activity chosen most recently, so the overlay can show it again,
+     * paused, after a stop and a new start. It lives in its own file, like the
+     * crash checkpoint, so switching activity does not set off the listeners
+     * that watch the settings file. It is never cleared: the overlay always
+     * has an activity once one was chosen.
+     */
+    public String getLastActivityName() { return stateSp.getString("last_activity_name", ""); }
+    public void setLastActivityName(String name) { stateSp.edit().putString("last_activity_name", name).apply(); }
 
     // ---- Crash recovery (uses separate SharedPreferences file) ----
 

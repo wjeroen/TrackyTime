@@ -7,6 +7,7 @@
 - **Border**: configurable color (uses accent/border color setting), width (0-6dp, default 2dp black), and opacity (separate from background opacity, default ~60%). Uses LayerDrawable: bottom layer = bg fill (inset by border width), top layer = stroke-only drawable (transparent fill + stroke). This avoids both the filled-rectangle-behind-bg bug and the stroke/fill overlap bug. Padding offsets content so the border doesn't overlap it.
 - **Tap activity text** → expand overlay (keyboard pops up, +/➚/− icon buttons appear, quick-select rows show). Icon buttons scale with overlay text size for consistent tap targets. Type a new name and press Done, the previous activity is saved, timer restarts, and overlay collapses.
 - **Tap timer** → pause/resume (timer dims to icon opacity 0x99 when paused)
+- **Stop and start keeps the activity** → when the overlay starts again (app button or shortcut), the pill shows the last chosen activity, paused at 00:00, whether it was running or paused when it stopped. Stopping still saved what it tracked, so tapping the timer starts a new entry, dated from that tap by the 10-second rule below. The name is kept in its own small file (`overlay_state`), so it also comes back after a crash or a reboot.
 - **Drag anywhere** → reposition the pill on screen (clamped to screen bounds)
 - **Tap outside overlay** → releases keyboard focus (overlay stays expanded, phone becomes usable for typing elsewhere)
 - **+ add shortcut** → adds a quick-select row below the timeline. Type an activity name, then tap ▶ to instantly switch to it (overlay stays expanded, focus released). Tap X icon on a row to remove it. Shortcuts persist across sessions.
@@ -26,7 +27,7 @@
 - **Live-update**: changing any setting (colors, size, border, opacity) updates the overlay instantly, no restart needed. Includes quick-select row text/icon colors and sizes. Changing a task's color in the app immediately updates the timeline bar colors on the overlay.
 
 ### Start/stop shortcut
-- **Long-press the app icon → "Start/stop overlay"** does the same as the app's Start/Stop Overlay button without opening the app: when the pill shows, it stops the overlay (the running activity is saved, exactly like the button), otherwise it starts it. If the overlay permission is missing, the permission screen opens first, like with the button.
+- **Long-press the app icon → "Start/stop overlay"** does the same as the app's Start/Stop Overlay button without opening the app: when the pill shows, it stops the overlay (the running activity is saved, exactly like the button), otherwise it starts it, showing the last chosen activity paused. If the overlay permission is missing, the permission screen opens first, like with the button.
 - It runs on an invisible screen (`ToggleOverlayActivity`) that closes right away, so whatever app was on screen stays there.
 - **Two kinds of entry**, so other apps can trigger it too:
   - an **app shortcut**, for the launcher and for gesture and automation apps that run app shortcuts (for example One Hand Operation+, or Samsung Modes and Routines with "Open an app or do an app action")
@@ -98,7 +99,7 @@
 | `app/build.gradle` | Android build config: SDK versions, package name, build types |
 | `app/proguard-rules.pro` | ProGuard rules for release builds (currently empty) |
 | `app/src/main/AndroidManifest.xml` | Permissions + component declarations |
-| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, expand/collapse/focus model, quick-select shortcuts with icon buttons, timeline bar, progressive pulse, breathing overlay (stroke-only border layer + bg darken/brighten), live-update settings. Runs only while the pill shows |
+| `app/src/main/java/.../OverlayService.java` | Foreground service: floating pill overlay, drift-proof timer, drag, tap-to-pause, expand/collapse/focus model, quick-select shortcuts with icon buttons, timeline bar, progressive pulse, breathing overlay (stroke-only border layer + bg darken/brighten), live-update settings, last chosen activity shown again (paused) on start. Runs only while the pill shows |
 | `app/src/main/java/.../ClockService.java` | Foreground service for the immersive clock (WindowInsets detection, time + battery pill), separate from the overlay. `ClockService.sync()` starts or stops it to match the setting |
 | `app/src/main/java/.../TimelineBarView.java` | Custom View: draws day timeline as proportional colored segments on a Canvas |
 | `app/src/main/java/.../MainActivity.java` | History view (individual entries, inline rename, live activity row that shows REC while recording and PAUSED while paused), pie chart, color bar, day/week toggle, date nav, color picker, export/import (with shortcuts), settings (border color + width) |
@@ -115,7 +116,7 @@
 | `app/src/main/java/.../BackupExtensions.java` | Optional extension point: a build variant can add its own section to the backup file, inert in the standard build |
 | `app/src/main/java/.../ShortcutSuggestions.java` | Optional extension point: a build variant can pre-fill the batch-add dialog with suggested shortcut names, inert in the standard build |
 | `app/src/main/java/.../RemoteActivities.java` | Optional extension point: a build variant can report activities running right now on another device, which then get a history row, a striped timeline segment, and a place in the day's totals. Inert in the standard build |
-| `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance (bg/text/border colors, border width, opacity, size, overlay pulse toggle + breathing transparency/brightness/grayscale, task color bg mode + brightness, text stroke toggle + stroke width, UI elements opacity, quick-select activities, color change signal) + crash recovery checkpoint (separate `crash_recovery` file) |
+| `app/src/main/java/.../OverlayPreferences.java` | SharedPreferences for overlay appearance (bg/text/border colors, border width, opacity, size, overlay pulse toggle + breathing transparency/brightness/grayscale, task color bg mode + brightness, text stroke toggle + stroke width, UI elements opacity, quick-select activities, color change signal) + crash recovery checkpoint (separate `crash_recovery` file) + last chosen activity name (separate `overlay_state` file) |
 | `.github/workflows/android.yml` | GitHub Actions workflow, builds APK on every push |
 
 > **Note:** Java files live under `app/src/main/java/com/timetracker/overlay/`. The `...` above abbreviates that path.
