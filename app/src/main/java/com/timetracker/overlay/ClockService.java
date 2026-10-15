@@ -123,7 +123,13 @@ public class ClockService extends Service {
 
         float density = getResources().getDisplayMetrics().density;
 
-        // 1x1 pixel view to receive system inset changes without blocking touches
+        // Invisible 1x1 pixel window that only listens for system inset changes.
+        // A full-screen detector made pop-ups in other apps refuse taps, so it
+        // covers a single pixel. Its window alpha is 0 because Android still
+        // counts a window that draws nothing as covering the apps below it.
+        // Some apps refuse taps while any other app's window covers any part
+        // of theirs (Chrome's permission prompts, for one). Android ignores a
+        // window only when it is both not touchable and at alpha 0.
         immersiveDetectorView = new View(this);
         WindowManager.LayoutParams detectorParams = new WindowManager.LayoutParams(
             1,
@@ -135,6 +141,7 @@ public class ClockService extends Service {
                 | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         );
+        detectorParams.alpha = 0f;
         immersiveDetectorView.setOnApplyWindowInsetsListener((view, insets) -> {
             boolean immersive;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

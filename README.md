@@ -41,7 +41,7 @@
 - Shows current time and battery level (e.g. "14:30 · 72%")
 - Uses the same **text size**, **stroke settings**, and **background opacity** as the main overlay, but always black/white and borderless
 - Updates every minute, aligned to minute boundaries
-- **Detection**: uses Android's WindowInsets API (`isVisible()` on API 30+) to detect when both status bar and navigation bar are hidden. Falls back to inset height checks on older APIs.
+- **Detection**: uses Android's WindowInsets API (`isVisible()` on API 30+) to detect when both status bar and navigation bar are hidden. Falls back to inset height checks on older APIs. The signals arrive at an invisible detector window that stays on screen while the setting is on, even with the overlay stopped. It is 1x1 pixel and fully transparent (window alpha 0), because Android counts any other visible window as covering an app, and some apps refuse taps while that is so (Chrome's permission prompts refuse them when any part of Chrome is covered). Android ignores a window only when it is both not touchable and at alpha 0.
 - **Auto-start on boot**: if enabled, the clock service starts automatically after reboot, no need to open the app
 - Tapping the clock does nothing; touches outside it pass through to the app below
 - Toggle in settings: "Display a clock while playing videos or gaming"
