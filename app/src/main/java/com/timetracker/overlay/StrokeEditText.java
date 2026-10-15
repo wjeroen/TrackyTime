@@ -40,7 +40,7 @@ public class StrokeEditText extends EditText {
     /**
      * Set stroke width setting (1-10). Actual pixel width is computed in onDraw()
      * using linear scaling proportional to text size so the stroke scales with
-     * overlay size — matching how icon stroke scales with icon size.
+     * overlay size, matching how icon stroke scales with icon size.
      * Anchored at 16sp Medium where setting 4 = 4px (original default).
      */
     public void setStrokeWidth(float width) {

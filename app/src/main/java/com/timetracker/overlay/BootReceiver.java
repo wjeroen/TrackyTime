@@ -8,10 +8,7 @@ public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) return;
-        OverlayPreferences prefs = new OverlayPreferences(context);
-        if (prefs.isImmersiveClockEnabled()) {
-            Intent svc = new Intent(context, OverlayService.class);
-            context.startForegroundService(svc);
-        }
+        // Starts the immersive clock when it is enabled, nothing otherwise
+        ClockService.sync(context);
     }
 }
