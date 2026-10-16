@@ -14,8 +14,8 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # Uses the repo's keystore secret when configured. Without it (a fork,
-      # for instance) a throwaway key is generated so the build still succeeds.
+      # Uses the repo's keystore secret when configured. Without it, a
+      # throwaway key is generated so the build still succeeds.
       # APKs signed with a throwaway key cannot install over an app that was
       # installed with a different key without uninstalling it first.
       - name: Provide debug keystore
@@ -44,6 +44,5 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: TrackyTime-debug
-          # The ** also covers product-flavor output dirs (apk/<flavor>/debug/).
           path: app/build/outputs/apk/**/TrackyTime-*.apk
           if-no-files-found: error

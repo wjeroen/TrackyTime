@@ -51,7 +51,7 @@ public class ToggleOverlayActivity extends Activity {
 
     private static ShortcutInfo buildShortcutInfo(Context context) {
         String label = context.getString(R.string.toggle_overlay_label);
-        // The app's own icon, so a build variant with its own icon gets that one
+        // The app's own launcher icon
         int iconRes = context.getApplicationInfo().icon;
         return new ShortcutInfo.Builder(context, SHORTCUT_ID)
             .setShortLabel(label)
