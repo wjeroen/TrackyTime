@@ -93,8 +93,12 @@ public class OverlayPreferences {
     public int getSize() { return sp.getInt("size", 0); }
     public void setSize(int s) { sp.edit().putInt("size", s).apply(); }
 
-    // Size while expanded (buttons and shortcut rows showing), same steps as
-    // getSize. Follows getSize until one is set.
+    // Keep the same size when expanded (default on). When off, the expanded
+    // overlay (buttons and shortcut rows showing) uses getExpandedSize.
+    public boolean isSameSizeExpanded() { return sp.getBoolean("same_size_expanded", true); }
+    public void setSameSizeExpanded(boolean on) { sp.edit().putBoolean("same_size_expanded", on).apply(); }
+
+    // Size when expanded, same steps as getSize
     public int getExpandedSize() { return sp.getInt("size_expanded", getSize()); }
     public void setExpandedSize(int s) { sp.edit().putInt("size_expanded", s).apply(); }
     public boolean hasExpandedSize() { return sp.contains("size_expanded"); }
@@ -103,7 +107,9 @@ public class OverlayPreferences {
     public float getTextSize() { return textSizeFor(getSize()); }
 
     /** The same as getTextSize, for the expanded overlay. */
-    public float getExpandedTextSize() { return textSizeFor(getExpandedSize()); }
+    public float getExpandedTextSize() {
+        return isSameSizeExpanded() ? getTextSize() : textSizeFor(getExpandedSize());
+    }
 
     private static float textSizeFor(int size) {
         switch (size) {
@@ -112,11 +118,6 @@ public class OverlayPreferences {
             case 3: return 30f; // extra large for computer use
             default: return 16f;
         }
-    }
-
-    /** Same as getTextSize(), timer matches activity text. */
-    public float getTimerTextSize() {
-        return getTextSize();
     }
 
     // Signal to overlay that a task color changed in the DB (timestamp, triggers pref listener)
@@ -205,9 +206,9 @@ public class OverlayPreferences {
         sb.append("strokeWidth:").append(getStrokeWidth()).append(",");
         sb.append("uiElementsOpacity:").append(getUiElementsOpacity()).append(",");
         sb.append("immersiveClock:").append(isImmersiveClockEnabled()).append(",");
-        sb.append("size:").append(getSize());
-        // Only once set, so an import elsewhere keeps it following size
-        if (hasExpandedSize()) sb.append(",sizeExpanded:").append(getExpandedSize());
+        sb.append("size:").append(getSize()).append(",");
+        sb.append("sameSizeExpanded:").append(isSameSizeExpanded()).append(",");
+        sb.append("sizeExpanded:").append(getExpandedSize());
         return sb.toString();
     }
 
@@ -277,6 +278,9 @@ public class OverlayPreferences {
                         break;
                     case "size":
                         setSize(Integer.parseInt(value));
+                        break;
+                    case "sameSizeExpanded":
+                        setSameSizeExpanded(Boolean.parseBoolean(value));
                         break;
                     case "sizeExpanded":
                         setExpandedSize(Integer.parseInt(value));

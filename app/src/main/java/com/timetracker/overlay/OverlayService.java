@@ -366,7 +366,7 @@ public class OverlayService extends Service {
         applySize();
     }
 
-    /** Size setting while collapsed, Expanded Size while the buttons and shortcuts show. */
+    /** The Size setting while collapsed, Size when expanded while the buttons and shortcuts show. */
     private float currentTextSize(OverlayPreferences prefs) {
         return isExpanded ? prefs.getExpandedTextSize() : prefs.getTextSize();
     }

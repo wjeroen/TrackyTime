@@ -1454,21 +1454,24 @@ public class MainActivity extends Activity {
             sizeGroup.addView(rb);
         }
         sizeGroup.check(prefs.getSize());
+        sizeGroup.setOnCheckedChangeListener((g, id) -> prefs.setSize(id));
         layout.addView(sizeGroup);
 
-        // Expanded size: same choices, used while the buttons and shortcuts show
-        addSpacer(layout, 8);
-        TextView expSizeLabel = new TextView(this);
-        expSizeLabel.setText("Expanded Size");
-        expSizeLabel.setTextColor(0xFFCDD6F4);
-        expSizeLabel.setTextSize(15f);
-        layout.addView(expSizeLabel);
+        // Same size when expanded (buttons and shortcuts showing), or a separate one
+        CheckBox sameSizeCb = new CheckBox(this);
+        sameSizeCb.setText("Keep the same size when expanded");
+        sameSizeCb.setTextColor(0xFFCDD6F4);
+        sameSizeCb.setTextSize(14f);
+        sameSizeCb.setChecked(prefs.isSameSizeExpanded());
+        layout.addView(sameSizeCb);
 
-        TextView expSizeHint = new TextView(this);
-        expSizeHint.setText("While the buttons and shortcuts show. Follows Size until you pick one.");
-        expSizeHint.setTextColor(0xFF9399B2);
-        expSizeHint.setTextSize(12f);
-        layout.addView(expSizeHint);
+        // Size when expanded (only visible when the checkbox is off)
+        TextView expSizeLabel = new TextView(this);
+        expSizeLabel.setText("Size when expanded");
+        expSizeLabel.setTextColor(0xFFCDD6F4);
+        expSizeLabel.setTextSize(14f);
+        expSizeLabel.setVisibility(prefs.isSameSizeExpanded() ? View.GONE : View.VISIBLE);
+        layout.addView(expSizeLabel);
 
         RadioGroup expSizeGroup = new RadioGroup(this);
         expSizeGroup.setOrientation(RadioGroup.HORIZONTAL);
@@ -1480,18 +1483,20 @@ public class MainActivity extends Activity {
             expSizeGroup.addView(rb);
         }
         expSizeGroup.check(prefs.getExpandedSize());
-        RadioGroup.OnCheckedChangeListener expSizeListener = (g, id) -> prefs.setExpandedSize(id);
-        expSizeGroup.setOnCheckedChangeListener(expSizeListener);
+        expSizeGroup.setOnCheckedChangeListener((g, id) -> prefs.setExpandedSize(id));
+        expSizeGroup.setVisibility(prefs.isSameSizeExpanded() ? View.GONE : View.VISIBLE);
         layout.addView(expSizeGroup);
 
-        sizeGroup.setOnCheckedChangeListener((g, id) -> {
-            prefs.setSize(id);
-            if (!prefs.hasExpandedSize()) {
-                // Still following Size: move the selection without saving it
-                expSizeGroup.setOnCheckedChangeListener(null);
-                expSizeGroup.check(id);
-                expSizeGroup.setOnCheckedChangeListener(expSizeListener);
+        // Toggle shows/hides the expanded size choices. The first time they
+        // show, they start at the current Size.
+        sameSizeCb.setOnCheckedChangeListener((btn, checked) -> {
+            prefs.setSameSizeExpanded(checked);
+            if (!checked) {
+                if (!prefs.hasExpandedSize()) prefs.setExpandedSize(prefs.getSize());
+                expSizeGroup.check(prefs.getExpandedSize());
             }
+            expSizeLabel.setVisibility(checked ? View.GONE : View.VISIBLE);
+            expSizeGroup.setVisibility(checked ? View.GONE : View.VISIBLE);
         });
 
         // Overlay pulse toggle
