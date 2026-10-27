@@ -93,9 +93,20 @@ public class OverlayPreferences {
     public int getSize() { return sp.getInt("size", 0); }
     public void setSize(int s) { sp.edit().putInt("size", s).apply(); }
 
+    // Size while expanded (buttons and shortcut rows showing), same steps as
+    // getSize. Follows getSize until one is set.
+    public int getExpandedSize() { return sp.getInt("size_expanded", getSize()); }
+    public void setExpandedSize(int s) { sp.edit().putInt("size_expanded", s).apply(); }
+    public boolean hasExpandedSize() { return sp.contains("size_expanded"); }
+
     /** Unified text size: activity name, timer, separator all use this. */
-    public float getTextSize() {
-        switch (getSize()) {
+    public float getTextSize() { return textSizeFor(getSize()); }
+
+    /** The same as getTextSize, for the expanded overlay. */
+    public float getExpandedTextSize() { return textSizeFor(getExpandedSize()); }
+
+    private static float textSizeFor(int size) {
+        switch (size) {
             case 0: return 14f;
             case 2: return 20f;
             case 3: return 30f; // extra large for computer use
@@ -195,6 +206,8 @@ public class OverlayPreferences {
         sb.append("uiElementsOpacity:").append(getUiElementsOpacity()).append(",");
         sb.append("immersiveClock:").append(isImmersiveClockEnabled()).append(",");
         sb.append("size:").append(getSize());
+        // Only once set, so an import elsewhere keeps it following size
+        if (hasExpandedSize()) sb.append(",sizeExpanded:").append(getExpandedSize());
         return sb.toString();
     }
 
@@ -264,6 +277,9 @@ public class OverlayPreferences {
                         break;
                     case "size":
                         setSize(Integer.parseInt(value));
+                        break;
+                    case "sizeExpanded":
+                        setExpandedSize(Integer.parseInt(value));
                         break;
                     // Ignore unrecognized keys (forward compatibility)
                 }

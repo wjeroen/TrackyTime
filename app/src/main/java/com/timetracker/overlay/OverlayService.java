@@ -323,27 +323,6 @@ public class OverlayService extends Service {
         openAppBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | (uiOpacity << 24)));
         closeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | (uiOpacity << 24)));
 
-        // Unified text size for text elements
-        float textSize = prefs.getTextSize();
-
-        // Main button icon sizes: baseline 24dp at large (20sp) = 1.2x multiplier
-        // Perfect for large, scales down for small/medium, scales up for extra large
-        int iconSize = (int) (textSize * 1.2f * density);
-        LinearLayout.LayoutParams addBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
-        addBtnParams.setMargins((int) (6 * density), 0, 0, 0);
-        addBtn.setLayoutParams(addBtnParams);
-
-        LinearLayout.LayoutParams openAppBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
-        openAppBtnParams.setMargins((int) (8 * density), 0, 0, 0);
-        openAppBtn.setLayoutParams(openAppBtnParams);
-
-        LinearLayout.LayoutParams closeBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
-        closeBtnParams.setMargins((int) (6 * density), 0, 0, 0);
-        closeBtn.setLayoutParams(closeBtnParams);
-        timerText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
-        editText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
-        separator.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
-
         // Text stroke (TV subtitle style with auto-contrast)
         boolean strokeEnabled = prefs.isTextStrokeEnabled();
         int strokeWidth = prefs.getStrokeWidth();
@@ -364,33 +343,69 @@ public class OverlayService extends Service {
         // Timeline bar corner radius (not affected by opacity)
         timelineBar.setCornerRadius(2 * density);
 
-        // Live-update quick-select row colors + sizes + stroke
-        // Perfect for small, scales up for medium/large/extra large
-        int quickSelectIconSize = (int) (textSize * 1.2f * density);
+        // Live-update quick-select row colors + stroke
         for (int i = 0; i < quickSelectContainer.getChildCount(); i++) {
             LinearLayout row = (LinearLayout) quickSelectContainer.getChildAt(i);
             StrokeTextView playBtn = (StrokeTextView) row.getChildAt(0);
             StrokeEditText nameField = (StrokeEditText) row.getChildAt(1);
             StrokeImageView removeBtn = (StrokeImageView) row.getChildAt(2);
             playBtn.setTextColor((textColor & 0x00FFFFFF) | (uiOpacity << 24));
-            playBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
             playBtn.setStrokeEnabled(strokeEnabled);
             playBtn.setStrokeWidth(strokeWidth);
             nameField.setTextColor(textColor);
             nameField.setHintTextColor((textColor & 0x00FFFFFF) | (uiOpacity << 24));
             // Force EditText to redraw after color change (needed for stroke updates)
             nameField.invalidate();
-            nameField.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
             nameField.setStrokeEnabled(strokeEnabled);
             nameField.setStrokeWidth(strokeWidth);
             removeBtn.setImageTintList(ColorStateList.valueOf((textColor & 0x00FFFFFF) | (uiOpacity << 24)));
             removeBtn.setStrokeEnabled(strokeEnabled);
             removeBtn.setStrokeWidthScale(strokeWidthScale);
-            // Update icon size
-            LinearLayout.LayoutParams removeBtnParams = new LinearLayout.LayoutParams(
-                quickSelectIconSize, quickSelectIconSize);
+        }
+
+        applySize();
+    }
+
+    /** Size setting while collapsed, Expanded Size while the buttons and shortcuts show. */
+    private float currentTextSize(OverlayPreferences prefs) {
+        return isExpanded ? prefs.getExpandedTextSize() : prefs.getTextSize();
+    }
+
+    /**
+     * Text and icon sizes for the current state. Runs with every
+     * applyPreferences and on each expand and collapse, since the two states
+     * can have different sizes.
+     */
+    private void applySize() {
+        float density = getResources().getDisplayMetrics().density;
+        float textSize = currentTextSize(new OverlayPreferences(this));
+
+        // Main button icon sizes: baseline 24dp at large (20sp) = 1.2x multiplier
+        // Perfect for large, scales down for small/medium, scales up for extra large
+        int iconSize = (int) (textSize * 1.2f * density);
+        LinearLayout.LayoutParams addBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+        addBtnParams.setMargins((int) (6 * density), 0, 0, 0);
+        addBtn.setLayoutParams(addBtnParams);
+
+        LinearLayout.LayoutParams openAppBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+        openAppBtnParams.setMargins((int) (8 * density), 0, 0, 0);
+        openAppBtn.setLayoutParams(openAppBtnParams);
+
+        LinearLayout.LayoutParams closeBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+        closeBtnParams.setMargins((int) (6 * density), 0, 0, 0);
+        closeBtn.setLayoutParams(closeBtnParams);
+        timerText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+        editText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+        separator.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+
+        // Quick-select rows: same text and icon size as the main row
+        for (int i = 0; i < quickSelectContainer.getChildCount(); i++) {
+            LinearLayout row = (LinearLayout) quickSelectContainer.getChildAt(i);
+            ((StrokeTextView) row.getChildAt(0)).setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+            ((StrokeEditText) row.getChildAt(1)).setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+            LinearLayout.LayoutParams removeBtnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
             removeBtnParams.setMargins((int) (6 * density), 0, 0, 0);
-            removeBtn.setLayoutParams(removeBtnParams);
+            row.getChildAt(2).setLayoutParams(removeBtnParams);
         }
     }
 
@@ -538,6 +553,7 @@ public class OverlayService extends Service {
     /** Expand: show buttons + quick-select, gain focus, show keyboard. */
     private void expandOverlay() {
         isExpanded = true;
+        applySize();
         addBtn.setVisibility(View.VISIBLE);
         openAppBtn.setVisibility(View.VISIBLE);
         closeBtn.setVisibility(View.VISIBLE);
@@ -585,6 +601,7 @@ public class OverlayService extends Service {
         openAppBtn.setVisibility(View.GONE);
         closeBtn.setVisibility(View.GONE);
         quickSelectContainer.setVisibility(View.GONE);
+        applySize();
     }
 
     // ---- Timer (drift-proof) ----
@@ -1001,7 +1018,7 @@ public class OverlayService extends Service {
 
         OverlayPreferences prefs = new OverlayPreferences(this);
         float density = getResources().getDisplayMetrics().density;
-        float textSize = prefs.getTextSize();
+        float textSize = currentTextSize(prefs);
         int textColor = prefs.getTextColor();
         boolean strokeEnabled = prefs.isTextStrokeEnabled();
         int strokeWidthPref = prefs.getStrokeWidth();

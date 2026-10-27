@@ -1454,8 +1454,45 @@ public class MainActivity extends Activity {
             sizeGroup.addView(rb);
         }
         sizeGroup.check(prefs.getSize());
-        sizeGroup.setOnCheckedChangeListener((g, id) -> prefs.setSize(id));
         layout.addView(sizeGroup);
+
+        // Expanded size: same choices, used while the buttons and shortcuts show
+        addSpacer(layout, 8);
+        TextView expSizeLabel = new TextView(this);
+        expSizeLabel.setText("Expanded Size");
+        expSizeLabel.setTextColor(0xFFCDD6F4);
+        expSizeLabel.setTextSize(15f);
+        layout.addView(expSizeLabel);
+
+        TextView expSizeHint = new TextView(this);
+        expSizeHint.setText("While the buttons and shortcuts show. Follows Size until you pick one.");
+        expSizeHint.setTextColor(0xFF9399B2);
+        expSizeHint.setTextSize(12f);
+        layout.addView(expSizeHint);
+
+        RadioGroup expSizeGroup = new RadioGroup(this);
+        expSizeGroup.setOrientation(RadioGroup.HORIZONTAL);
+        for (int i = 0; i < sizes.length; i++) {
+            RadioButton rb = new RadioButton(this);
+            rb.setText(sizes[i]);
+            rb.setTextColor(0xFFCDD6F4);
+            rb.setId(i);
+            expSizeGroup.addView(rb);
+        }
+        expSizeGroup.check(prefs.getExpandedSize());
+        RadioGroup.OnCheckedChangeListener expSizeListener = (g, id) -> prefs.setExpandedSize(id);
+        expSizeGroup.setOnCheckedChangeListener(expSizeListener);
+        layout.addView(expSizeGroup);
+
+        sizeGroup.setOnCheckedChangeListener((g, id) -> {
+            prefs.setSize(id);
+            if (!prefs.hasExpandedSize()) {
+                // Still following Size: move the selection without saving it
+                expSizeGroup.setOnCheckedChangeListener(null);
+                expSizeGroup.check(id);
+                expSizeGroup.setOnCheckedChangeListener(expSizeListener);
+            }
+        });
 
         // Overlay pulse toggle
         addSpacer(layout, 14);
