@@ -1457,6 +1457,48 @@ public class MainActivity extends Activity {
         sizeGroup.setOnCheckedChangeListener((g, id) -> prefs.setSize(id));
         layout.addView(sizeGroup);
 
+        // Same size when expanded (buttons and shortcuts showing), or a separate one
+        CheckBox sameSizeCb = new CheckBox(this);
+        sameSizeCb.setText("Keep the same size when expanded");
+        sameSizeCb.setTextColor(0xFFCDD6F4);
+        sameSizeCb.setTextSize(14f);
+        sameSizeCb.setChecked(prefs.isSameSizeExpanded());
+        layout.addView(sameSizeCb);
+
+        // Size when expanded (only visible when the checkbox is off)
+        TextView expSizeLabel = new TextView(this);
+        expSizeLabel.setText("Size when expanded");
+        expSizeLabel.setTextColor(0xFFCDD6F4);
+        expSizeLabel.setTextSize(14f);
+        expSizeLabel.setVisibility(prefs.isSameSizeExpanded() ? View.GONE : View.VISIBLE);
+        layout.addView(expSizeLabel);
+
+        RadioGroup expSizeGroup = new RadioGroup(this);
+        expSizeGroup.setOrientation(RadioGroup.HORIZONTAL);
+        for (int i = 0; i < sizes.length; i++) {
+            RadioButton rb = new RadioButton(this);
+            rb.setText(sizes[i]);
+            rb.setTextColor(0xFFCDD6F4);
+            rb.setId(i);
+            expSizeGroup.addView(rb);
+        }
+        expSizeGroup.check(prefs.getExpandedSize());
+        expSizeGroup.setOnCheckedChangeListener((g, id) -> prefs.setExpandedSize(id));
+        expSizeGroup.setVisibility(prefs.isSameSizeExpanded() ? View.GONE : View.VISIBLE);
+        layout.addView(expSizeGroup);
+
+        // Toggle shows/hides the expanded size choices. The first time they
+        // show, they start at the current Size.
+        sameSizeCb.setOnCheckedChangeListener((btn, checked) -> {
+            prefs.setSameSizeExpanded(checked);
+            if (!checked) {
+                if (!prefs.hasExpandedSize()) prefs.setExpandedSize(prefs.getSize());
+                expSizeGroup.check(prefs.getExpandedSize());
+            }
+            expSizeLabel.setVisibility(checked ? View.GONE : View.VISIBLE);
+            expSizeGroup.setVisibility(checked ? View.GONE : View.VISIBLE);
+        });
+
         // Overlay pulse toggle
         addSpacer(layout, 14);
         CheckBox pulseCb = new CheckBox(this);
